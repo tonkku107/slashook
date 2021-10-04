@@ -1,0 +1,382 @@
+// Copyright 2021 slashook Developers
+//
+// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
+// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
+// http://opensource.org/licenses/MIT>, at your option. This file may not be
+// copied, modified, or distributed except according to those terms.
+
+use crate::structs::{
+  embeds::Embed,
+  interactions::InteractionCallbackData,
+  channels::{Message, AllowedMentions},
+  components::{Component, Components},
+  utils::File
+};
+use crate::tokio::sync::mpsc;
+use crate::rest;
+
+type SimpleResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+/// Message that can be sent as a response to a command or other interaction
+///
+/// This struct can be easily constructed from a `str`, `String`, [`Embed`](crate::structs::embeds::Embed) or [`Components`](crate::structs::components::Components)
+/// with the `From` trait
+#[derive(Clone, Debug)]
+pub struct MessageResponse {
+  /// Should the response is TTS or not
+  pub tts: Option<bool>,
+  /// Content of the message
+  pub content: Option<String>,
+  /// Should only the user receiving the message be able to see it
+  pub ephemeral: bool,
+  /// Up to 10 embeds to send with the response
+  pub embeds: Option<Vec<Embed>>,
+  /// Components to send with the response
+  pub components: Option<Vec<Component>>,
+  /// Which mentions should be parsed
+  pub allowed_mentions: Option<AllowedMentions>,
+  /// Up to 10 files to send with the response
+  ///
+  /// Only available for follow-up responses
+  pub files: Option<Vec<File>>
+}
+
+impl MessageResponse {
+  /// Set the value of tts for the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// let response = MessageResponse::from("This message is text to speech")
+  ///   .set_tts(true);
+  /// assert_eq!(response.tts, Some(true));
+  /// ```
+  pub fn set_tts(mut self, tts: bool) -> Self {
+    self.tts = Some(tts);
+    self
+  }
+
+  /// Set the content of the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// let response = MessageResponse::from("This content will be replaced")
+  ///   .set_content("I rule the world!");
+  /// assert_eq!(response.content, Some(String::from("I rule the world!")));
+  /// ```
+  pub fn set_content<T: ToString>(mut self, content: T) -> Self {
+    self.content = Some(content.to_string());
+    self
+  }
+
+  /// Set the ephemeralness of the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// let response = MessageResponse::from("This is for your eyes only!")
+  ///   .set_ephemeral(true);
+  /// assert_eq!(response.ephemeral, true);
+  /// ```
+  pub fn set_ephemeral(mut self, ephemeral: bool) -> Self {
+    self.ephemeral = ephemeral;
+    self
+  }
+
+  /// Add an embed to the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::embeds::Embed;
+  /// let embed = Embed::new().set_description("This is an embed");
+  /// let response = MessageResponse::from("Look at my embed:")
+  ///   .add_embed(embed);
+  /// assert_eq!(response.embeds.unwrap()[0].description, Some(String::from("This is an embed")));
+  /// ```
+  pub fn add_embed(mut self, embed: Embed) -> Self {
+    let mut embeds = self.embeds.unwrap_or_default();
+    embeds.push(embed);
+    self.embeds = Some(embeds);
+    self
+  }
+
+  /// Set the components on the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::components::{Components, Button, ButtonStyle};
+  /// let button = Button::new()
+  ///   .set_style(ButtonStyle::DANGER)
+  ///   .set_label("Do not press!")
+  ///   .set_id("example_button", "danger");
+  /// let components = Components::new().add_button(button);
+  /// let response = MessageResponse::from("Ooh! A big red button!")
+  ///   .set_components(components);
+  /// ```
+  pub fn set_components(mut self, components: Components) -> Self {
+    self.components = Some(components.components);
+    self
+  }
+
+  /// Set the allowed mentions for the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::channels::{AllowedMentions, AllowedMentionType};
+  /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::users);
+  /// let response = MessageResponse::from("<@1234> Get pinged. Not @everyone or <@&1235> tho.")
+  ///   .set_allowed_mentions(allowed_mentions);
+  /// ```
+  pub fn set_allowed_mentions(mut self, allowed_mentions: AllowedMentions) -> Self {
+    self.allowed_mentions = Some(allowed_mentions);
+    self
+  }
+
+  /// Add a file to be sent with the message
+  /// ```no_run
+  /// # use slashook::commands::{MessageResponse, CmdResult};
+  /// # use slashook::structs::utils::File;
+  /// use slashook::tokio::fs::File as TokioFile;
+  /// # #[slashook::main]
+  /// # async fn main() -> CmdResult {
+  /// let file = TokioFile::open("cat.png").await?;
+  /// let response = MessageResponse::from("Here's a picture of my cat")
+  ///   .add_file(File::from_file("cat.png", file).await?);
+  /// # Ok(())
+  /// # }
+  /// ```
+  pub fn add_file(mut self, file: File) -> Self {
+    let mut files = self.files.unwrap_or_default();
+    files.push(file);
+    self.files = Some(files);
+    self
+  }
+}
+
+#[derive(Debug)]
+pub enum CommandResponse {
+  DeferMessage(bool),
+  SendMessage(MessageResponse),
+  DeferUpdate,
+  UpdateMessage(MessageResponse)
+}
+
+/// Struct with methods for responding to interactions
+#[derive(Debug)]
+pub struct CommandResponder {
+  pub(crate) tx: mpsc::UnboundedSender<CommandResponse>,
+  pub(crate) id: String,
+  pub(crate) token: String,
+}
+
+impl CommandResponder {
+  /// Respond to an interaction with a message.\
+  /// Only valid for the first response. If you've already responded or deferred once, use the follow-up methods
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// ##[command("example")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   res.send_message("Hello!")?;
+  /// }
+  /// ```
+  pub fn send_message<T: Into<MessageResponse>>(&self, response: T) -> SimpleResult<()> {
+    let response = response.into();
+    self.tx.send(CommandResponse::SendMessage(response))?;
+    // TODO: Figure out why the sender doesn't realize it is closed and forward further send_message calls to send_followup_message
+    Ok(())
+  }
+
+  /// Respond to an interaction by editing the original message.\
+  /// Only valid for the first response to a component interaction. If you've already responded or deferred once, use the follow-up methods
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
+  /// # use slashook::structs::components::{Components, Button};
+  /// ##[command("example_button")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   res.update_message("Button was clicked!")?;
+  /// }
+  /// ```
+  pub fn update_message<T: Into<MessageResponse>>(&self, response: T) -> SimpleResult<()> {
+    let response = response.into();
+    self.tx.send(CommandResponse::UpdateMessage(response))?;
+    Ok(())
+  }
+
+  /// Give yourself more execution time.\
+  /// If you don't respond within 3 seconds, Discord will disconnect and tell the user the interaction failed to run.
+  /// By deferring, Discord will tell the user your bot is "thinking" and allow you to take your time. You can use the `send_followup_message` or `edit_original_message` methods to send the response.\
+  /// The ephemeralness set here will be passed on to your first follow-up, no matter what ephemeralness you set there.
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
+  /// ##[command("example")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   res.defer(false)?;
+  ///   // Do something that takes longer than 3s
+  ///   res.send_followup_message("Thank you for your patience!").await?;
+  /// }
+  /// ```
+  pub fn defer(&self, ephemeral: bool) -> SimpleResult<()> {
+    self.tx.send(CommandResponse::DeferMessage(ephemeral))?;
+    Ok(())
+  }
+
+  /// Much like `defer` but for component interactions and it shows nothing visibly to the user.
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
+  /// ##[command("example_button")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   res.defer_update()?;
+  ///   // Do something that takes longer than 3s
+  ///   res.edit_original_message("Finally it changed!").await?;
+  /// }
+  /// ```
+  pub fn defer_update(&self) -> SimpleResult<()> {
+    self.tx.send(CommandResponse::DeferUpdate)?;
+    Ok(())
+  }
+
+  /// Send more messages after the initial response
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
+  /// ##[command("example")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   res.send_message("First message!")?;
+  ///   res.send_followup_message("Second message!").await?;
+  /// }
+  /// ```
+  pub async fn send_followup_message<T: Into<MessageResponse>>(&self, response: T) -> SimpleResult<Message> {
+    let mut response = response.into();
+    let files = response.files;
+    response.files = None;
+    let msg: InteractionCallbackData = response.into();
+    if let Some(files) = files {
+      rest::post_files(format!("webhooks/{}/{}", self.id, self.token), msg, files).await
+    } else {
+      rest::post(format!("webhooks/{}/{}", self.id, self.token), msg).await
+    }
+  }
+
+  /// Edits a follow-up message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
+  /// ##[command("example")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   res.send_message("First message!")?;
+  ///   let msg = res.send_followup_message("Second message!").await?;
+  ///   res.edit_followup_message(msg.id, "Second message but edited!").await?;
+  /// }
+  /// ```
+  pub async fn edit_followup_message<T: Into<MessageResponse>>(&self, id: String, response: T) -> SimpleResult<Message> {
+    let mut response = response.into();
+    let files = response.files;
+    response.files = None;
+    let msg: InteractionCallbackData = response.into();
+    if let Some(files) = files {
+      rest::patch_files(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id), msg, files).await
+    } else {
+      rest::patch(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id), msg).await
+    }
+  }
+
+  /// Edits the original message\
+  /// Same as running `edit_followup_message` with id of `@original`
+  pub async fn edit_original_message<T: Into<MessageResponse>>(&self, response: T) -> SimpleResult<Message> {
+    self.edit_followup_message(String::from("@original"), response).await
+  }
+
+  /// Gets a follow-up message
+  pub async fn get_followup_message(&self, id: String) -> SimpleResult<Message> {
+    rest::get(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
+  }
+
+  /// Gets the original message\
+  /// Same as running `get_followup_message` with id of `@original`
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
+  /// ##[command("example")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   res.send_message("First message!")?;
+  ///   let msg = res.get_original_message().await?;
+  ///   println!("I responded with {}", msg.content);
+  /// }
+  /// ```
+  pub async fn get_original_message(&self) -> SimpleResult<Message> {
+    self.get_followup_message(String::from("@original")).await
+  }
+
+  /// Deletes a follow-up message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
+  /// ##[command("example")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   res.send_message("First message!")?;
+  ///   let msg = res.send_followup_message("If you see me say hi").await?;
+  ///   res.delete_followup_message(msg.id).await?;
+  /// }
+  /// ```
+  pub async fn delete_followup_message(&self, id: String) -> SimpleResult<()> {
+    rest::delete(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
+  }
+
+  /// Deletes the original message\
+  /// Same as running `delete_followup_message` with id of `@original`
+  pub async fn delete_original_message(&self) -> SimpleResult<()> {
+    self.delete_followup_message(String::from("@original")).await
+  }
+}
+
+impl From<&str> for MessageResponse {
+  fn from(s: &str) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: Some(String::from(s)),
+      ephemeral: false,
+      embeds: None,
+      components: None,
+      allowed_mentions: None,
+      files: None
+    }
+  }
+}
+
+impl From<String> for MessageResponse {
+  fn from(s: String) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: Some(s),
+      ephemeral: false,
+      embeds: None,
+      components: None,
+      allowed_mentions: None,
+      files: None
+    }
+  }
+}
+
+impl From<Embed> for MessageResponse {
+  fn from(e: Embed) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      ephemeral: false,
+      embeds: Some(vec![e]),
+      components: None,
+      allowed_mentions: None,
+      files: None
+    }
+  }
+}
+
+impl From<Components> for MessageResponse {
+  fn from(c: Components) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      ephemeral: false,
+      embeds: None,
+      components: Some(c.components),
+      allowed_mentions: None,
+      files: None
+    }
+  }
+}
