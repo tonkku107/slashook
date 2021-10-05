@@ -21,7 +21,7 @@ use super::structs::{
     InteractionCallback, InteractionCallbackType, InteractionCallbackData,
     OptionValue
   },
-  channels::Message,
+  channels::{Message, MessageFlags},
   users::User,
   guilds::GuildMember,
   Snowflake
@@ -236,20 +236,18 @@ impl CommandHandler {
   fn format_response(&self, response: CommandResponse) -> Result<InteractionCallback> {
     match response {
       CommandResponse::DeferMessage(ephemeral) => {
-        let mut data = None;
-        if ephemeral {
-          data = Some(InteractionCallbackData {
+        let mut flags = MessageFlags::empty();
+        if ephemeral { flags.insert(MessageFlags::EPHEMERAL) };
+        Ok(InteractionCallback {
+          response_type: InteractionCallbackType::DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+          data: Some(InteractionCallbackData {
             tts: None,
             content: None,
-            flags: Some(1 << 6),
+            flags: Some(flags),
             embeds: None,
             components: None,
             allowed_mentions: None
           })
-        }
-        Ok(InteractionCallback {
-          response_type: InteractionCallbackType::DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-          data
         })
       },
 

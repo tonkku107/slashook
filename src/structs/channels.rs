@@ -7,7 +7,8 @@
 
 //! Structs related to Discord channels
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, de::Deserializer};
+use serde::{Serialize, ser::Serializer};
 use serde_repr::{Deserialize_repr};
 use super::{
   Snowflake,
@@ -21,6 +22,7 @@ use super::{
   permissions::Permissions
 };
 use chrono::{DateTime, Utc};
+use bitflags::bitflags;
 
 /// Discord Channel Object
 #[derive(Deserialize, Clone, Debug)]
@@ -226,8 +228,8 @@ pub struct Message {
   pub application_id: Option<Snowflake>,
   /// Data showing the source of a crosspost, channel follow add, pin, or reply message
   pub message_reference: Option<MessageReference>,
-  /// [Message flags](https://discord.com/developers/docs/resources/channel#message-object-message-flags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
-  pub flags: Option<i64>,
+  /// [Message flags](MessageFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
+  pub flags: Option<MessageFlags>,
   /// The message associated with the message_reference
   pub referenced_message: Option<Box<Message>>,
   /// Sent if the message is a response to an [Interaction](https://discord.com/developers/docs/interactions/receiving-and-responding)
@@ -348,6 +350,28 @@ pub struct MessageReference {
   pub guild_id: Option<Snowflake>,
   /// When sending, whether to error if the referenced message doesn't exist instead of sending as a normal (non-reply) message, default true
   pub fail_if_not_exists: Option<bool>
+}
+
+bitflags! {
+  /// Bitflags for Discord Message Flags
+  pub struct MessageFlags: u32 {
+    /// This message has been published to subscribed channels (via Channel Following)
+    const CROSSPOSTED = 1 << 0;
+    /// This message originated from a message in another channel (via Channel Following)
+    const IS_CROSSPOST = 1 << 1;
+    /// Do not include any embeds when serializing this message
+    const SUPPRESS_EMBEDS = 1 << 2;
+    /// The source message for this crosspost has been deleted (via Channel Following)
+    const SOURCE_MESSAGE_DELETED = 1 << 3;
+    /// This message came from the urgent message system
+    const URGENT = 1 << 4;
+    /// This message has an associated thread, with the same id as the message
+    const HAS_THREAD = 1 << 5;
+    /// This message is only visible to the user who invoked the Interaction
+    const EPHEMERAL = 1 << 6;
+    /// This message is an Interaction Response and the bot is "thinking"
+    const LOADING = 1 << 7;
+  }
 }
 
 /// Discord Message Interaction Object
@@ -484,5 +508,18 @@ impl AllowedMentions {
 impl Default for AllowedMentions {
   fn default() -> Self {
     Self::new()
+  }
+}
+
+impl<'de> Deserialize<'de> for MessageFlags {
+  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    let bits = u32::deserialize(d)?;
+    Ok(Self::from_bits_truncate(bits))
+  }
+}
+
+impl Serialize for MessageFlags {
+  fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_u32(self.bits())
   }
 }
