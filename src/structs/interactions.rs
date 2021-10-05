@@ -16,7 +16,7 @@ use super::{
   embeds::Embed,
   users::User,
   guilds::{GuildMember, Role},
-  channels::{Channel, Message, AllowedMentions},
+  channels::{Channel, Message, MessageFlags, AllowedMentions},
   components::{Component, ComponentType}
 };
 use crate::commands::MessageResponse;
@@ -153,14 +153,15 @@ pub struct InteractionCallbackData {
   pub content: Option<String>,
   pub embeds: Option<Vec<Embed>>,
   pub allowed_mentions: Option<AllowedMentions>,
-  pub flags: Option<i64>,
+  pub flags: Option<MessageFlags>,
   pub components: Option<Vec<Component>>
 }
 
 #[doc(hidden)]
 impl From<MessageResponse> for InteractionCallbackData {
   fn from(msg: MessageResponse) -> InteractionCallbackData {
-    let flags = if msg.ephemeral { 1 << 6 } else { 0 };
+    let mut flags = MessageFlags::empty();
+    if msg.ephemeral { flags.insert(MessageFlags::EPHEMERAL) }
     InteractionCallbackData {
       tts: msg.tts,
       content: msg.content,
