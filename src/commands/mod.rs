@@ -17,7 +17,7 @@ use std::{
 use rocket::futures::future::BoxFuture;
 use super::structs::{
   interactions::{
-    Interaction, ApplicationCommandType, InteractionDataResolved, InteractionOption, InteractionOptionType,
+    Interaction, InteractionType, ApplicationCommandType, InteractionDataResolved, InteractionOption, InteractionOptionType,
     InteractionCallback, InteractionCallbackType, InteractionCallbackData,
     OptionValue
   },
@@ -128,16 +128,15 @@ impl CommandHandler {
     while let Some(command) = receiver.recv().await {
       let command_handler = self.clone();
       spawn(async move {
-        match command {
-          RocketCommand::HandleCommand(interaction, handler_send) => {
-            let value = command_handler.handle_command(interaction).await.map_err(|_| ());
-            handler_send.send(value).unwrap();
-          },
-          RocketCommand::HandleComponent(interaction, handler_send) => {
-            let value = command_handler.handle_component(interaction).await.map_err(|_| ());
-            handler_send.send(value).unwrap();
-          }
-        }
+        let RocketCommand(interaction, handler_send) = command;
+
+        let value = match interaction.interaction_type {
+          InteractionType::APPLICATION_COMMAND => command_handler.handle_command(interaction).await.map_err(|_| ()),
+          InteractionType::MESSAGE_COMPONENT => command_handler.handle_component(interaction).await.map_err(|_| ()),
+          _ => Err(())
+        };
+
+        handler_send.send(value).unwrap();
       });
     }
   }
@@ -338,7 +337,4 @@ impl CommandHandler {
 }
 
 #[derive(Debug)]
-pub(crate) enum RocketCommand {
-  HandleCommand(Interaction, oneshot::Sender::<std::result::Result<InteractionCallback, ()>>),
-  HandleComponent(Interaction, oneshot::Sender::<std::result::Result<InteractionCallback, ()>>)
-}
+pub(crate) struct RocketCommand(pub Interaction, pub oneshot::Sender::<std::result::Result<InteractionCallback, ()>>);
