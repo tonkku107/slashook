@@ -22,6 +22,26 @@ use super::{
 use crate::commands::MessageResponse;
 
 #[doc(hidden)]
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum ApplicationCommandType {
+  CHAT_INPUT = 1,
+  USER = 2,
+  MESSAGE = 3,
+  UNKNOWN
+}
+
+/// Discord Application Command Option Choice Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ApplicationCommandOptionChoice {
+  /// 1-100 character choice name
+  pub name: String,
+  /// Value of the choice, up to 100 characters if string
+  pub value: String, // TODO: integers and doubles?
+}
+
+#[doc(hidden)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct Interaction {
   pub id: Snowflake,
@@ -38,7 +58,7 @@ pub struct Interaction {
   pub message: Option<Message>
 }
 
-#[doc(hidden)]
+/// Discord Interaction Types
 #[derive(Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
@@ -46,6 +66,7 @@ pub enum InteractionType {
   PING = 1,
   APPLICATION_COMMAND = 2,
   MESSAGE_COMPONENT = 3,
+  APPLICATION_COMMAND_AUTOCOMPLETE = 4,
   UNKNOWN
 }
 
@@ -65,17 +86,6 @@ pub struct InteractionData {
 }
 
 #[doc(hidden)]
-#[derive(Deserialize_repr, Clone, Debug)]
-#[repr(u8)]
-#[allow(non_camel_case_types)]
-pub enum ApplicationCommandType {
-  CHAT_INPUT = 1,
-  USER = 2,
-  MESSAGE = 3,
-  UNKNOWN
-}
-
-#[doc(hidden)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct InteractionDataResolved {
   pub users: Option<HashMap<Snowflake, User>>,
@@ -92,7 +102,8 @@ pub struct InteractionOption {
   #[serde(rename = "type")]
   pub option_type: InteractionOptionType,
   pub value: Option<Value>,
-  pub options: Option<Vec<InteractionOption>>
+  pub options: Option<Vec<InteractionOption>>,
+  pub focused: Option<bool>
 }
 
 #[doc(hidden)]
@@ -143,7 +154,8 @@ pub enum InteractionCallbackType {
   CHANNEL_MESSAGE_WITH_SOURCE = 4,
   DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5,
   DEFERRED_UPDATE_MESSAGE = 6,
-  UPDATE_MESSAGE = 7
+  UPDATE_MESSAGE = 7,
+  APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8
 }
 
 #[doc(hidden)]
@@ -154,7 +166,8 @@ pub struct InteractionCallbackData {
   pub embeds: Option<Vec<Embed>>,
   pub allowed_mentions: Option<AllowedMentions>,
   pub flags: Option<MessageFlags>,
-  pub components: Option<Vec<Component>>
+  pub components: Option<Vec<Component>>,
+  pub choices: Option<Vec<ApplicationCommandOptionChoice>>
 }
 
 #[doc(hidden)]
@@ -168,7 +181,38 @@ impl From<MessageResponse> for InteractionCallbackData {
       flags: Some(flags),
       embeds: msg.embeds,
       components: msg.components,
-      allowed_mentions: msg.allowed_mentions
+      allowed_mentions: msg.allowed_mentions,
+      choices: None
+    }
+  }
+}
+
+#[doc(hidden)]
+impl From<MessageFlags> for InteractionCallbackData {
+  fn from(flags: MessageFlags) -> InteractionCallbackData {
+    InteractionCallbackData {
+      tts: None,
+      content: None,
+      flags: Some(flags),
+      embeds: None,
+      components: None,
+      allowed_mentions: None,
+      choices: None
+    }
+  }
+}
+
+#[doc(hidden)]
+impl From<Vec<ApplicationCommandOptionChoice>> for InteractionCallbackData {
+  fn from(results: Vec<ApplicationCommandOptionChoice>) -> InteractionCallbackData {
+    InteractionCallbackData {
+      tts: None,
+      content: None,
+      flags: None,
+      embeds: None,
+      components: None,
+      allowed_mentions: None,
+      choices: Some(results)
     }
   }
 }
@@ -263,6 +307,12 @@ impl OptionValue {
       Self::Role(r) => Some(r),
       _ => None
     }
+  }
+}
+
+impl ApplicationCommandOptionChoice {
+  pub fn new<T: ToString, U: ToString>(name: T, value: U) -> Self {
+    Self { name: name.to_string(), value: value.to_string() }
   }
 }
 

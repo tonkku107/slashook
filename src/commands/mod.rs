@@ -18,7 +18,7 @@ use rocket::futures::future::BoxFuture;
 use super::structs::{
   interactions::{
     Interaction, InteractionType, ApplicationCommandType, InteractionDataResolved, InteractionOption, InteractionOptionType,
-    InteractionCallback, InteractionCallbackType, InteractionCallbackData,
+    InteractionCallback, InteractionCallbackType,
     OptionValue
   },
   channels::{Message, MessageFlags},
@@ -65,6 +65,8 @@ pub struct Command {
 /// Values passed as inputs for your command
 #[derive(Clone, Debug)]
 pub struct CommandInput {
+  /// The type of the interaction this command was called for
+  pub interaction_type: InteractionType,
   /// Name of the command that was executed
   pub command: String,
   /// Sub command that was executed
@@ -106,7 +108,11 @@ pub struct CommandInput {
   /// Chosen values from a Select Menu
   ///
   /// Only included in Select Menu component interactions
-  pub values: Option<Vec<String>>
+  pub values: Option<Vec<String>>,
+  /// The argument currently in focus
+  ///
+  /// Only included in command autocomplete interactions
+  pub focused: Option<String>
 }
 
 pub(crate) struct CommandHandler {
@@ -133,6 +139,7 @@ impl CommandHandler {
         let value = match interaction.interaction_type {
           InteractionType::APPLICATION_COMMAND => command_handler.handle_command(interaction).await.map_err(|_| ()),
           InteractionType::MESSAGE_COMPONENT => command_handler.handle_component(interaction).await.map_err(|_| ()),
+          InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE => command_handler.handle_autocomplete(interaction).await.map_err(|_| ()),
           _ => Err(())
         };
 
@@ -164,6 +171,9 @@ impl CommandHandler {
         InteractionOptionType::NUMBER => OptionValue::Number(option.value.unwrap().as_f64().unwrap()),
         _ => OptionValue::Other(option.value.unwrap())
       };
+      if option.focused.unwrap_or_default() {
+        input.focused = Some(option.name.clone());
+      }
       input.args.insert(option.name, option_value);
     }
   }
@@ -239,14 +249,7 @@ impl CommandHandler {
         if ephemeral { flags.insert(MessageFlags::EPHEMERAL) };
         Ok(InteractionCallback {
           response_type: InteractionCallbackType::DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-          data: Some(InteractionCallbackData {
-            tts: None,
-            content: None,
-            flags: Some(flags),
-            embeds: None,
-            components: None,
-            allowed_mentions: None
-          })
+          data: Some(flags.into())
         })
       },
 
@@ -269,7 +272,14 @@ impl CommandHandler {
           response_type: InteractionCallbackType::UPDATE_MESSAGE,
           data: Some(msg.into())
         })
-      }
+      },
+
+      CommandResponse::AutocompleteResult(results) => {
+        Ok(InteractionCallback {
+          response_type: InteractionCallbackType::APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
+          data: Some(results.into())
+        })
+      },
 
     }
   }
@@ -281,6 +291,7 @@ impl CommandHandler {
     let task_command = command.clone();
 
     let mut input = CommandInput {
+      interaction_type: interaction.interaction_type,
       command: name,
       sub_command: None,
       sub_command_group: None,
@@ -295,7 +306,8 @@ impl CommandHandler {
       target_member: None,
       target_message: None,
       custom_id: None,
-      values: None
+      values: None,
+      focused: None
     };
     if let Some(options) = data.options {
       self.parse_options(options, &data.resolved, &mut input);
@@ -314,6 +326,7 @@ impl CommandHandler {
     let task_command = command.clone();
 
     let input = CommandInput {
+      interaction_type: interaction.interaction_type,
       command: command_name.to_string(),
       sub_command: None,
       sub_command_group: None,
@@ -328,8 +341,42 @@ impl CommandHandler {
       target_member: None,
       target_message: None,
       custom_id: Some(rest_id.to_string()),
-      values: data.values
+      values: data.values,
+      focused: None
     };
+
+    let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
+    self.format_response(response)
+  }
+
+  pub async fn handle_autocomplete(&self, interaction: Interaction) -> Result<InteractionCallback> {
+    let data = interaction.data.ok_or("Interaction has no data")?;
+    let name = data.name.ok_or("Command should have a name")?;
+    let command = self.commands.get(&name).ok_or("Command not found")?;
+    let task_command = command.clone();
+
+    let mut input = CommandInput {
+      interaction_type: interaction.interaction_type,
+      command: name,
+      sub_command: None,
+      sub_command_group: None,
+      args: HashMap::new(),
+      resolved: None,
+      guild_id: interaction.guild_id,
+      channel_id: interaction.channel_id,
+      user: self.parse_user(interaction.user, &interaction.member),
+      member: interaction.member,
+      message: None,
+      target_user: None,
+      target_member: None,
+      target_message: None,
+      custom_id: None,
+      values: None,
+      focused: None
+    };
+    if let Some(options) = data.options {
+      self.parse_options(options, &data.resolved, &mut input);
+    }
 
     let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
     self.format_response(response)

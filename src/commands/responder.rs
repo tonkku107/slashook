@@ -7,7 +7,7 @@
 
 use crate::structs::{
   embeds::Embed,
-  interactions::InteractionCallbackData,
+  interactions::{InteractionCallbackData, ApplicationCommandOptionChoice},
   channels::{Message, AllowedMentions},
   components::{Component, Components},
   utils::File
@@ -150,7 +150,8 @@ pub enum CommandResponse {
   DeferMessage(bool),
   SendMessage(MessageResponse),
   DeferUpdate,
-  UpdateMessage(MessageResponse)
+  UpdateMessage(MessageResponse),
+  AutocompleteResult(Vec<ApplicationCommandOptionChoice>)
 }
 
 /// Struct with methods for responding to interactions
@@ -228,6 +229,12 @@ impl CommandResponder {
   /// ```
   pub fn defer_update(&self) -> SimpleResult<()> {
     self.tx.send(CommandResponse::DeferUpdate)?;
+    Ok(())
+  }
+
+  /// Send autocomplete choices
+  pub fn autocomplete(&self, results: Vec<ApplicationCommandOptionChoice>) -> SimpleResult<()> {
+    self.tx.send(CommandResponse::AutocompleteResult(results))?;
     Ok(())
   }
 
