@@ -42,6 +42,7 @@ pub type CmdResult = std::result::Result<(), Box<dyn std::error::Error>>;
 /// A trait that allows requiring an `async fn(CommandInput, CommandResponder) -> CmdResult` in the [Command] struct.\
 /// The function must also be `Send` as they can be transferred between threads
 pub trait AsyncCmdFn: Send {
+  /// A method that calls the function
   fn call(&self, input: CommandInput, responder: CommandResponder) -> BoxFuture<'static, CmdResult>;
 }
 impl<T, F> AsyncCmdFn for T
@@ -58,7 +59,9 @@ where
 ///
 /// **NOTE: This struct is usually constructed with the help of the [command attribute macro](macro@crate::command)**
 pub struct Command {
+  /// A handler function for the command
   pub func: Box<dyn AsyncCmdFn>,
+  /// The name of the command
   pub name: String
 }
 

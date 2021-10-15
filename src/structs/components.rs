@@ -37,6 +37,7 @@ pub enum Component {
 /// A struct for adding components to a message
 #[derive(Clone, Debug)]
 pub struct Components {
+  /// The components
   pub components: Vec<Component>,
 }
 
