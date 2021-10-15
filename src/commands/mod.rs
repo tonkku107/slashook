@@ -383,5 +383,22 @@ impl CommandHandler {
   }
 }
 
+impl CommandInput {
+  /// Returns true if the interaction is for an executed command
+  pub fn is_command(&self) -> bool {
+    matches!(self.interaction_type, InteractionType::APPLICATION_COMMAND)
+  }
+
+  /// Returns true if the interaction is for a message component
+  pub fn is_component(&self) -> bool {
+    matches!(self.interaction_type, InteractionType::MESSAGE_COMPONENT)
+  }
+
+  /// Returns true if the interaction is for autocompletion
+  pub fn is_autocomplete(&self) -> bool {
+    matches!(self.interaction_type, InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE)
+  }
+}
+
 #[derive(Debug)]
 pub(crate) struct RocketCommand(pub Interaction, pub oneshot::Sender::<std::result::Result<InteractionCallback, ()>>);

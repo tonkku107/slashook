@@ -311,6 +311,7 @@ impl OptionValue {
 }
 
 impl ApplicationCommandOptionChoice {
+  /// Creates a new choice with a name and value
   pub fn new<T: ToString, U: ToString>(name: T, value: U) -> Self {
     Self { name: name.to_string(), value: value.to_string() }
   }

@@ -232,7 +232,24 @@ impl CommandResponder {
     Ok(())
   }
 
-  /// Send autocomplete choices
+  /// Respond to an autocomplete interaction with autocomplete choices
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
+  /// # use slashook::structs::interactions::ApplicationCommandOptionChoice;
+  /// ##[command("example")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   if input.is_autocomplete() {
+  ///     let search = input.args.get(&input.focused.unwrap()).unwrap().as_string().unwrap();
+  ///     // Use the current input to fetch or filter choices
+  ///     let choices = vec![
+  ///       ApplicationCommandOptionChoice::new("An autocompleted choice", "autocomplete1"),
+  ///       ApplicationCommandOptionChoice::new("Another autocompleted choice", "autocomplete2")
+  ///     ];
+  ///     return res.autocomplete(choices)?;
+  ///   }
+  /// }
+  /// ```
   pub fn autocomplete(&self, results: Vec<ApplicationCommandOptionChoice>) -> SimpleResult<()> {
     self.tx.send(CommandResponse::AutocompleteResult(results))?;
     Ok(())
