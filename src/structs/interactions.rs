@@ -38,7 +38,7 @@ pub struct ApplicationCommandOptionChoice {
   /// 1-100 character choice name
   pub name: String,
   /// Value of the choice, up to 100 characters if string
-  pub value: String, // TODO: integers and doubles?
+  pub value: Value,
 }
 
 #[doc(hidden)]
@@ -312,8 +312,8 @@ impl OptionValue {
 
 impl ApplicationCommandOptionChoice {
   /// Creates a new choice with a name and value
-  pub fn new<T: ToString, U: ToString>(name: T, value: U) -> Self {
-    Self { name: name.to_string(), value: value.to_string() }
+  pub fn new<T: ToString, U: Into<Value>>(name: T, value: U) -> Self {
+    Self { name: name.to_string(), value: value.into() }
   }
 }
 
