@@ -73,6 +73,10 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
       Res{ status: Status::Ok, json: json!(response) }
     },
 
+    InteractionType::UNKNOWN => {
+      Res{ status: Status::NotFound, json: json!({ "error": "Unknown interaction type" }) }
+    },
+
     _ => {
       let (handler_send, handler_respond) = oneshot::channel::<Result<InteractionCallback, ()>>();
       cmd_sender.send(RocketCommand(interaction, handler_send)).expect("Cannot execute handler");
