@@ -14,12 +14,12 @@ use super::structs::interactions::{Interaction, InteractionType, InteractionCall
 use signature_headers::SignatureHeaders;
 use rocket::{
   http::Status,
-  serde::json::{self, Value, json},
   request::Request,
-  response::{self, Response, Responder},
+  response::{self, Response, Responder, content},
   State,
   tokio::sync::{mpsc, oneshot}
 };
+use serde_json::{Value, json};
 use ring::signature;
 
 struct Res {
@@ -29,7 +29,8 @@ struct Res {
 
 impl<'r> Responder<'r, 'static> for Res {
   fn respond_to(self, req: &'r Request<'_>) -> response::Result<'static> {
-    Response::build_from(self.json.respond_to(req).unwrap())
+    Response::build()
+      .merge(content::Json(self.json.to_string()).respond_to(req)?)
       .status(self.status)
       .ok()
   }
@@ -56,7 +57,7 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
     return Res{ status: Status::Unauthorized, json: json!({ "error": "bad signature" })}
   }
 
-  let interaction: Interaction = match json::from_slice(body) {
+  let interaction: Interaction = match serde_json::from_slice(body) {
     Ok(i) => i,
     Err(err) => {
       println!("Received bad request body from Discord. Error: {}", err);
