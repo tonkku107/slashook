@@ -274,7 +274,9 @@ pub struct Attachment {
   /// Height of file (if image)
   pub height: Option<i64>,
   /// Width of file (if image)
-  pub width: Option<i64>
+  pub width: Option<i64>,
+  /// Whether this attachment is ephemeral
+  pub ephemeral: Option<bool>
 }
 
 /// Discord Reaction Object

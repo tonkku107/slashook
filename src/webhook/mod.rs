@@ -54,14 +54,14 @@ fn verify_signature(body: &[u8], headers: SignatureHeaders, public_key: &str) ->
 async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config>, cmd_sender: &State<mpsc::UnboundedSender::<RocketCommand>>) -> Res {
 
   if !verify_signature(body, headers, &config.public_key) {
-    return Res{ status: Status::Unauthorized, json: json!({ "error": "bad signature" })}
+    return Res{ status: Status::Unauthorized, json: json!({ "error": "Bad signature" })}
   }
 
   let interaction: Interaction = match serde_json::from_slice(body) {
     Ok(i) => i,
     Err(err) => {
       println!("Received bad request body from Discord. Error: {}", err);
-      return Res{ status: Status::BadRequest, json: json!({ "error": "bad body" })}
+      return Res{ status: Status::BadRequest, json: json!({ "error": "Bad body" })}
     }
   };
 
@@ -74,29 +74,20 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
       Res{ status: Status::Ok, json: json!(response) }
     },
 
-    InteractionType::APPLICATION_COMMAND => {
-      let (handler_send, handler_respond) = oneshot::channel::<Result<InteractionCallback, ()>>();
-      cmd_sender.send(RocketCommand::HandleCommand(interaction, handler_send)).expect("Cannot execute command handler");
-      let response = handler_respond.await.unwrap();
-
-      match response {
-        Err(_) => Res{ status: Status::InternalServerError, json: json!({ "error": "command handler failed to run" }) },
-        Ok(res) => Res{ status: Status::Ok, json: json!(res) }
-      }
+    InteractionType::UNKNOWN => {
+      Res{ status: Status::NotFound, json: json!({ "error": "Unknown interaction type" }) }
     },
 
-    InteractionType::MESSAGE_COMPONENT => {
+    _ => {
       let (handler_send, handler_respond) = oneshot::channel::<Result<InteractionCallback, ()>>();
-      cmd_sender.send(RocketCommand::HandleComponent(interaction, handler_send)).expect("Cannot execute component handler");
+      cmd_sender.send(RocketCommand(interaction, handler_send)).expect("Cannot execute handler");
       let response = handler_respond.await.unwrap();
 
       match response {
-        Err(_) => Res{ status: Status::InternalServerError, json: json!({ "error": "component handler failed to run" }) },
+        Err(_) => Res{ status: Status::InternalServerError, json: json!({ "error": "Handler failed" }) },
         Ok(res) => Res{ status: Status::Ok, json: json!(res) }
       }
     }
-
-    _ => Res{ status: Status::NotFound, json: json!({ "error": "bad interaction type" })}
   }
 }
 
