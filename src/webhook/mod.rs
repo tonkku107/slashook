@@ -80,7 +80,7 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
 
     _ => {
       let (handler_send, handler_respond) = oneshot::channel::<Result<InteractionCallback, ()>>();
-      cmd_sender.send(RocketCommand(interaction, handler_send)).expect("Cannot execute handler");
+      cmd_sender.send(RocketCommand(interaction, config.bot_token.clone(), handler_send)).expect("Cannot execute handler");
       let response = handler_respond.await.unwrap();
 
       match response {

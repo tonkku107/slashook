@@ -13,7 +13,7 @@ use crate::structs::{
   utils::File
 };
 use crate::tokio::sync::mpsc;
-use crate::rest;
+use crate::rest::Rest;
 
 type SimpleResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -271,9 +271,9 @@ impl CommandResponder {
     response.files = None;
     let msg: InteractionCallbackData = response.into();
     if let Some(files) = files {
-      rest::post_files(format!("webhooks/{}/{}", self.id, self.token), msg, files).await
+      Rest::new().post_files(format!("webhooks/{}/{}", self.id, self.token), msg, files).await
     } else {
-      rest::post(format!("webhooks/{}/{}", self.id, self.token), msg).await
+      Rest::new().post(format!("webhooks/{}/{}", self.id, self.token), msg).await
     }
   }
 
@@ -294,9 +294,9 @@ impl CommandResponder {
     response.files = None;
     let msg: InteractionCallbackData = response.into();
     if let Some(files) = files {
-      rest::patch_files(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id), msg, files).await
+      Rest::new().patch_files(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id), msg, files).await
     } else {
-      rest::patch(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id), msg).await
+      Rest::new().patch(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id), msg).await
     }
   }
 
@@ -308,7 +308,7 @@ impl CommandResponder {
 
   /// Gets a follow-up message
   pub async fn get_followup_message(&self, id: String) -> SimpleResult<Message> {
-    rest::get(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
+    Rest::new().get(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
   }
 
   /// Gets the original message\
@@ -339,7 +339,7 @@ impl CommandResponder {
   /// }
   /// ```
   pub async fn delete_followup_message(&self, id: String) -> SimpleResult<()> {
-    rest::delete(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
+    Rest::new().delete(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
   }
 
   /// Deletes the original message\

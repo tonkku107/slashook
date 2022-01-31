@@ -46,7 +46,7 @@
 mod webhook;
 pub mod structs;
 pub mod commands;
-pub(crate) mod rest;
+pub mod rest;
 
 // Macros
 pub use slashook_macros::*;
@@ -70,7 +70,9 @@ pub struct Config {
   /// Port to listen to
   pub port: u16,
   /// Public key provided by Discord for verifying their request signatures
-  pub public_key: String
+  pub public_key: String,
+  /// Bot token provided by Discord for Bot accounts
+  pub bot_token: Option<String>
 }
 
 impl Default for Config {
@@ -78,7 +80,8 @@ impl Default for Config {
     Self {
       ip: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
       port: 3000,
-      public_key: "".to_string()
+      public_key: "".to_string(),
+      bot_token: None,
     }
   }
 }
