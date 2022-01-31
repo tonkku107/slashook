@@ -55,7 +55,9 @@ pub struct Interaction {
   pub user: Option<User>,
   pub token: String,
   pub version: u8,
-  pub message: Option<Message>
+  pub message: Option<Message>,
+  pub locale: Option<String>,
+  pub guild_locale: Option<String>
 }
 
 /// Discord Interaction Types

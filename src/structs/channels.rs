@@ -160,7 +160,9 @@ pub struct ThreadMetadata {
   /// Whether the thread is locked; when a thread is locked, only users with MANAGE_THREADS can unarchive it
   pub locked: bool,
   /// Whether non-moderators can add other non-moderators to a thread; only available on private threads
-  pub invitable: Option<bool>
+  pub invitable: Option<bool>,
+  // Timestamp when the thread was created; only populated for threads created after 2022-01-09
+  pub create_timestamp: Option<DateTime<Utc>>
 }
 
 /// Discord Thread Member Object
@@ -263,6 +265,8 @@ pub struct Attachment {
   pub id: Snowflake,
   /// Name of file attached
   pub filename: String,
+  /// Description for the file
+  pub description: Option<String>,
   /// The attachment's [media type](https://en.wikipedia.org/wiki/Media_type)
   pub content_type: Option<String>,
   /// Size of file in bytes
@@ -314,9 +318,10 @@ pub enum MessageType {
   GUILD_DISCOVERY_GRACE_PERIOD_FINAL_WARNING = 17,
   THREAD_CREATED = 18,
   REPLY = 19,
-  APPLICATION_COMMAND = 20,
+  CHAT_INPUT_COMMAND = 20,
   THREAD_STARTER_MESSAGE = 21,
   GUILD_INVITE_REMINDER = 22,
+  CONTEXT_MENU_COMMAND = 23,
   UNKNOWN
 }
 
@@ -324,6 +329,7 @@ pub enum MessageType {
 #[derive(Deserialize, Clone, Debug)]
 pub struct MessageActivity {
   /// [Type of message activity](MessageActivityType)
+  #[serde(rename = "type")]
   pub activity_type: MessageActivityType,
   /// party_id from a [Rich Presence event](https://discord.com/developers/docs/rich-presence/how-to#updating-presence-update-presence-payload-fields)
   pub party_id: Option<String>
@@ -382,11 +388,14 @@ pub struct MessageInteraction {
   /// Id of the interaction
   pub id: Snowflake,
   /// The type of interaction
+  #[serde(rename = "type")]
   pub interaction_type: Option<InteractionType>,
   /// The name of the [application command](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-structure)
   pub name: String,
   /// The user who invoked the interaction
-  pub user: User
+  pub user: User,
+  /// The member who invoked the interaction in the guild
+  pub member: Option<GuildMember>
 }
 
 /// Discord Sticker Item Object

@@ -117,6 +117,10 @@ pub struct CommandInput {
   ///
   /// Only included in command autocomplete interactions
   pub focused: Option<String>,
+  /// The selected [language](https://discord.com/developers/docs/reference#locales) of the user
+  pub locale: String,
+  /// The guild's preferred locale
+  pub guild_locale: Option<String>,
   /// Handler for Discord API calls
   pub rest: Rest,
 }
@@ -314,6 +318,8 @@ impl CommandHandler {
       custom_id: None,
       values: None,
       focused: None,
+      locale: interaction.locale.expect("No locale in interaction"),
+      guild_locale: interaction.guild_locale,
       rest: Rest::with_optional_token(bot_token)
     };
     if let Some(options) = data.options {
@@ -350,6 +356,8 @@ impl CommandHandler {
       custom_id: Some(rest_id.to_string()),
       values: data.values,
       focused: None,
+      locale: interaction.locale.expect("No locale in interaction"),
+      guild_locale: interaction.guild_locale,
       rest: Rest::with_optional_token(bot_token)
     };
 
@@ -381,6 +389,8 @@ impl CommandHandler {
       custom_id: None,
       values: None,
       focused: None,
+      locale: interaction.locale.expect("No locale in interaction"),
+      guild_locale: interaction.guild_locale,
       rest: Rest::with_optional_token(bot_token)
     };
     if let Some(options) = data.options {

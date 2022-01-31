@@ -59,18 +59,18 @@ pub struct ActionRow {
 pub struct Button {
   #[serde(rename = "type")]
   component_type: ComponentType,
+  /// A developer-defined identifier for the button, max 100 characters
+  pub custom_id: Option<String>,
+  /// Whether the button is disabled (default `false`)
+  pub disabled: Option<bool>,
   /// The style of the Button
   pub style: ButtonStyle,
   /// Text that appears on the button, max 80 characters
   pub label: Option<String>,
   /// An emoji to be shown on the button
   pub emoji: Option<Emoji>,
-  /// A developer-defined identifier for the button, max 100 characters
-  pub custom_id: Option<String>,
   /// A url for link-style buttons
-  pub url: Option<String>,
-  /// Whether the button is disabled (default `false`)
-  pub disabled: Option<bool>
+  pub url: Option<String>
 }
 
 /// Discord Button Styles
@@ -98,6 +98,8 @@ pub struct SelectMenu {
   component_type: ComponentType,
   /// A developer-defined identifier for the select menu, max 100 characters
   pub custom_id: Option<String>,
+  /// Disable the select, default false
+  pub disabled: Option<bool>,
   /// The choices in the select, max 25
   pub options: Vec<SelectOption>,
   /// Custom placeholder text if nothing is selected, max 100 characters
@@ -105,9 +107,7 @@ pub struct SelectMenu {
   /// The minimum number of items that must be chosen; default 1, min 0, max 25
   pub min_values: Option<i64>,
   /// The maximum number of items that can be chosen; default 1, max 25
-  pub max_values: Option<i64>,
-  /// Disable the select, default false
-  pub disabled: Option<bool>,
+  pub max_values: Option<i64>
 }
 
 /// Choices in a Select Menu

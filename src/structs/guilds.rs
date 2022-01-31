@@ -9,6 +9,7 @@
 
 use serde::{Deserialize, de::Deserializer};
 use super::{Snowflake, users::User, Permissions};
+use chrono::{DateTime, Utc};
 
 /// Discord Guild Member Object
 #[derive(Deserialize, Clone, Debug)]
@@ -17,6 +18,8 @@ pub struct GuildMember {
   pub user: Option<User>,
   /// This users guild nickname
   pub nick: Option<String>,
+  /// The member's [guild avatar hash](https://discord.com/developers/docs/reference#image-formatting)
+  pub avatar: Option<String>,
   /// Array of [role](Role) object ids
   pub roles: Vec<Snowflake>,
   /// When the user joined the guild
@@ -30,7 +33,9 @@ pub struct GuildMember {
   /// Whether the user has not yet passed the guild's [Membership Screening](https://discord.com/developers/docs/resources/guild#membership-screening-object) requirements
   pub pending: Option<bool>,
   /// Total permissions of the member in the channel, including overwrites, returned when in the interaction object
-  pub permissions: Option<Permissions>
+  pub permissions: Option<Permissions>,
+  /// When the user's [timeout](https://support.discord.com/hc/en-us/articles/4413305239191-Time-Out-FAQ) will expire and the user will be able to communicate in the guild again, None or a time in the past if the user is not timed out
+  pub communication_disabled_until: Option<DateTime<Utc>>
 }
 
 /// Discord Role Object
@@ -44,6 +49,10 @@ pub struct Role {
   pub color: i64,
   /// If this role is pinned in the user listing
   pub hoist: bool,
+  /// Role [icon hash](https://discord.com/developers/docs/reference#image-formatting)
+  pub icon: Option<String>,
+  /// Role unicode emoji
+  pub unicode_emoji: Option<String>,
   /// Position of this role
   pub position: i64,
   /// Permission bit set

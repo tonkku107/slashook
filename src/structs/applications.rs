@@ -7,12 +7,13 @@
 
 //! Structs related to Discord applications
 
-use serde::{Deserialize};
+use serde::{Deserialize, de::Deserializer};
 use serde_repr::{Deserialize_repr};
 use super::{
   Snowflake,
   users::User
 };
+use bitflags::bitflags;
 
 /// Discord Application Object
 #[derive(Deserialize, Clone, Debug)]
@@ -52,7 +53,21 @@ pub struct Application {
   /// The application's default rich presence invite [cover image hash](https://discord.com/developers/docs/reference#image-formatting)
   pub cover_image: Option<String>,
   /// The application's public [flags](https://discord.com/developers/docs/resources/application#application-object-application-flags)
-  pub flags: Option<i64>
+  pub flags: Option<ApplicationFlags>
+}
+
+bitflags! {
+  /// Bitflags for Discord Application Flags
+  pub struct ApplicationFlags: u32 {
+    const GATEWAY_PRESENCE = 1 << 12;
+    const GATEWAY_PRESENCE_LIMITED = 1 << 13;
+    const GATEWAY_GUILD_MEMBERS = 1 << 14;
+    const GATEWAY_GUILD_MEMBERS_LIMITED = 1 << 15;
+    const VERIFICATION_PENDING_GUILD_LIMIT = 1 << 16;
+    const EMBEDDED = 1 << 17;
+    const GATEWAY_MESSAGE_CONTENT = 1 << 18;
+    const GATEWAY_MESSAGE_CONTENT_LIMITED = 1 << 19;
+  }
 }
 
 /// Discord Team Object
@@ -91,4 +106,11 @@ pub enum TeamMembershipState {
   INVITED = 1,
   ACCEPTED = 2,
   UNKNOWN
+}
+
+impl<'de> Deserialize<'de> for ApplicationFlags {
+  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    let bits = u32::deserialize(d)?;
+    Ok(Self::from_bits_truncate(bits))
+  }
 }

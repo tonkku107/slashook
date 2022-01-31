@@ -51,19 +51,34 @@ pub struct User {
 bitflags! {
   /// Bitflags for Discord User Flags
   pub struct UserFlags: u32 {
-    const DISCORD_EMPLOYEE = 1 << 0;
-    const PARTNERED_SERVER_OWNER = 1 << 1;
-    const HYPESQUAD_EVENTS = 1 << 2;
+    /// Discord Employee
+    const STAFF = 1 << 0;
+    /// Partnered Server Owner
+    const PARTNER = 1 << 1;
+    /// HypeSquad Events Coordinator
+    const HYPESQUAD = 1 << 2;
+    /// Bug Hunter Level 1
     const BUG_HUNTER_LEVEL_1 = 1 << 3;
-    const HOUSE_BRAVERY = 1 << 6;
-    const HOUSE_BRILLIANCE = 1 << 7;
-    const HOUSE_BALANCE = 1 << 8;
-    const EARLY_SUPPORTER = 1 << 9;
-    const TEAM_USER = 1 << 10;
+    /// House Bravery Member
+    const HYPESQUAD_ONLINE_HOUSE_1 = 1 << 6;
+    /// House Brilliance Member
+    const HYPESQUAD_ONLINE_HOUSE_2 = 1 << 7;
+    /// House Balance Member
+    const HYPESQUAD_ONLINE_HOUSE_3 = 1 << 8;
+    /// Early Nitro Supporter
+    const PREMIUM_EARLY_SUPPORTER = 1 << 9;
+    /// User is a [team](https://discord.com/developers/docs/topics/teams)
+    const TEAM_PSEUDO_USER = 1 << 10;
+    /// Bug Hunter Level 2
     const BUG_HUNTER_LEVEL_2 = 1 << 14;
+    /// Verified Bot
     const VERIFIED_BOT = 1 << 16;
-    const EARLY_VERIFIED_BOT_DEVELOPER = 1 << 17;
-    const DISCORD_CERTIFIED_MODERATOR = 1 << 18;
+    /// Early Verified Bot Developer
+    const VERIFIED_DEVELOPER = 1 << 17;
+    /// Discord Certified Moderator
+    const CERTIFIED_MODERATOR = 1 << 18;
+    /// Bot uses only [HTTP interactions](https://discord.com/developers/docs/interactions/receiving-and-responding#receiving-an-interaction) and is shown in the online member list
+    const BOT_HTTP_INTERACTIONS = 1 << 19;
   }
 }
 
