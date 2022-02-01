@@ -35,7 +35,7 @@ impl std::fmt::Display for RestError {
 impl std::error::Error for RestError {}
 
 /// Handler for Discord API calls
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Rest {
   token: Option<String>,
 }
@@ -80,6 +80,18 @@ impl Rest {
   pub async fn get<T: DeserializeOwned>(&self, path: String) -> Result<T> {
     let mut req = reqwest::Client::new()
       .get(format!("{}/{}", API_URL, path));
+    if let Some(token) = &self.token {
+      req = req.header("Authorization", format!("Bot {}", token));
+    }
+    let res = req.send().await?;
+    handle_response(res).await
+  }
+
+  /// Make a get request with query parameters
+  pub async fn get_query<T: DeserializeOwned, U: Serialize>(&self, path: String, query: U) -> Result<T> {
+    let mut req = reqwest::Client::new()
+      .get(format!("{}/{}", API_URL, path))
+      .query(&query);
     if let Some(token) = &self.token {
       req = req.header("Authorization", format!("Bot {}", token));
     }
@@ -145,13 +157,12 @@ impl Rest {
       req = req.header("Authorization", format!("Bot {}", token));
     }
     let res = req.send().await?;
-    handle_response(res).await
-  }
-}
 
-impl Default for Rest {
-  fn default() -> Self {
-    Self::new()
+    let status = res.status();
+    if status.is_client_error() || status.is_server_error() {
+      return Err(Box::new(RestError::new(format!("Status {}, Body: {}", status.as_u16(), res.text().await?))))
+    }
+    Ok(())
   }
 }
 

@@ -12,6 +12,7 @@ use crate::structs::{
   components::{Component, Components},
   utils::File
 };
+use serde::Serialize;
 use crate::tokio::sync::mpsc;
 use crate::rest::Rest;
 
@@ -21,13 +22,14 @@ type SimpleResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 ///
 /// This struct can be easily constructed from a `str`, `String`, [`Embed`](crate::structs::embeds::Embed) or [`Components`](crate::structs::components::Components)
 /// with the `From` trait
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct MessageResponse {
   /// Should the response is TTS or not
   pub tts: Option<bool>,
   /// Content of the message
   pub content: Option<String>,
   /// Should only the user receiving the message be able to see it
+  #[serde(skip_serializing)]
   pub ephemeral: bool,
   /// Up to 10 embeds to send with the response
   pub embeds: Option<Vec<Embed>>,
@@ -38,6 +40,7 @@ pub struct MessageResponse {
   /// Up to 10 files to send with the response
   ///
   /// Only available for follow-up responses
+  #[serde(skip_serializing)]
   pub files: Option<Vec<File>>
 }
 
@@ -270,10 +273,11 @@ impl CommandResponder {
     let files = response.files;
     response.files = None;
     let msg: InteractionCallbackData = response.into();
+    let path = format!("webhooks/{}/{}", self.id, self.token);
     if let Some(files) = files {
-      Rest::new().post_files(format!("webhooks/{}/{}", self.id, self.token), msg, files).await
+      Rest::new().post_files(path, msg, files).await
     } else {
-      Rest::new().post(format!("webhooks/{}/{}", self.id, self.token), msg).await
+      Rest::new().post(path, msg).await
     }
   }
 
@@ -293,10 +297,11 @@ impl CommandResponder {
     let files = response.files;
     response.files = None;
     let msg: InteractionCallbackData = response.into();
+    let path = format!("webhooks/{}/{}/messages/{}", self.id, self.token, id);
     if let Some(files) = files {
-      Rest::new().patch_files(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id), msg, files).await
+      Rest::new().patch_files(path, msg, files).await
     } else {
-      Rest::new().patch(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id), msg).await
+      Rest::new().patch(path, msg).await
     }
   }
 
