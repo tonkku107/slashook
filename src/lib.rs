@@ -14,7 +14,7 @@
 //! Scaling can be performed using any load balancing solution and no guild count based sharding is required.
 //!
 //! ## Usage
-//! First, head over to the [Discord Developer Portal](https://discord.com/developers/applications) and grab your application's public key.\
+//! First, head over to the [Discord Developer Portal](https://discord.com/developers/applications) and grab your application's public key and optionally a bot token.\
 //! Here's a simple example to get you started:
 //! ```no_run
 //! #[macro_use] extern crate slashook;
@@ -25,6 +25,7 @@
 //! async fn main() {
 //!   let config = Config {
 //!     public_key: String::from("your_public_key"),
+//!     bot_token: Some(String::from("your.bot.token")),
 //!     ..Default::default()
 //!   };
 //!

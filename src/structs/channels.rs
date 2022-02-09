@@ -510,16 +510,44 @@ impl MessageFetchOptions {
 
 impl Message {
   /// Fetch a single message with a channel and message ID
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Message;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let message = Message::fetch(&input.rest, "613430047285706767", "916413462467465246").await?;
+  /// # }
+  /// ```
   pub async fn fetch<T: ToString, U: ToString>(rest: &Rest, channel_id: T, message_id: U) -> Result<Self, RestError> {
     Ok(rest.get(format!("channels/{}/messages/{}", channel_id.to_string(), message_id.to_string())).await?)
   }
 
   /// Fetch multiple messages with a channel ID and options
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::{Message, MessageFetchOptions};
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let options = MessageFetchOptions::new().set_before("940762083820175440").set_limit(5);
+  /// let messages = Message::fetch_many(&input.rest, "697138785317814292", options).await?;
+  /// # }
+  /// ```
   pub async fn fetch_many<T: ToString>(rest: &Rest, channel_id: T, options: MessageFetchOptions) -> Result<Vec<Self>, RestError> {
     Ok(rest.get_query(format!("channels/{}/messages", channel_id.to_string()), options).await?)
   }
 
   /// Send a new message to a channel
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Message;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = Message::create(&input.rest, "344581372137963522", "Hello!").await?;
+  /// # }
+  /// ```
   pub async fn create<T: ToString, U: Into<MessageResponse>>(rest: &Rest, channel_id: T, message: U) -> Result<Self, RestError> {
     let mut message = message.into();
     let files = message.files;
@@ -533,6 +561,16 @@ impl Message {
   }
 
   /// Edit a message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Message;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = Message::create(&input.rest, "344581372137963522", "Hello!").await?;
+  /// let edited_msg = msg.edit(&input.rest, "Bye!").await?;
+  /// # }
+  /// ```
   pub async fn edit<T: Into<MessageResponse>>(&self, rest: &Rest, message: T) -> Result<Message, RestError> {
     let mut message = message.into();
     let files = message.files;
@@ -546,11 +584,31 @@ impl Message {
   }
 
   /// Delete a message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Message;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = Message::create(&input.rest, "344581372137963522", "Hello!").await?;
+  /// msg.delete(&input.rest).await?;
+  /// # }
+  /// ```
   pub async fn delete(&self, rest: &Rest) -> Result<(), RestError> {
     Ok(rest.delete(format!("channels/{}/messages/{}", self.channel_id, self.id)).await?)
   }
 
   /// Publish a message that was posted in an [Announcement channel](ChannelType::GUILD_NEWS)
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Message;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = Message::create(&input.rest, "344581598878105605", "Hello!").await?;
+  /// msg.crosspost(&input.rest).await?;
+  /// # }
+  /// ```
   pub async fn crosspost(&self, rest: &Rest) -> Result<Message, RestError> {
     Ok(rest.post(format!("channels/{}/messages/{}/crosspost", self.channel_id, self.id), Value::Null).await?)
   }
