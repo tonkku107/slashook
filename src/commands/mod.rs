@@ -29,6 +29,7 @@ use super::structs::{
 use super::tokio::{spawn, sync::{mpsc, oneshot}};
 pub use responder::{MessageResponse, CommandResponder};
 use responder::CommandResponse;
+use crate::rest::Rest;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 /// The `Result` types expected from a command function
@@ -115,7 +116,13 @@ pub struct CommandInput {
   /// The argument currently in focus
   ///
   /// Only included in command autocomplete interactions
-  pub focused: Option<String>
+  pub focused: Option<String>,
+  /// The selected [language](https://discord.com/developers/docs/reference#locales) of the user
+  pub locale: String,
+  /// The guild's preferred locale
+  pub guild_locale: Option<String>,
+  /// Handler for Discord API calls
+  pub rest: Rest,
 }
 
 pub(crate) struct CommandHandler {
@@ -137,12 +144,12 @@ impl CommandHandler {
     while let Some(command) = receiver.recv().await {
       let command_handler = self.clone();
       spawn(async move {
-        let RocketCommand(interaction, handler_send) = command;
+        let RocketCommand(interaction, bot_token, handler_send) = command;
 
         let value = match interaction.interaction_type {
-          InteractionType::APPLICATION_COMMAND => command_handler.handle_command(interaction).await.map_err(|_| ()),
-          InteractionType::MESSAGE_COMPONENT => command_handler.handle_component(interaction).await.map_err(|_| ()),
-          InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE => command_handler.handle_autocomplete(interaction).await.map_err(|_| ()),
+          InteractionType::APPLICATION_COMMAND => command_handler.handle_command(interaction, bot_token).await.map_err(|_| ()),
+          InteractionType::MESSAGE_COMPONENT => command_handler.handle_component(interaction, bot_token).await.map_err(|_| ()),
+          InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE => command_handler.handle_autocomplete(interaction, bot_token).await.map_err(|_| ()),
           _ => Err(())
         };
 
@@ -156,12 +163,12 @@ impl CommandHandler {
       let option_value = match option.option_type {
         InteractionOptionType::SUB_COMMAND_GROUP => {
           input.sub_command_group = Some(option.name);
-          return self.parse_options(option.options.expect("Sub command group is missing options"), resolved, &mut input)
+          return self.parse_options(option.options.expect("Sub command group is missing options"), resolved, input)
         },
         InteractionOptionType::SUB_COMMAND => {
           input.sub_command = Some(option.name);
           if option.options.is_none() { return }
-          return self.parse_options(option.options.unwrap(), resolved, &mut input)
+          return self.parse_options(option.options.unwrap(), resolved, input)
         },
 
         InteractionOptionType::STRING => OptionValue::String(option.value.unwrap().as_str().unwrap().to_string()),
@@ -287,7 +294,7 @@ impl CommandHandler {
     }
   }
 
-  pub async fn handle_command(&self, interaction: Interaction) -> Result<InteractionCallback> {
+  pub async fn handle_command(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
     let data = interaction.data.ok_or("Interaction has no data")?;
     let name = data.name.ok_or("Command should have a name")?;
     let command = self.commands.get(&name).ok_or("Command not found")?;
@@ -310,7 +317,10 @@ impl CommandHandler {
       target_message: None,
       custom_id: None,
       values: None,
-      focused: None
+      focused: None,
+      locale: interaction.locale.expect("No locale in interaction"),
+      guild_locale: interaction.guild_locale,
+      rest: Rest::with_optional_token(bot_token)
     };
     if let Some(options) = data.options {
       self.parse_options(options, &data.resolved, &mut input);
@@ -321,7 +331,7 @@ impl CommandHandler {
     self.format_response(response)
   }
 
-  pub async fn handle_component(&self, interaction: Interaction) -> Result<InteractionCallback> {
+  pub async fn handle_component(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
     let data = interaction.data.ok_or("Interaction has no data")?;
     let custom_id = data.custom_id.expect("Component interaction should have a custom_id");
     let (command_name, rest_id) = custom_id.as_str().split_once("/").ok_or("Invalid custom_id")?;
@@ -345,14 +355,17 @@ impl CommandHandler {
       target_message: None,
       custom_id: Some(rest_id.to_string()),
       values: data.values,
-      focused: None
+      focused: None,
+      locale: interaction.locale.expect("No locale in interaction"),
+      guild_locale: interaction.guild_locale,
+      rest: Rest::with_optional_token(bot_token)
     };
 
     let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
     self.format_response(response)
   }
 
-  pub async fn handle_autocomplete(&self, interaction: Interaction) -> Result<InteractionCallback> {
+  pub async fn handle_autocomplete(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
     let data = interaction.data.ok_or("Interaction has no data")?;
     let name = data.name.ok_or("Command should have a name")?;
     let command = self.commands.get(&name).ok_or("Command not found")?;
@@ -375,7 +388,10 @@ impl CommandHandler {
       target_message: None,
       custom_id: None,
       values: None,
-      focused: None
+      focused: None,
+      locale: interaction.locale.expect("No locale in interaction"),
+      guild_locale: interaction.guild_locale,
+      rest: Rest::with_optional_token(bot_token)
     };
     if let Some(options) = data.options {
       self.parse_options(options, &data.resolved, &mut input);
@@ -404,4 +420,4 @@ impl CommandInput {
 }
 
 #[derive(Debug)]
-pub(crate) struct RocketCommand(pub Interaction, pub oneshot::Sender::<std::result::Result<InteractionCallback, ()>>);
+pub(crate) struct RocketCommand(pub Interaction, pub Option<String>, pub oneshot::Sender::<std::result::Result<InteractionCallback, ()>>);

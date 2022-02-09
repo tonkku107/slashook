@@ -14,7 +14,7 @@
 //! Scaling can be performed using any load balancing solution and no guild count based sharding is required.
 //!
 //! ## Usage
-//! First, head over to the [Discord Developer Portal](https://discord.com/developers/applications) and grab your application's public key.\
+//! First, head over to the [Discord Developer Portal](https://discord.com/developers/applications) and grab your application's public key and optionally a bot token.\
 //! Here's a simple example to get you started:
 //! ```no_run
 //! #[macro_use] extern crate slashook;
@@ -25,6 +25,7 @@
 //! async fn main() {
 //!   let config = Config {
 //!     public_key: String::from("your_public_key"),
+//!     bot_token: Some(String::from("your.bot.token")),
 //!     ..Default::default()
 //!   };
 //!
@@ -46,7 +47,7 @@
 mod webhook;
 pub mod structs;
 pub mod commands;
-pub(crate) mod rest;
+pub mod rest;
 
 // Macros
 pub use slashook_macros::*;
@@ -70,7 +71,9 @@ pub struct Config {
   /// Port to listen to
   pub port: u16,
   /// Public key provided by Discord for verifying their request signatures
-  pub public_key: String
+  pub public_key: String,
+  /// Bot token provided by Discord for Bot accounts
+  pub bot_token: Option<String>
 }
 
 impl Default for Config {
@@ -78,7 +81,8 @@ impl Default for Config {
     Self {
       ip: IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)),
       port: 3000,
-      public_key: "".to_string()
+      public_key: "".to_string(),
+      bot_token: None,
     }
   }
 }

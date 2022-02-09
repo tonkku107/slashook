@@ -10,6 +10,7 @@
 use serde::{Deserialize, de::Deserializer};
 use serde::{Serialize, ser::Serializer};
 use serde_repr::{Deserialize_repr};
+use serde_json::Value;
 use super::{
   Snowflake,
   users::User,
@@ -20,6 +21,10 @@ use super::{
   interactions::InteractionType,
   components::Component,
   permissions::Permissions
+};
+use crate::{
+  rest::{Rest, RestError},
+  commands::MessageResponse
 };
 use chrono::{DateTime, Utc};
 use bitflags::bitflags;
@@ -109,6 +114,7 @@ pub enum ChannelType {
   GUILD_PRIVATE_THREAD = 12,
   /// A voice channel for [hosting events with an audience](https://support.discord.com/hc/en-us/articles/1500005513722)
   GUILD_STAGE_VOICE = 13,
+  /// Channel type that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -145,6 +151,7 @@ pub enum VideoQualityMode {
   AUTO = 1,
   /// 720p
   FULL = 2,
+  /// Video quality mode that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -160,7 +167,9 @@ pub struct ThreadMetadata {
   /// Whether the thread is locked; when a thread is locked, only users with MANAGE_THREADS can unarchive it
   pub locked: bool,
   /// Whether non-moderators can add other non-moderators to a thread; only available on private threads
-  pub invitable: Option<bool>
+  pub invitable: Option<bool>,
+  /// Timestamp when the thread was created; only populated for threads created after 2022-01-09
+  pub create_timestamp: Option<DateTime<Utc>>
 }
 
 /// Discord Thread Member Object
@@ -263,6 +272,8 @@ pub struct Attachment {
   pub id: Snowflake,
   /// Name of file attached
   pub filename: String,
+  /// Description for the file
+  pub description: Option<String>,
   /// The attachment's [media type](https://en.wikipedia.org/wiki/Media_type)
   pub content_type: Option<String>,
   /// Size of file in bytes
@@ -314,9 +325,10 @@ pub enum MessageType {
   GUILD_DISCOVERY_GRACE_PERIOD_FINAL_WARNING = 17,
   THREAD_CREATED = 18,
   REPLY = 19,
-  APPLICATION_COMMAND = 20,
+  CHAT_INPUT_COMMAND = 20,
   THREAD_STARTER_MESSAGE = 21,
   GUILD_INVITE_REMINDER = 22,
+  CONTEXT_MENU_COMMAND = 23,
   UNKNOWN
 }
 
@@ -324,6 +336,7 @@ pub enum MessageType {
 #[derive(Deserialize, Clone, Debug)]
 pub struct MessageActivity {
   /// [Type of message activity](MessageActivityType)
+  #[serde(rename = "type")]
   pub activity_type: MessageActivityType,
   /// party_id from a [Rich Presence event](https://discord.com/developers/docs/rich-presence/how-to#updating-presence-update-presence-payload-fields)
   pub party_id: Option<String>
@@ -382,11 +395,14 @@ pub struct MessageInteraction {
   /// Id of the interaction
   pub id: Snowflake,
   /// The type of interaction
+  #[serde(rename = "type")]
   pub interaction_type: Option<InteractionType>,
   /// The name of the [application command](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-structure)
   pub name: String,
   /// The user who invoked the interaction
-  pub user: User
+  pub user: User,
+  /// The member who invoked the interaction in the guild
+  pub member: Option<GuildMember>
 }
 
 /// Discord Sticker Item Object
@@ -431,6 +447,171 @@ pub enum AllowedMentionType {
   roles,
   users,
   everyone
+}
+
+/// Options for fetching multiple messages with [fetch_many](Message::fetch_many).
+/// Only one of `around`, `before`, or `after` can be passed at once.
+#[derive(Serialize, Default)]
+pub struct MessageFetchOptions {
+  /// Get messages around this message ID
+  pub around: Option<Snowflake>,
+  /// Get messages before this message ID
+  pub before: Option<Snowflake>,
+  /// Get messages after this message ID
+  pub after: Option<Snowflake>,
+  /// Max number of messages to return (1-100). Defaults to 50.
+  pub limit: Option<i64>,
+}
+
+impl MessageFetchOptions {
+  /// Creates a new empty MessageFetchOptions
+  pub fn new() -> Self {
+    Self {
+      around: None,
+      before: None,
+      after: None,
+      limit: None,
+    }
+  }
+
+  /// Sets the message ID to search around.
+  /// Also removes `before` and `after` if set.
+  pub fn set_around<T: ToString>(mut self, around: T) -> Self {
+    self.around = Some(around.to_string());
+    self.before = None;
+    self.after = None;
+    self
+  }
+
+  /// Sets the message ID to search before.
+  /// Also removes `around` and `after` if set.
+  pub fn set_before<T: ToString>(mut self, before: T) -> Self {
+    self.around = None;
+    self.before = Some(before.to_string());
+    self.after = None;
+    self
+  }
+
+  /// Sets the message ID to search aafter.
+  /// Also removes `around` and `before` if set.
+  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
+    self.around = None;
+    self.before = None;
+    self.after = Some(after.to_string());
+    self
+  }
+
+  /// Sets the limit for the amount of messages to fetch
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+}
+
+impl Message {
+  /// Fetch a single message with a channel and message ID
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Message;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let message = Message::fetch(&input.rest, "613430047285706767", "916413462467465246").await?;
+  /// # }
+  /// ```
+  pub async fn fetch<T: ToString, U: ToString>(rest: &Rest, channel_id: T, message_id: U) -> Result<Self, RestError> {
+    Ok(rest.get(format!("channels/{}/messages/{}", channel_id.to_string(), message_id.to_string())).await?)
+  }
+
+  /// Fetch multiple messages with a channel ID and options
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::{Message, MessageFetchOptions};
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let options = MessageFetchOptions::new().set_before("940762083820175440").set_limit(5);
+  /// let messages = Message::fetch_many(&input.rest, "697138785317814292", options).await?;
+  /// # }
+  /// ```
+  pub async fn fetch_many<T: ToString>(rest: &Rest, channel_id: T, options: MessageFetchOptions) -> Result<Vec<Self>, RestError> {
+    Ok(rest.get_query(format!("channels/{}/messages", channel_id.to_string()), options).await?)
+  }
+
+  /// Send a new message to a channel
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Message;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = Message::create(&input.rest, "344581372137963522", "Hello!").await?;
+  /// # }
+  /// ```
+  pub async fn create<T: ToString, U: Into<MessageResponse>>(rest: &Rest, channel_id: T, message: U) -> Result<Self, RestError> {
+    let mut message = message.into();
+    let files = message.files;
+    message.files = None;
+    let path = format!("channels/{}/messages", channel_id.to_string());
+    if let Some(files) = files {
+      Ok(rest.post_files(path, message, files).await?)
+    } else {
+      Ok(rest.post(path, message).await?)
+    }
+  }
+
+  /// Edit a message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Message;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = Message::create(&input.rest, "344581372137963522", "Hello!").await?;
+  /// let edited_msg = msg.edit(&input.rest, "Bye!").await?;
+  /// # }
+  /// ```
+  pub async fn edit<T: Into<MessageResponse>>(&self, rest: &Rest, message: T) -> Result<Message, RestError> {
+    let mut message = message.into();
+    let files = message.files;
+    message.files = None;
+    let path = format!("channels/{}/messages/{}", self.channel_id, self.id);
+    if let Some(files) = files {
+      Ok(rest.patch_files(path, message, files).await?)
+    } else {
+      Ok(rest.patch(path, message).await?)
+    }
+  }
+
+  /// Delete a message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Message;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = Message::create(&input.rest, "344581372137963522", "Hello!").await?;
+  /// msg.delete(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn delete(&self, rest: &Rest) -> Result<(), RestError> {
+    Ok(rest.delete(format!("channels/{}/messages/{}", self.channel_id, self.id)).await?)
+  }
+
+  /// Publish a message that was posted in an [Announcement channel](ChannelType::GUILD_NEWS)
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Message;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = Message::create(&input.rest, "344581598878105605", "Hello!").await?;
+  /// msg.crosspost(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn crosspost(&self, rest: &Rest) -> Result<Message, RestError> {
+    Ok(rest.post(format!("channels/{}/messages/{}/crosspost", self.channel_id, self.id), Value::Null).await?)
+  }
 }
 
 impl AllowedMentions {

@@ -25,4 +25,5 @@ mod permissions;
 pub use permissions::Permissions;
 
 // TODO: Useful Snowflake impls?
+/// Alias for Discord snowflakes
 pub type Snowflake = String;
