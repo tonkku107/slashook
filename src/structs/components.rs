@@ -88,6 +88,7 @@ pub enum ButtonStyle {
   DANGER = 4,
   /// A grey button that navigates to a URL
   LINK = 5,
+  /// A button style that hasn't been implemented yet
   UNKNOWN
 }
 

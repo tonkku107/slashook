@@ -20,3 +20,4 @@ reqwest = { version = "0.11.4", features = ["json", "multipart"] }
 ring = "0.16.20"
 hex = "0.4.3"
 chrono = { version = "0.4.19", features = ["serde"] }
+thiserror = "1.0.30"

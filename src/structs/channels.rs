@@ -23,12 +23,11 @@ use super::{
   permissions::Permissions
 };
 use crate::{
-  rest::Rest,
+  rest::{Rest, RestError},
   commands::MessageResponse
 };
 use chrono::{DateTime, Utc};
 use bitflags::bitflags;
-type SimpleResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 /// Discord Channel Object
 #[derive(Deserialize, Clone, Debug)]
@@ -115,6 +114,7 @@ pub enum ChannelType {
   GUILD_PRIVATE_THREAD = 12,
   /// A voice channel for [hosting events with an audience](https://support.discord.com/hc/en-us/articles/1500005513722)
   GUILD_STAGE_VOICE = 13,
+  /// Channel type that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -151,6 +151,7 @@ pub enum VideoQualityMode {
   AUTO = 1,
   /// 720p
   FULL = 2,
+  /// Video quality mode that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -167,7 +168,7 @@ pub struct ThreadMetadata {
   pub locked: bool,
   /// Whether non-moderators can add other non-moderators to a thread; only available on private threads
   pub invitable: Option<bool>,
-  // Timestamp when the thread was created; only populated for threads created after 2022-01-09
+  /// Timestamp when the thread was created; only populated for threads created after 2022-01-09
   pub create_timestamp: Option<DateTime<Utc>>
 }
 
@@ -509,17 +510,17 @@ impl MessageFetchOptions {
 
 impl Message {
   /// Fetch a single message with a channel and message ID
-  pub async fn fetch<T: ToString, U: ToString>(rest: &Rest, channel_id: T, message_id: U) -> SimpleResult<Self> {
+  pub async fn fetch<T: ToString, U: ToString>(rest: &Rest, channel_id: T, message_id: U) -> Result<Self, RestError> {
     Ok(rest.get(format!("channels/{}/messages/{}", channel_id.to_string(), message_id.to_string())).await?)
   }
 
   /// Fetch multiple messages with a channel ID and options
-  pub async fn fetch_many<T: ToString>(rest: &Rest, channel_id: T, options: MessageFetchOptions) -> SimpleResult<Vec<Self>> {
+  pub async fn fetch_many<T: ToString>(rest: &Rest, channel_id: T, options: MessageFetchOptions) -> Result<Vec<Self>, RestError> {
     Ok(rest.get_query(format!("channels/{}/messages", channel_id.to_string()), options).await?)
   }
 
   /// Send a new message to a channel
-  pub async fn create<T: ToString, U: Into<MessageResponse>>(rest: &Rest, channel_id: T, message: U) -> SimpleResult<Self> {
+  pub async fn create<T: ToString, U: Into<MessageResponse>>(rest: &Rest, channel_id: T, message: U) -> Result<Self, RestError> {
     let mut message = message.into();
     let files = message.files;
     message.files = None;
@@ -532,7 +533,7 @@ impl Message {
   }
 
   /// Edit a message
-  pub async fn edit<T: Into<MessageResponse>>(&self, rest: &Rest, message: T) -> SimpleResult<Message> {
+  pub async fn edit<T: Into<MessageResponse>>(&self, rest: &Rest, message: T) -> Result<Message, RestError> {
     let mut message = message.into();
     let files = message.files;
     message.files = None;
@@ -545,12 +546,12 @@ impl Message {
   }
 
   /// Delete a message
-  pub async fn delete(&self, rest: &Rest) -> SimpleResult<()> {
+  pub async fn delete(&self, rest: &Rest) -> Result<(), RestError> {
     Ok(rest.delete(format!("channels/{}/messages/{}", self.channel_id, self.id)).await?)
   }
 
   /// Publish a message that was posted in an [Announcement channel](ChannelType::GUILD_NEWS)
-  pub async fn crosspost(&self, rest: &Rest) -> SimpleResult<Message> {
+  pub async fn crosspost(&self, rest: &Rest) -> Result<Message, RestError> {
     Ok(rest.post(format!("channels/{}/messages/{}/crosspost", self.channel_id, self.id), Value::Null).await?)
   }
 }

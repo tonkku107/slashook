@@ -14,7 +14,7 @@ use crate::structs::{
 };
 use serde::Serialize;
 use crate::tokio::sync::mpsc;
-use crate::rest::Rest;
+use crate::rest::{Rest, RestError};
 
 type SimpleResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -268,7 +268,7 @@ impl CommandResponder {
   ///   res.send_followup_message("Second message!").await?;
   /// }
   /// ```
-  pub async fn send_followup_message<T: Into<MessageResponse>>(&self, response: T) -> SimpleResult<Message> {
+  pub async fn send_followup_message<T: Into<MessageResponse>>(&self, response: T) -> Result<Message, RestError> {
     let mut response = response.into();
     let files = response.files;
     response.files = None;
@@ -292,7 +292,7 @@ impl CommandResponder {
   ///   res.edit_followup_message(msg.id, "Second message but edited!").await?;
   /// }
   /// ```
-  pub async fn edit_followup_message<T: Into<MessageResponse>>(&self, id: String, response: T) -> SimpleResult<Message> {
+  pub async fn edit_followup_message<T: Into<MessageResponse>>(&self, id: String, response: T) -> Result<Message, RestError> {
     let mut response = response.into();
     let files = response.files;
     response.files = None;
@@ -307,12 +307,12 @@ impl CommandResponder {
 
   /// Edits the original message\
   /// Same as running `edit_followup_message` with id of `@original`
-  pub async fn edit_original_message<T: Into<MessageResponse>>(&self, response: T) -> SimpleResult<Message> {
+  pub async fn edit_original_message<T: Into<MessageResponse>>(&self, response: T) -> Result<Message, RestError> {
     self.edit_followup_message(String::from("@original"), response).await
   }
 
   /// Gets a follow-up message
-  pub async fn get_followup_message(&self, id: String) -> SimpleResult<Message> {
+  pub async fn get_followup_message(&self, id: String) -> Result<Message, RestError> {
     Rest::new().get(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
   }
 
@@ -328,7 +328,7 @@ impl CommandResponder {
   ///   println!("I responded with {}", msg.content);
   /// }
   /// ```
-  pub async fn get_original_message(&self) -> SimpleResult<Message> {
+  pub async fn get_original_message(&self) -> Result<Message, RestError> {
     self.get_followup_message(String::from("@original")).await
   }
 
@@ -343,13 +343,13 @@ impl CommandResponder {
   ///   res.delete_followup_message(msg.id).await?;
   /// }
   /// ```
-  pub async fn delete_followup_message(&self, id: String) -> SimpleResult<()> {
+  pub async fn delete_followup_message(&self, id: String) -> Result<(), RestError> {
     Rest::new().delete(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
   }
 
   /// Deletes the original message\
   /// Same as running `delete_followup_message` with id of `@original`
-  pub async fn delete_original_message(&self) -> SimpleResult<()> {
+  pub async fn delete_original_message(&self) -> Result<(), RestError> {
     self.delete_followup_message(String::from("@original")).await
   }
 }

@@ -12,27 +12,30 @@ pub const API_URL: &str = "https://discord.com/api/v9";
 
 use serde::{Serialize, de::DeserializeOwned};
 use crate::structs::utils::File;
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+use reqwest::{
+  StatusCode,
+  Response
+};
+use thiserror::Error;
 
 /// Type for errors from rest api calls
-#[derive(Debug)]
-pub struct RestError {
-  message: String
-}
-
-impl RestError {
-  fn new(msg: String) -> Self {
-    Self { message: msg }
+#[derive(Error, Debug)]
+pub enum RestError {
+  /// Represents an error that occurred within the reqwest library
+  #[error("There was an error performing this request")]
+  ReqwestError(#[from] reqwest::Error),
+  /// Represents an error that occurred within the serde library
+  #[error("Failed to (de)serialize data")]
+  SerializationError(#[from] serde_json::Error),
+  /// Represents an error for requests with a failed status
+  #[error("Request failed with status {status}. Body: {body}")]
+  RequestFailed {
+    /// Status code of the request
+    status: StatusCode,
+    /// Body of the request
+    body: String
   }
 }
-
-impl std::fmt::Display for RestError {
-  fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-    write!(f, "{}", self.message)
-  }
-}
-
-impl std::error::Error for RestError {}
 
 /// Handler for Discord API calls
 #[derive(Clone, Default)]
@@ -40,16 +43,17 @@ pub struct Rest {
   token: Option<String>,
 }
 
-async fn handle_response<T: DeserializeOwned>(res: reqwest::Response) -> Result<T> {
+async fn handle_response<T: DeserializeOwned>(res: Response) -> Result<T, RestError> {
   let status = res.status();
   if status.is_client_error() || status.is_server_error() {
-    return Err(Box::new(RestError::new(format!("Status {}, Body: {}", status.as_u16(), res.text().await?))))
+    let body = res.text().await?;
+    return Err(RestError::RequestFailed{ status, body });
   }
   let body = res.json::<T>().await?;
   Ok(body)
 }
 
-fn handle_multipart<U: Serialize>(json_data: U, files: Vec<File>) -> Result<reqwest::multipart::Form> {
+fn handle_multipart<U: Serialize>(json_data: U, files: Vec<File>) -> Result<reqwest::multipart::Form, RestError> {
   let mut form_data = reqwest::multipart::Form::new()
     .text("payload_json", serde_json::to_string(&json_data)?);
   for file in files.into_iter() {
@@ -77,7 +81,7 @@ impl Rest {
   }
 
   /// Make a get request
-  pub async fn get<T: DeserializeOwned>(&self, path: String) -> Result<T> {
+  pub async fn get<T: DeserializeOwned>(&self, path: String) -> Result<T, RestError> {
     let mut req = reqwest::Client::new()
       .get(format!("{}/{}", API_URL, path));
     if let Some(token) = &self.token {
@@ -88,7 +92,7 @@ impl Rest {
   }
 
   /// Make a get request with query parameters
-  pub async fn get_query<T: DeserializeOwned, U: Serialize>(&self, path: String, query: U) -> Result<T> {
+  pub async fn get_query<T: DeserializeOwned, U: Serialize>(&self, path: String, query: U) -> Result<T, RestError> {
     let mut req = reqwest::Client::new()
       .get(format!("{}/{}", API_URL, path))
       .query(&query);
@@ -100,7 +104,7 @@ impl Rest {
   }
 
   /// Make a post request
-  pub async fn post<T: DeserializeOwned, U: Serialize>(&self, path: String, data: U) -> Result<T> {
+  pub async fn post<T: DeserializeOwned, U: Serialize>(&self, path: String, data: U) -> Result<T, RestError> {
     let mut req = reqwest::Client::new()
       .post(format!("{}/{}", API_URL, path))
       .json(&data);
@@ -112,7 +116,7 @@ impl Rest {
   }
 
   /// Make a post request including files
-  pub async fn post_files<T: DeserializeOwned, U: Serialize>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T> {
+  pub async fn post_files<T: DeserializeOwned, U: Serialize>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T, RestError> {
     let form_data = handle_multipart(json_data, files)?;
     let mut req = reqwest::Client::new()
       .post(format!("{}/{}", API_URL, path))
@@ -125,7 +129,7 @@ impl Rest {
   }
 
   /// Make a patch request
-  pub async fn patch<T: DeserializeOwned, U: Serialize>(&self, path: String, data: U) -> Result<T> {
+  pub async fn patch<T: DeserializeOwned, U: Serialize>(&self, path: String, data: U) -> Result<T, RestError> {
     let mut req = reqwest::Client::new()
       .patch(format!("{}/{}", API_URL, path))
       .json(&data);
@@ -137,7 +141,7 @@ impl Rest {
   }
 
   /// Make a patch request including files
-  pub async fn patch_files<T: DeserializeOwned, U: Serialize>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T> {
+  pub async fn patch_files<T: DeserializeOwned, U: Serialize>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T, RestError> {
     let form_data = handle_multipart(json_data, files)?;
     let mut req = reqwest::Client::new()
       .patch(format!("{}/{}", API_URL, path))
@@ -150,7 +154,7 @@ impl Rest {
   }
 
   /// Make a delete request
-  pub async fn delete(&self, path: String) -> Result<()> {
+  pub async fn delete(&self, path: String) -> Result<(), RestError> {
     let mut req = reqwest::Client::new()
       .delete(format!("{}/{}", API_URL, path));
     if let Some(token) = &self.token {
@@ -160,7 +164,8 @@ impl Rest {
 
     let status = res.status();
     if status.is_client_error() || status.is_server_error() {
-      return Err(Box::new(RestError::new(format!("Status {}, Body: {}", status.as_u16(), res.text().await?))))
+      let body = res.text().await?;
+      return Err(RestError::RequestFailed{ status, body });
     }
     Ok(())
   }

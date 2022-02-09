@@ -163,12 +163,12 @@ impl CommandHandler {
       let option_value = match option.option_type {
         InteractionOptionType::SUB_COMMAND_GROUP => {
           input.sub_command_group = Some(option.name);
-          return self.parse_options(option.options.expect("Sub command group is missing options"), resolved, &mut input)
+          return self.parse_options(option.options.expect("Sub command group is missing options"), resolved, input)
         },
         InteractionOptionType::SUB_COMMAND => {
           input.sub_command = Some(option.name);
           if option.options.is_none() { return }
-          return self.parse_options(option.options.unwrap(), resolved, &mut input)
+          return self.parse_options(option.options.unwrap(), resolved, input)
         },
 
         InteractionOptionType::STRING => OptionValue::String(option.value.unwrap().as_str().unwrap().to_string()),
