@@ -266,7 +266,7 @@ pub struct ChannelMention {
 }
 
 /// Discord Attachment Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Attachment {
   /// Attachment id
   pub id: Snowflake,
@@ -611,6 +611,39 @@ impl Message {
   /// ```
   pub async fn crosspost(&self, rest: &Rest) -> Result<Message, RestError> {
     Ok(rest.post(format!("channels/{}/messages/{}/crosspost", self.channel_id, self.id), Value::Null).await?)
+  }
+}
+
+impl Attachment {
+  /// Creates an attachment object that can be used to tell discord to keep the attachment when editing.
+  pub fn keep_with_id<T: ToString>(id: T) -> Self {
+    Self {
+      id: id.to_string(),
+      filename: String::from(""),
+      description: None,
+      content_type: None,
+      size: 0,
+      url: String::from(""),
+      proxy_url: String::from(""),
+      height: None,
+      width: None,
+      ephemeral: None
+    }
+  }
+
+  pub(crate) fn with_description<T: ToString, U: ToString>(id: T, description: U) -> Self {
+    Self {
+      id: id.to_string(),
+      filename: String::from(""),
+      description: Some(description.to_string()),
+      content_type: None,
+      size: 0,
+      url: String::from(""),
+      proxy_url: String::from(""),
+      height: None,
+      width: None,
+      ephemeral: None
+    }
   }
 }
 

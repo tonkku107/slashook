@@ -16,7 +16,7 @@ use super::{
   embeds::Embed,
   users::User,
   guilds::{GuildMember, Role},
-  channels::{Channel, Message, MessageFlags, AllowedMentions},
+  channels::{Channel, Message, MessageFlags, AllowedMentions, Attachment},
   components::{Component, ComponentType}
 };
 use crate::commands::MessageResponse;
@@ -87,14 +87,21 @@ pub struct InteractionData {
   pub target_id: Option<Snowflake>
 }
 
-#[doc(hidden)]
+/// Discord Interaction Data Resolved Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct InteractionDataResolved {
+  /// The ids and User objects
   pub users: Option<HashMap<Snowflake, User>>,
+  /// The ids and partial Member objects
   pub members: Option<HashMap<Snowflake, GuildMember>>,
+  /// The ids and Role objects
   pub roles: Option<HashMap<Snowflake, Role>>,
+  /// The ids and partial Channel objects
   pub channels: Option<HashMap<Snowflake, Channel>>,
-  pub messages: Option<HashMap<Snowflake, Message>>
+  /// The ids and partial Message objects
+  pub messages: Option<HashMap<Snowflake, Message>>,
+  /// The ids and attachment objects
+  pub attachments: Option<HashMap<Snowflake, Attachment>>
 }
 
 #[doc(hidden)]
@@ -123,6 +130,7 @@ pub enum InteractionOptionType {
   ROLE = 8,
   MENTIONABLE = 9,
   NUMBER = 10,
+  ATTACHMENT = 11,
   UNKNOWN
 }
 
@@ -136,6 +144,7 @@ pub enum OptionValue {
   Channel(Box<Channel>),
   Role(Role),
   Number(f64),
+  Attachment(Attachment),
   Other(Value)
 }
 
@@ -169,6 +178,7 @@ pub struct InteractionCallbackData {
   pub allowed_mentions: Option<AllowedMentions>,
   pub flags: Option<MessageFlags>,
   pub components: Option<Vec<Component>>,
+  pub attachments: Option<Vec<Attachment>>,
   pub choices: Option<Vec<ApplicationCommandOptionChoice>>
 }
 
@@ -183,6 +193,7 @@ impl From<MessageResponse> for InteractionCallbackData {
       flags: Some(flags),
       embeds: msg.embeds,
       components: msg.components,
+      attachments: msg.attachments,
       allowed_mentions: msg.allowed_mentions,
       choices: None
     }
@@ -198,6 +209,7 @@ impl From<MessageFlags> for InteractionCallbackData {
       flags: Some(flags),
       embeds: None,
       components: None,
+      attachments: None,
       allowed_mentions: None,
       choices: None
     }
@@ -213,9 +225,31 @@ impl From<Vec<ApplicationCommandOptionChoice>> for InteractionCallbackData {
       flags: None,
       embeds: None,
       components: None,
+      attachments: None,
       allowed_mentions: None,
       choices: Some(results)
     }
+  }
+}
+
+/// Trait for structs that have an [Attachment](crate::structs::channels::Attachment) Vec.
+/// Functions for use with [post_files](crate::rest::Rest::post_files) and [patch_files](crate::rest::Rest::patch_files)
+pub trait Attachments {
+  /// Returns the attachments that have been set and possibly removes the originals.
+  fn take_attachments(&mut self) -> Vec<Attachment>;
+
+  /// Sets updated attachments.
+  fn set_attachments(&mut self, attachments: Vec<Attachment>) -> &mut Self;
+}
+
+impl Attachments for InteractionCallbackData {
+  fn take_attachments(&mut self) -> Vec<Attachment> {
+    self.attachments.take().unwrap_or_default()
+  }
+
+  fn set_attachments(&mut self, attachments: Vec<Attachment>) -> &mut Self {
+    self.attachments = Some(attachments);
+    self
   }
 }
 
@@ -310,6 +344,19 @@ impl OptionValue {
       _ => None
     }
   }
+
+  /// Returns true if the value is an attachment. Returns false otherwise.
+  pub fn is_attachment(&self) -> bool {
+    matches!(self, Self::Attachment(_))
+  }
+
+  /// If the value is an attachment, returns the Attachment. Returns None otherwise.
+  pub fn as_attachment(&self) -> Option<&Attachment> {
+    match self {
+      Self::Attachment(a) => Some(a),
+      _ => None
+    }
+  }
 }
 
 impl ApplicationCommandOptionChoice {
@@ -329,6 +376,7 @@ impl std::fmt::Display for OptionValue {
       Self::Channel(c) => write!(f, "\"{}\"", c.id),
       Self::Role(r) => write!(f, "\"{}\"", r.id),
       Self::Number(n) => write!(f, "{}", n),
+      Self::Attachment(a) => write!(f, "{}", a.url),
       Self::Other(o) => write!(f, "{}", o)
     }
   }

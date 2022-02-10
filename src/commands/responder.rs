@@ -7,8 +7,8 @@
 
 use crate::structs::{
   embeds::Embed,
-  interactions::{InteractionCallbackData, ApplicationCommandOptionChoice},
-  channels::{Message, AllowedMentions},
+  interactions::{InteractionCallbackData, ApplicationCommandOptionChoice, Attachments},
+  channels::{Message, AllowedMentions, Attachment},
   components::{Component, Components},
   utils::File
 };
@@ -35,6 +35,8 @@ pub struct MessageResponse {
   pub embeds: Option<Vec<Embed>>,
   /// Components to send with the response
   pub components: Option<Vec<Component>>,
+  /// Partial attachment objects indicating which to keep when editing.
+  pub attachments: Option<Vec<Attachment>>,
   /// Which mentions should be parsed
   pub allowed_mentions: Option<AllowedMentions>,
   /// Up to 10 files to send with the response
@@ -135,8 +137,10 @@ impl MessageResponse {
   /// # #[slashook::main]
   /// # async fn main() -> CmdResult {
   /// let file = TokioFile::open("cat.png").await?;
+  /// let msg_file = File::from_file("cat.png", file).await?
+  ///   .set_description("Picture of my cute cat!");
   /// let response = MessageResponse::from("Here's a picture of my cat")
-  ///   .add_file(File::from_file("cat.png", file).await?);
+  ///   .add_file(msg_file);
   /// # Ok(())
   /// # }
   /// ```
@@ -144,6 +148,14 @@ impl MessageResponse {
     let mut files = self.files.unwrap_or_default();
     files.push(file);
     self.files = Some(files);
+    self
+  }
+
+  /// Keep an existing attachment when editing
+  pub fn keep_attachment<T: ToString>(mut self, attachment_id: T) -> Self {
+    let mut attachments = self.attachments.unwrap_or_default();
+    attachments.push(Attachment::keep_with_id(attachment_id));
+    self.attachments = Some(attachments);
     self
   }
 }
@@ -362,6 +374,7 @@ impl From<&str> for MessageResponse {
       ephemeral: false,
       embeds: None,
       components: None,
+      attachments: None,
       allowed_mentions: None,
       files: None
     }
@@ -376,6 +389,7 @@ impl From<String> for MessageResponse {
       ephemeral: false,
       embeds: None,
       components: None,
+      attachments: None,
       allowed_mentions: None,
       files: None
     }
@@ -390,6 +404,7 @@ impl From<Embed> for MessageResponse {
       ephemeral: false,
       embeds: Some(vec![e]),
       components: None,
+      attachments: None,
       allowed_mentions: None,
       files: None
     }
@@ -404,8 +419,20 @@ impl From<Components> for MessageResponse {
       ephemeral: false,
       embeds: None,
       components: Some(c.components),
+      attachments: None,
       allowed_mentions: None,
       files: None
     }
+  }
+}
+
+impl Attachments for MessageResponse {
+  fn take_attachments(&mut self) -> Vec<Attachment> {
+    self.attachments.take().unwrap_or_default()
+  }
+
+  fn set_attachments(&mut self, attachments: Vec<Attachment>) -> &mut Self {
+    self.attachments = Some(attachments);
+    self
   }
 }

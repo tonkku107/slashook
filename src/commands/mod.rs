@@ -179,6 +179,7 @@ impl CommandHandler {
         InteractionOptionType::ROLE => OptionValue::Role(resolved.as_ref().unwrap().roles.as_ref().unwrap().get(option.value.unwrap().as_str().unwrap()).unwrap().clone()),
         InteractionOptionType::MENTIONABLE => self.parse_mentionable(resolved, &option),
         InteractionOptionType::NUMBER => OptionValue::Number(option.value.unwrap().as_f64().unwrap()),
+        InteractionOptionType::ATTACHMENT => OptionValue::Attachment(resolved.as_ref().unwrap().attachments.as_ref().unwrap().get(option.value.unwrap().as_str().unwrap()).unwrap().clone()),
         _ => OptionValue::Other(option.value.unwrap())
       };
       if option.focused.unwrap_or_default() {

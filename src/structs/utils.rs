@@ -32,7 +32,9 @@ pub struct File {
   /// Name of the file
   pub filename: String,
   /// The bytes in the file
-  pub data: Vec<u8>
+  pub data: Vec<u8>,
+  /// Optional alt text for the file
+  pub description: Option<String>
 }
 
 impl Color {
@@ -83,7 +85,8 @@ impl File {
   pub fn new<T: ToString, U: Into<Vec<u8>>>(filename: T, data: U) -> Self {
     Self {
       filename: filename.to_string(),
-      data: data.into()
+      data: data.into(),
+      description: None
     }
   }
 
@@ -103,7 +106,25 @@ impl File {
     file.read_to_end(&mut data).await?;
     Ok(Self {
       filename: filename.to_string(),
-      data
+      data,
+      description: None
     })
+  }
+
+  /// Set a description for a file
+  /// ```no_run
+  /// # use slashook::structs::utils::File;
+  /// use slashook::tokio::fs::File as TokioFile;
+  /// # #[slashook::main]
+  /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+  /// let tokio_file = TokioFile::open("cat.png").await?;
+  /// let file = File::from_file("cat.png", tokio_file).await?
+  ///     .set_description("A picture of my cat!");
+  /// # Ok(())
+  /// # }
+  /// ```
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = Some(description.to_string());
+    self
   }
 }
