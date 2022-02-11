@@ -19,7 +19,7 @@ use super::{
   channels::{Channel, Message, MessageFlags, AllowedMentions, Attachment},
   components::{Component, ComponentType}
 };
-use crate::commands::MessageResponse;
+use crate::commands::{MessageResponse, Modal};
 
 #[doc(hidden)]
 #[derive(Deserialize_repr, Clone, Debug)]
@@ -69,6 +69,7 @@ pub enum InteractionType {
   APPLICATION_COMMAND = 2,
   MESSAGE_COMPONENT = 3,
   APPLICATION_COMMAND_AUTOCOMPLETE = 4,
+  MODAL_SUBMIT = 5,
   UNKNOWN
 }
 
@@ -84,7 +85,8 @@ pub struct InteractionData {
   pub custom_id: Option<String>,
   pub component_type: Option<ComponentType>,
   pub values: Option<Vec<String>>,
-  pub target_id: Option<Snowflake>
+  pub target_id: Option<Snowflake>,
+  pub components: Option<Vec<Component>>
 }
 
 /// Discord Interaction Data Resolved Object
@@ -166,7 +168,8 @@ pub enum InteractionCallbackType {
   DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5,
   DEFERRED_UPDATE_MESSAGE = 6,
   UPDATE_MESSAGE = 7,
-  APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8
+  APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8,
+  MODAL = 9
 }
 
 #[doc(hidden)]
@@ -179,7 +182,9 @@ pub struct InteractionCallbackData {
   pub flags: Option<MessageFlags>,
   pub components: Option<Vec<Component>>,
   pub attachments: Option<Vec<Attachment>>,
-  pub choices: Option<Vec<ApplicationCommandOptionChoice>>
+  pub choices: Option<Vec<ApplicationCommandOptionChoice>>,
+  pub custom_id: Option<String>,
+  pub title: Option<String>,
 }
 
 #[doc(hidden)]
@@ -195,7 +200,9 @@ impl From<MessageResponse> for InteractionCallbackData {
       components: msg.components,
       attachments: msg.attachments,
       allowed_mentions: msg.allowed_mentions,
-      choices: None
+      choices: None,
+      custom_id: None,
+      title: None
     }
   }
 }
@@ -211,7 +218,9 @@ impl From<MessageFlags> for InteractionCallbackData {
       components: None,
       attachments: None,
       allowed_mentions: None,
-      choices: None
+      choices: None,
+      custom_id: None,
+      title: None
     }
   }
 }
@@ -227,7 +236,27 @@ impl From<Vec<ApplicationCommandOptionChoice>> for InteractionCallbackData {
       components: None,
       attachments: None,
       allowed_mentions: None,
-      choices: Some(results)
+      choices: Some(results),
+      custom_id: None,
+      title: None
+    }
+  }
+}
+
+#[doc(hidden)]
+impl From<Modal> for InteractionCallbackData {
+  fn from(modal: Modal) -> InteractionCallbackData {
+    InteractionCallbackData {
+      tts: None,
+      content: None,
+      flags: None,
+      embeds: None,
+      components: Some(modal.components),
+      attachments: None,
+      allowed_mentions: None,
+      choices: None,
+      custom_id: Some(modal.custom_id),
+      title: Some(modal.title)
     }
   }
 }

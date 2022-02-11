@@ -21,13 +21,14 @@ use super::structs::{
     InteractionCallback, InteractionCallbackType,
     OptionValue
   },
+  components::{Component, ComponentType},
   channels::{Message, MessageFlags},
   users::User,
   guilds::GuildMember,
   Snowflake
 };
 use super::tokio::{spawn, sync::{mpsc, oneshot}};
-pub use responder::{MessageResponse, CommandResponder};
+pub use responder::{MessageResponse, CommandResponder, Modal};
 use responder::CommandResponse;
 use crate::rest::Rest;
 
@@ -71,6 +72,8 @@ pub struct Command {
 pub struct CommandInput {
   /// The type of the interaction this command was called for
   pub interaction_type: InteractionType,
+  /// The type of the component on component interactions
+  pub component_type: Option<ComponentType>,
   /// Name of the command that was executed
   pub command: String,
   /// Sub command that was executed
@@ -81,7 +84,8 @@ pub struct CommandInput {
   ///
   /// Only included in chat input commands
   pub sub_command_group: Option<String>,
-  /// Arguments the user of your command used. The key is the name of the argument
+  /// Arguments or modal inputs the user of your command filled./
+  /// The key is the name of the argument or custom_id of the component
   pub args: HashMap<String, OptionValue>,
   /// user, member, role, channel and message objects resolved from arguments by Discord
   ///
@@ -150,6 +154,7 @@ impl CommandHandler {
           InteractionType::APPLICATION_COMMAND => command_handler.handle_command(interaction, bot_token).await.map_err(|_| ()),
           InteractionType::MESSAGE_COMPONENT => command_handler.handle_component(interaction, bot_token).await.map_err(|_| ()),
           InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE => command_handler.handle_autocomplete(interaction, bot_token).await.map_err(|_| ()),
+          InteractionType::MODAL_SUBMIT => command_handler.handle_modal_submit(interaction, bot_token).await.map_err(|_| ()),
           _ => Err(())
         };
 
@@ -186,6 +191,21 @@ impl CommandHandler {
         input.focused = Some(option.name.clone());
       }
       input.args.insert(option.name, option_value);
+    }
+  }
+
+  fn parse_component_values(&self, components: Vec<Component>, input: &mut CommandInput) {
+    for component in components.into_iter() {
+      match component {
+        Component::ActionRow(action_row) => {
+          self.parse_component_values(action_row.components, input);
+        },
+        Component::TextInput(text_input) => {
+          let value = OptionValue::String(text_input.value.unwrap_or_default());
+          input.args.insert(text_input.custom_id, value);
+        },
+        _ => {}
+      }
     }
   }
 
@@ -292,6 +312,13 @@ impl CommandHandler {
         })
       },
 
+      CommandResponse::Modal(modal) => {
+        Ok(InteractionCallback {
+          response_type: InteractionCallbackType::MODAL,
+          data: Some(modal.into())
+        })
+      }
+
     }
   }
 
@@ -303,6 +330,7 @@ impl CommandHandler {
 
     let mut input = CommandInput {
       interaction_type: interaction.interaction_type,
+      component_type: data.component_type,
       command: name,
       sub_command: None,
       sub_command_group: None,
@@ -341,6 +369,7 @@ impl CommandHandler {
 
     let input = CommandInput {
       interaction_type: interaction.interaction_type,
+      component_type: data.component_type,
       command: command_name.to_string(),
       sub_command: None,
       sub_command_group: None,
@@ -374,6 +403,7 @@ impl CommandHandler {
 
     let mut input = CommandInput {
       interaction_type: interaction.interaction_type,
+      component_type: data.component_type,
       command: name,
       sub_command: None,
       sub_command_group: None,
@@ -401,6 +431,44 @@ impl CommandHandler {
     let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
     self.format_response(response)
   }
+
+  pub async fn handle_modal_submit(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
+    let data = interaction.data.ok_or("Interaction has no data")?;
+    let custom_id = data.custom_id.expect("Component interaction should have a custom_id");
+    let (command_name, rest_id) = custom_id.as_str().split_once("/").ok_or("Invalid custom_id")?;
+    let command = self.commands.get(command_name).ok_or("Command not found")?;
+    let task_command = command.clone();
+
+    let mut input = CommandInput {
+      interaction_type: interaction.interaction_type,
+      component_type: data.component_type,
+      command: command_name.to_string(),
+      sub_command: None,
+      sub_command_group: None,
+      args: HashMap::new(),
+      resolved: None,
+      guild_id: interaction.guild_id,
+      channel_id: interaction.channel_id,
+      user: self.parse_user(interaction.user, &interaction.member),
+      member: interaction.member,
+      message: interaction.message,
+      target_user: None,
+      target_member: None,
+      target_message: None,
+      custom_id: Some(rest_id.to_string()),
+      values: None,
+      focused: None,
+      locale: interaction.locale.expect("No locale in interaction"),
+      guild_locale: interaction.guild_locale,
+      rest: Rest::with_optional_token(bot_token)
+    };
+    if let Some(components) = data.components {
+      self.parse_component_values(components, &mut input);
+    }
+
+    let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
+    self.format_response(response)
+  }
 }
 
 impl CommandInput {
@@ -417,6 +485,11 @@ impl CommandInput {
   /// Returns true if the interaction is for autocompletion
   pub fn is_autocomplete(&self) -> bool {
     matches!(self.interaction_type, InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE)
+  }
+
+  /// Returns true if the interaction is for a modal submission
+  pub fn is_modal_submit(&self) -> bool {
+    matches!(self.interaction_type, InteractionType::MODAL_SUBMIT)
   }
 }
 

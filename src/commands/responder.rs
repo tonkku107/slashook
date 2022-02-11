@@ -160,13 +160,58 @@ impl MessageResponse {
   }
 }
 
+/// A modal that can be opened for user input
+#[derive(Clone, Debug)]
+pub struct Modal {
+  /// a developer-defined identifier for the component, max 100 characters
+  pub custom_id: String,
+  /// The title of the popup modal
+  pub title: String,
+  /// The components that make up the modal
+  pub components: Vec<Component>
+}
+
+impl Modal {
+  /// Creates a new modal.\
+  /// The command argument is used by the library to choose which command to run when the modal is submitted.
+  /// The custom_id is formatted as `command/id`
+  /// ```
+  /// # use slashook::commands::Modal;
+  /// let modal = Modal::new("example_command", "modal1", "Please fill this form");
+  /// ```
+  pub fn new<T: ToString, U: ToString, V: ToString>(command: T, id: U, title: V) -> Self {
+    Self {
+      custom_id: format!("{}/{}", command.to_string(), id.to_string()),
+      title: title.to_string(),
+      components: Vec::new()
+    }
+  }
+
+  /// Set the components on the modal
+  /// ```
+  /// # use slashook::commands::Modal;
+  /// # use slashook::structs::components::{Components, TextInput};
+  /// let text_input = TextInput::new()
+  ///   .set_label("Tell us something")
+  ///   .set_id("input");
+  /// let components = Components::new().add_text_input(text_input);
+  /// let modal = Modal::new("example_command", "modal1", "Please fill this form")
+  ///   .set_components(components);
+  /// ```
+  pub fn set_components(mut self, components: Components) -> Self {
+    self.components = components.components;
+    self
+  }
+}
+
 #[derive(Debug)]
 pub enum CommandResponse {
   DeferMessage(bool),
   SendMessage(MessageResponse),
   DeferUpdate,
   UpdateMessage(MessageResponse),
-  AutocompleteResult(Vec<ApplicationCommandOptionChoice>)
+  AutocompleteResult(Vec<ApplicationCommandOptionChoice>),
+  Modal(Modal)
 }
 
 /// Struct with methods for responding to interactions
@@ -267,6 +312,27 @@ impl CommandResponder {
   /// ```
   pub fn autocomplete(&self, results: Vec<ApplicationCommandOptionChoice>) -> SimpleResult<()> {
     self.tx.send(CommandResponse::AutocompleteResult(results))?;
+    Ok(())
+  }
+
+  /// Respond to an interaction with a modal
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse, Modal};
+  /// # use slashook::structs::components::{Components, TextInput};
+  /// ##[command("example")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   let text_input = TextInput::new()
+  ///     .set_label("Tell us something")
+  ///     .set_id("input");
+  ///   let components = Components::new().add_text_input(text_input);
+  ///   let modal = Modal::new("example_command", "modal1", "Please fill this form")
+  ///     .set_components(components);
+  ///   return res.open_modal(modal)?;
+  /// }
+  /// ```
+  pub fn open_modal(&self, modal: Modal) -> SimpleResult<()> {
+    self.tx.send(CommandResponse::Modal(modal))?;
     Ok(())
   }
 
