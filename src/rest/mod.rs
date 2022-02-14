@@ -8,7 +8,7 @@
 //! Discord rest api handling
 
 /// Discord API base URL
-pub const API_URL: &str = "https://discord.com/api/v9";
+pub const API_URL: &str = "https://discord.com/api/v10";
 
 use serde::{Serialize, de::DeserializeOwned};
 use crate::structs::{
