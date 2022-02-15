@@ -177,10 +177,14 @@ pub enum InteractionCallbackType {
 pub struct InteractionCallbackData {
   pub tts: Option<bool>,
   pub content: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub embeds: Option<Vec<Embed>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub allowed_mentions: Option<AllowedMentions>,
   pub flags: Option<MessageFlags>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub components: Option<Vec<Component>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub attachments: Option<Vec<Attachment>>,
   pub choices: Option<Vec<ApplicationCommandOptionChoice>>,
   pub custom_id: Option<String>,
@@ -190,12 +194,10 @@ pub struct InteractionCallbackData {
 #[doc(hidden)]
 impl From<MessageResponse> for InteractionCallbackData {
   fn from(msg: MessageResponse) -> InteractionCallbackData {
-    let mut flags = MessageFlags::empty();
-    if msg.ephemeral { flags.insert(MessageFlags::EPHEMERAL) }
     InteractionCallbackData {
       tts: msg.tts,
       content: msg.content,
-      flags: Some(flags),
+      flags: msg.flags,
       embeds: msg.embeds,
       components: msg.components,
       attachments: msg.attachments,

@@ -8,7 +8,7 @@
 use crate::structs::{
   embeds::Embed,
   interactions::{InteractionCallbackData, ApplicationCommandOptionChoice, Attachments},
-  channels::{Message, AllowedMentions, Attachment},
+  channels::{Message, AllowedMentions, Attachment, MessageFlags},
   components::{Component, Components},
   utils::File
 };
@@ -28,16 +28,21 @@ pub struct MessageResponse {
   pub tts: Option<bool>,
   /// Content of the message
   pub content: Option<String>,
-  /// Should only the user receiving the message be able to see it
-  #[serde(skip_serializing)]
-  pub ephemeral: bool,
+  /// Flags of the message.\
+  /// Valid flags are [EPHEMERAL](crate::structs::channels::MessageFlags::EPHEMERAL) for interactions to only show the response to the invoking user and
+  /// [SUPPRESS_EMBEDS](crate::structs::channels::MessageFlags::SUPPRESS_EMBEDS) to hide embeds from showing in the message.
+  pub flags: Option<MessageFlags>,
   /// Up to 10 embeds to send with the response
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub embeds: Option<Vec<Embed>>,
   /// Components to send with the response
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub components: Option<Vec<Component>>,
   /// Partial attachment objects indicating which to keep when editing.
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub attachments: Option<Vec<Attachment>>,
   /// Which mentions should be parsed
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub allowed_mentions: Option<AllowedMentions>,
   /// Up to 10 files to send with the response
   ///
@@ -74,12 +79,30 @@ impl MessageResponse {
   /// Set the ephemeralness of the message
   /// ```
   /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::channels::MessageFlags;
   /// let response = MessageResponse::from("This is for your eyes only!")
   ///   .set_ephemeral(true);
-  /// assert_eq!(response.ephemeral, true);
+  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::EPHEMERAL), true);
   /// ```
   pub fn set_ephemeral(mut self, ephemeral: bool) -> Self {
-    self.ephemeral = ephemeral;
+    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
+    flags.set(MessageFlags::EPHEMERAL, ephemeral);
+    self.flags = Some(flags);
+    self
+  }
+
+  /// Set suppress embeds flag
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::channels::MessageFlags;
+  /// let response = MessageResponse::from("No embeds here")
+  ///   .set_suppress_embeds(true);
+  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::SUPPRESS_EMBEDS), true);
+  /// ```
+  pub fn set_suppress_embeds(mut self, suppress: bool) -> Self {
+    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
+    flags.set(MessageFlags::SUPPRESS_EMBEDS, suppress);
+    self.flags = Some(flags);
     self
   }
 
@@ -437,7 +460,7 @@ impl From<&str> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: Some(String::from(s)),
-      ephemeral: false,
+      flags: None,
       embeds: None,
       components: None,
       attachments: None,
@@ -452,7 +475,7 @@ impl From<String> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: Some(s),
-      ephemeral: false,
+      flags: None,
       embeds: None,
       components: None,
       attachments: None,
@@ -467,7 +490,7 @@ impl From<Embed> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      ephemeral: false,
+      flags: None,
       embeds: Some(vec![e]),
       components: None,
       attachments: None,
@@ -482,7 +505,7 @@ impl From<Components> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      ephemeral: false,
+      flags: None,
       embeds: None,
       components: Some(c.components),
       attachments: None,
