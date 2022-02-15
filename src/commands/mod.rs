@@ -72,6 +72,8 @@ pub struct Command {
 pub struct CommandInput {
   /// The type of the interaction this command was called for
   pub interaction_type: InteractionType,
+  /// The type of the command on command interactions
+  pub command_type: Option<ApplicationCommandType>,
   /// The type of the component on component interactions
   pub component_type: Option<ComponentType>,
   /// Name of the command that was executed
@@ -150,12 +152,14 @@ impl CommandHandler {
       spawn(async move {
         let RocketCommand(interaction, bot_token, handler_send) = command;
 
-        let value = match interaction.interaction_type {
-          InteractionType::APPLICATION_COMMAND => command_handler.handle_command(interaction, bot_token).await.map_err(|_| ()),
-          InteractionType::MESSAGE_COMPONENT => command_handler.handle_component(interaction, bot_token).await.map_err(|_| ()),
-          InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE => command_handler.handle_autocomplete(interaction, bot_token).await.map_err(|_| ()),
-          InteractionType::MODAL_SUBMIT => command_handler.handle_modal_submit(interaction, bot_token).await.map_err(|_| ()),
-          _ => Err(())
+        let value = if let
+        InteractionType::APPLICATION_COMMAND |
+        InteractionType::MESSAGE_COMPONENT |
+        InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE |
+        InteractionType::MODAL_SUBMIT = interaction.interaction_type {
+          command_handler.handle_command(interaction, bot_token).await.map_err(|_| ())
+        } else {
+          Err(())
         };
 
         handler_send.send(value).unwrap();
@@ -227,8 +231,8 @@ impl CommandHandler {
     }
   }
 
-  fn parse_resolved(&self, resolved: Option<InteractionDataResolved>, command_type: ApplicationCommandType, target_id: Option<String>, mut input: &mut CommandInput) {
-    match command_type {
+  fn parse_resolved(&self, resolved: Option<InteractionDataResolved>, target_id: Option<String>, mut input: &mut CommandInput) {
+    match input.command_type.as_ref().unwrap() {
       ApplicationCommandType::USER => {
         let target_id = target_id.expect("User context menu command has no target");
         let resolved = resolved.expect("User context menu command has no resolved");
@@ -324,53 +328,27 @@ impl CommandHandler {
 
   pub async fn handle_command(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
     let data = interaction.data.ok_or("Interaction has no data")?;
-    let name = data.name.ok_or("Command should have a name")?;
+
+    let (name, custom_id): (String, Option<String>) = match interaction.interaction_type {
+      InteractionType::APPLICATION_COMMAND | InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE => {
+        (data.name.ok_or("Command should have a name")?, None)
+      },
+      InteractionType::MESSAGE_COMPONENT | InteractionType::MODAL_SUBMIT => {
+        let custom_id = data.custom_id.ok_or("Component interaction should have a custom_id")?;
+        let (command_name, rest_id) = custom_id.as_str().split_once("/").ok_or("Invalid custom_id")?;
+        (command_name.to_string(), Some(rest_id.to_string()))
+      },
+      _ => panic!("This type shouldn't be handled here")
+    };
+
     let command = self.commands.get(&name).ok_or("Command not found")?;
     let task_command = command.clone();
 
     let mut input = CommandInput {
       interaction_type: interaction.interaction_type,
+      command_type: data.command_type,
       component_type: data.component_type,
       command: name,
-      sub_command: None,
-      sub_command_group: None,
-      args: HashMap::new(),
-      resolved: None,
-      guild_id: interaction.guild_id,
-      channel_id: interaction.channel_id,
-      user: self.parse_user(interaction.user, &interaction.member),
-      member: interaction.member,
-      message: None,
-      target_user: None,
-      target_member: None,
-      target_message: None,
-      custom_id: None,
-      values: None,
-      focused: None,
-      locale: interaction.locale.expect("No locale in interaction"),
-      guild_locale: interaction.guild_locale,
-      rest: Rest::with_optional_token(bot_token)
-    };
-    if let Some(options) = data.options {
-      self.parse_options(options, &data.resolved, &mut input);
-    }
-    self.parse_resolved(data.resolved, data.command_type.ok_or("Command should have a command type")?, data.target_id, &mut input);
-
-    let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
-    self.format_response(response)
-  }
-
-  pub async fn handle_component(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
-    let data = interaction.data.ok_or("Interaction has no data")?;
-    let custom_id = data.custom_id.expect("Component interaction should have a custom_id");
-    let (command_name, rest_id) = custom_id.as_str().split_once("/").ok_or("Invalid custom_id")?;
-    let command = self.commands.get(command_name).ok_or("Command not found")?;
-    let task_command = command.clone();
-
-    let input = CommandInput {
-      interaction_type: interaction.interaction_type,
-      component_type: data.component_type,
-      command: command_name.to_string(),
       sub_command: None,
       sub_command_group: None,
       args: HashMap::new(),
@@ -383,7 +361,7 @@ impl CommandHandler {
       target_user: None,
       target_member: None,
       target_message: None,
-      custom_id: Some(rest_id.to_string()),
+      custom_id,
       values: data.values,
       focused: None,
       locale: interaction.locale.expect("No locale in interaction"),
@@ -391,79 +369,16 @@ impl CommandHandler {
       rest: Rest::with_optional_token(bot_token)
     };
 
-    let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
-    self.format_response(response)
-  }
-
-  pub async fn handle_autocomplete(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
-    let data = interaction.data.ok_or("Interaction has no data")?;
-    let name = data.name.ok_or("Command should have a name")?;
-    let command = self.commands.get(&name).ok_or("Command not found")?;
-    let task_command = command.clone();
-
-    let mut input = CommandInput {
-      interaction_type: interaction.interaction_type,
-      component_type: data.component_type,
-      command: name,
-      sub_command: None,
-      sub_command_group: None,
-      args: HashMap::new(),
-      resolved: None,
-      guild_id: interaction.guild_id,
-      channel_id: interaction.channel_id,
-      user: self.parse_user(interaction.user, &interaction.member),
-      member: interaction.member,
-      message: None,
-      target_user: None,
-      target_member: None,
-      target_message: None,
-      custom_id: None,
-      values: None,
-      focused: None,
-      locale: interaction.locale.expect("No locale in interaction"),
-      guild_locale: interaction.guild_locale,
-      rest: Rest::with_optional_token(bot_token)
-    };
     if let Some(options) = data.options {
       self.parse_options(options, &data.resolved, &mut input);
     }
 
-    let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
-    self.format_response(response)
-  }
-
-  pub async fn handle_modal_submit(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
-    let data = interaction.data.ok_or("Interaction has no data")?;
-    let custom_id = data.custom_id.expect("Component interaction should have a custom_id");
-    let (command_name, rest_id) = custom_id.as_str().split_once("/").ok_or("Invalid custom_id")?;
-    let command = self.commands.get(command_name).ok_or("Command not found")?;
-    let task_command = command.clone();
-
-    let mut input = CommandInput {
-      interaction_type: interaction.interaction_type,
-      component_type: data.component_type,
-      command: command_name.to_string(),
-      sub_command: None,
-      sub_command_group: None,
-      args: HashMap::new(),
-      resolved: None,
-      guild_id: interaction.guild_id,
-      channel_id: interaction.channel_id,
-      user: self.parse_user(interaction.user, &interaction.member),
-      member: interaction.member,
-      message: interaction.message,
-      target_user: None,
-      target_member: None,
-      target_message: None,
-      custom_id: Some(rest_id.to_string()),
-      values: None,
-      focused: None,
-      locale: interaction.locale.expect("No locale in interaction"),
-      guild_locale: interaction.guild_locale,
-      rest: Rest::with_optional_token(bot_token)
-    };
     if let Some(components) = data.components {
       self.parse_component_values(components, &mut input);
+    }
+
+    if input.command_type.is_some() {
+      self.parse_resolved(data.resolved, data.target_id, &mut input);
     }
 
     let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
