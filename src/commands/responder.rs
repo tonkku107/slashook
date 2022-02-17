@@ -45,8 +45,6 @@ pub struct MessageResponse {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub allowed_mentions: Option<AllowedMentions>,
   /// Up to 10 files to send with the response
-  ///
-  /// Only available for follow-up responses
   #[serde(skip_serializing)]
   pub files: Option<Vec<File>>
 }

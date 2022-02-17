@@ -17,7 +17,8 @@ use super::{
   users::User,
   guilds::{GuildMember, Role},
   channels::{Channel, Message, MessageFlags, AllowedMentions, Attachment},
-  components::{Component, ComponentType}
+  components::{Component, ComponentType},
+  utils::File
 };
 use crate::commands::{MessageResponse, Modal};
 
@@ -189,6 +190,8 @@ pub struct InteractionCallbackData {
   pub choices: Option<Vec<ApplicationCommandOptionChoice>>,
   pub custom_id: Option<String>,
   pub title: Option<String>,
+  #[serde(skip_serializing)]
+  pub files: Option<Vec<File>>
 }
 
 #[doc(hidden)]
@@ -204,7 +207,8 @@ impl From<MessageResponse> for InteractionCallbackData {
       allowed_mentions: msg.allowed_mentions,
       choices: None,
       custom_id: None,
-      title: None
+      title: None,
+      files: msg.files
     }
   }
 }
@@ -222,7 +226,8 @@ impl From<MessageFlags> for InteractionCallbackData {
       allowed_mentions: None,
       choices: None,
       custom_id: None,
-      title: None
+      title: None,
+      files: None
     }
   }
 }
@@ -240,7 +245,8 @@ impl From<Vec<ApplicationCommandOptionChoice>> for InteractionCallbackData {
       allowed_mentions: None,
       choices: Some(results),
       custom_id: None,
-      title: None
+      title: None,
+      files: None
     }
   }
 }
@@ -258,7 +264,8 @@ impl From<Modal> for InteractionCallbackData {
       allowed_mentions: None,
       choices: None,
       custom_id: Some(modal.custom_id),
-      title: Some(modal.title)
+      title: Some(modal.title),
+      files: None
     }
   }
 }

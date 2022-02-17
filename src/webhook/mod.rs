@@ -8,6 +8,7 @@
 extern crate ring;
 extern crate hex;
 mod signature_headers;
+mod multipart;
 
 use super::{Config, commands::RocketCommand};
 use super::structs::interactions::{Interaction, InteractionType, InteractionCallback, InteractionCallbackType};
@@ -22,17 +23,39 @@ use rocket::{
 use serde_json::{Value, json};
 use ring::signature;
 
-struct Res {
-  status: Status,
-  json: Value
+
+enum Res {
+  Raw {
+    status: Status,
+    json: Value,
+  },
+  Response {
+    status: Status,
+    data: Box<InteractionCallback>
+  }
 }
 
 impl<'r> Responder<'r, 'static> for Res {
   fn respond_to(self, req: &'r Request<'_>) -> response::Result<'static> {
-    Response::build()
-      .merge(content::Json(self.json.to_string()).respond_to(req)?)
-      .status(self.status)
-      .ok()
+    match self {
+      Self::Raw{ status, json } => {
+        Response::build()
+        .merge(content::Json(json.to_string()).respond_to(req)?)
+        .status(status)
+        .ok()
+      },
+      Self::Response{ status, data } => {
+        if let Some(inner_data) = &data.data {
+          if inner_data.files.is_some() {
+            return multipart::handle_multipart(status, *data);
+          }
+        }
+        Response::build()
+        .merge(content::Json(serde_json::to_string(&data).map_err(|_| Status::InternalServerError)?).respond_to(req)?)
+        .status(status)
+        .ok()
+      }
+    }
   }
 }
 
@@ -54,14 +77,14 @@ fn verify_signature(body: &[u8], headers: SignatureHeaders, public_key: &str) ->
 async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config>, cmd_sender: &State<mpsc::UnboundedSender::<RocketCommand>>) -> Res {
 
   if !verify_signature(body, headers, &config.public_key) {
-    return Res{ status: Status::Unauthorized, json: json!({ "error": "Bad signature" })}
+    return Res::Raw{ status: Status::Unauthorized, json: json!({ "error": "Bad signature" })}
   }
 
   let interaction: Interaction = match serde_json::from_slice(body) {
     Ok(i) => i,
     Err(err) => {
       println!("Received bad request body from Discord. Error: {}", err);
-      return Res{ status: Status::BadRequest, json: json!({ "error": "Bad body" })}
+      return Res::Raw{ status: Status::BadRequest, json: json!({ "error": "Bad body" })}
     }
   };
 
@@ -71,11 +94,11 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
         response_type: InteractionCallbackType::PONG,
         data: None
       };
-      Res{ status: Status::Ok, json: json!(response) }
+      Res::Raw{ status: Status::Ok, json: json!(response) }
     },
 
     InteractionType::UNKNOWN => {
-      Res{ status: Status::NotFound, json: json!({ "error": "Unknown interaction type" }) }
+      Res::Raw{ status: Status::NotFound, json: json!({ "error": "Unknown interaction type" }) }
     },
 
     _ => {
@@ -84,8 +107,8 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
       let response = handler_respond.await.unwrap();
 
       match response {
-        Err(_) => Res{ status: Status::InternalServerError, json: json!({ "error": "Handler failed" }) },
-        Ok(res) => Res{ status: Status::Ok, json: json!(res) }
+        Err(_) => Res::Raw{ status: Status::InternalServerError, json: json!({ "error": "Handler failed" }) },
+        Ok(res) => Res::Response{ status: Status::Ok, data: Box::new(res) }
       }
     }
   }
