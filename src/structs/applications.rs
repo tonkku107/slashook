@@ -59,13 +59,21 @@ pub struct Application {
 bitflags! {
   /// Bitflags for Discord Application Flags
   pub struct ApplicationFlags: u32 {
+    /// Has presence intent
     const GATEWAY_PRESENCE = 1 << 12;
+    /// Enabled unverified presence intent
     const GATEWAY_PRESENCE_LIMITED = 1 << 13;
+    /// Has server members intent
     const GATEWAY_GUILD_MEMBERS = 1 << 14;
+    /// Enabled unverified server members intent
     const GATEWAY_GUILD_MEMBERS_LIMITED = 1 << 15;
+    /// Increased guild limit for applications pending verification
     const VERIFICATION_PENDING_GUILD_LIMIT = 1 << 16;
+    /// Embedded activity
     const EMBEDDED = 1 << 17;
+    /// Has message content intent
     const GATEWAY_MESSAGE_CONTENT = 1 << 18;
+    /// Enabled unverified message content intent
     const GATEWAY_MESSAGE_CONTENT_LIMITED = 1 << 19;
   }
 }
@@ -103,8 +111,11 @@ pub struct TeamMember {
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum TeamMembershipState {
+  /// Member has been invited
   INVITED = 1,
+  /// Member has accepted invitation
   ACCEPTED = 2,
+  /// Membership state that hasn't been implemented yet
   UNKNOWN
 }
 

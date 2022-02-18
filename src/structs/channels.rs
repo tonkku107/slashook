@@ -137,8 +137,11 @@ pub struct PermissionOverwrites {
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum PermissionOverwriteType {
+  /// Permission overwrite for a role
   ROLE = 0,
+  /// Permission overwrite for a member
   MEMBER = 1,
+  /// Permission overwrite type that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -306,29 +309,53 @@ pub struct Reaction {
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum MessageType {
+  /// Normal message
   DEFAULT = 0,
+  /// Member added to a group chat
   RECIPIENT_ADD = 1,
+  /// Member removed from a group chat
   RECIPIENT_REMOVE = 2,
+  /// Call notification
   CALL = 3,
+  /// Channel name changed
   CHANNEL_NAME_CHANGE = 4,
+  /// Channel icon changed
   CHANNEL_ICON_CHANGE = 5,
+  /// A message was pinned
   CHANNEL_PINNED_MESSAGE = 6,
+  /// A new member joined a server
   GUILD_MEMBER_JOIN = 7,
+  /// A member boosted the server
   USER_PREMIUM_GUILD_SUBSCRIPTION = 8,
+  /// A member boosted the server and reached tier 1
   USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_1 = 9,
+  /// A member boosted the server and reached tier 2
   USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_2 = 10,
+  /// A member boosted the server and reached tier 3
   USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_3 = 11,
+  /// A news channel followed
   CHANNEL_FOLLOW_ADD = 12,
+  /// Server is no longer qualified for discovery
   GUILD_DISCOVERY_DISQUALIFIED = 14,
+  /// Server is qualified for discovery again
   GUILD_DISCOVERY_REQUALIFIED = 15,
+  /// First warning about losing discovery eligibility
   GUILD_DISCOVERY_GRACE_PERIOD_INITIAL_WARNING = 16,
+  /// Final warning about losing discovery eligibility
   GUILD_DISCOVERY_GRACE_PERIOD_FINAL_WARNING = 17,
+  /// A new thread was created
   THREAD_CREATED = 18,
+  /// Message is a reply to another message
   REPLY = 19,
+  /// Message was sent from a chat input command
   CHAT_INPUT_COMMAND = 20,
+  /// Message is the first message that started the thread
   THREAD_STARTER_MESSAGE = 21,
+  /// Server setup tips
   GUILD_INVITE_REMINDER = 22,
+  /// Message was sent from a context menu command
   CONTEXT_MENU_COMMAND = 23,
+  /// A message type that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -347,10 +374,15 @@ pub struct MessageActivity {
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum MessageActivityType {
+  /// Invite to join activity
   JOIN = 1,
+  /// Invite to spectate activity
   SPECTATE = 2,
+  /// Invite to listen along
   LISTEN = 3,
+  /// Invite to request to join
   JOIN_REQUEST = 5,
+  /// Message activity type that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -421,9 +453,13 @@ pub struct StickerItem {
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum StickerFormatType {
+  /// .png format
   PNG = 1,
+  /// Animated .png format
   APNG = 2,
+  /// Lottie .json format
   LOTTIE = 3,
+  /// Sticker format type that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -444,8 +480,11 @@ pub struct AllowedMentions {
 #[derive(Serialize, Clone, Debug)]
 #[allow(non_camel_case_types)]
 pub enum AllowedMentionType {
+  /// Allowed to mention roles
   roles,
+  /// Allowed to mention users
   users,
+  /// Allowed to mention @everyone and @here
   everyone
 }
 

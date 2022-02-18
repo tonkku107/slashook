@@ -87,9 +87,13 @@ bitflags! {
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum PremiumType {
+  /// User has no nitro
   NONE = 0,
+  /// User has Nitro Classic
   NITRO_CLASSIC = 1,
+  /// User has Nitro
   NITRO = 2,
+  /// A premium type that hasn't been implemented yet
   UNKNOWN
 }
 

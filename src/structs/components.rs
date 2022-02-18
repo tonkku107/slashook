@@ -13,15 +13,20 @@ use serde_json::Value;
 use serde_repr::{Serialize_repr, Deserialize_repr};
 use super::emojis::Emoji;
 
-#[doc(hidden)]
+/// Discord Component Types
 #[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum ComponentType {
+  /// A container for other components
   ACTION_ROW = 1,
+  /// A button object
   BUTTON = 2,
+  /// A select menu for picking from choices
   SELECT_MENU = 3,
+  /// A text input object
   TEXT_INPUT = 4,
+  /// A component that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -29,10 +34,15 @@ pub enum ComponentType {
 #[derive(Serialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum Component {
+  /// An Action Row component
   ActionRow(ActionRow),
+  /// A Button component
   Button(Box<Button>),
+  /// A Select Menu component
   SelectMenu(SelectMenu),
+  /// A Text Input component
   TextInput(TextInput),
+  /// A component that hasn't been implemented yet
   Unknown
 }
 

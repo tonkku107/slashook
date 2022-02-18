@@ -22,14 +22,18 @@ use super::{
 };
 use crate::commands::{MessageResponse, Modal};
 
-#[doc(hidden)]
+/// Discord Application Command Types
 #[derive(Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum ApplicationCommandType {
+  /// Slash commands; a text-based command that shows up when a user types `/`
   CHAT_INPUT = 1,
+  /// A UI-based command that shows up when you right click or tap on a user
   USER = 2,
+  /// A UI-based command that shows up when you right click or tap on a message
   MESSAGE = 3,
+  /// An application command type that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -66,11 +70,17 @@ pub struct Interaction {
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum InteractionType {
+  /// Ping interaction
   PING = 1,
+  /// Application command interaction
   APPLICATION_COMMAND = 2,
+  /// Message component interaction
   MESSAGE_COMPONENT = 3,
+  /// Autocomplete interaction
   APPLICATION_COMMAND_AUTOCOMPLETE = 4,
+  /// Modal submit interaction
   MODAL_SUBMIT = 5,
+  /// Interaction type that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -140,14 +150,23 @@ pub enum InteractionOptionType {
 /// Represents the possible values from command arguments
 #[derive(Clone, Debug)]
 pub enum OptionValue {
+  /// Represents a string value
   String(String),
+  /// Represents an integer value
   Integer(i64),
+  /// Represents a boolean value
   Boolean(bool),
+  /// Represents a user value
   User(User),
+  /// Represents a channel value
   Channel(Box<Channel>),
+  /// Represents a role channe
   Role(Role),
+  /// Represents a number value
   Number(f64),
+  /// Represents an attachment value
   Attachment(Attachment),
+  /// Represents any unknown value
   Other(Value)
 }
 
