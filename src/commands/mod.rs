@@ -392,9 +392,34 @@ impl CommandInput {
     matches!(self.interaction_type, InteractionType::APPLICATION_COMMAND)
   }
 
+  /// Returns true if the interaction is for a chat input command
+  pub fn is_chat_input(&self) -> bool {
+    self.command_type.as_ref().map_or(false, |t| matches!(t, ApplicationCommandType::CHAT_INPUT))
+  }
+
+  /// Returns true if the interaction is for a user context menu
+  pub fn is_user_context(&self) -> bool {
+    self.command_type.as_ref().map_or(false, |t| matches!(t, ApplicationCommandType::USER))
+  }
+
+  /// Returns true if the interaction is for a message context menu
+  pub fn is_message_context(&self) -> bool {
+    self.command_type.as_ref().map_or(false, |t| matches!(t, ApplicationCommandType::MESSAGE))
+  }
+
   /// Returns true if the interaction is for a message component
   pub fn is_component(&self) -> bool {
     matches!(self.interaction_type, InteractionType::MESSAGE_COMPONENT)
+  }
+
+  /// Returns true if the interaction is for a clicked button
+  pub fn is_button(&self) -> bool {
+    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::BUTTON))
+  }
+
+  /// Returns true if the interaction is for a selecting from a select menu
+  pub fn is_select_menu(&self) -> bool {
+    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::SELECT_MENU))
   }
 
   /// Returns true if the interaction is for autocompletion
