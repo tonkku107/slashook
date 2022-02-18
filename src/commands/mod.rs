@@ -21,13 +21,14 @@ use super::structs::{
     InteractionCallback, InteractionCallbackType,
     OptionValue
   },
+  components::{Component, ComponentType},
   channels::{Message, MessageFlags},
   users::User,
   guilds::GuildMember,
   Snowflake
 };
 use super::tokio::{spawn, sync::{mpsc, oneshot}};
-pub use responder::{MessageResponse, CommandResponder};
+pub use responder::{MessageResponse, CommandResponder, Modal};
 use responder::CommandResponse;
 use crate::rest::Rest;
 
@@ -71,6 +72,10 @@ pub struct Command {
 pub struct CommandInput {
   /// The type of the interaction this command was called for
   pub interaction_type: InteractionType,
+  /// The type of the command on command interactions
+  pub command_type: Option<ApplicationCommandType>,
+  /// The type of the component on component interactions
+  pub component_type: Option<ComponentType>,
   /// Name of the command that was executed
   pub command: String,
   /// Sub command that was executed
@@ -81,7 +86,8 @@ pub struct CommandInput {
   ///
   /// Only included in chat input commands
   pub sub_command_group: Option<String>,
-  /// Arguments the user of your command used. The key is the name of the argument
+  /// Arguments or modal inputs the user of your command filled./
+  /// The key is the name of the argument or custom_id of the component
   pub args: HashMap<String, OptionValue>,
   /// user, member, role, channel and message objects resolved from arguments by Discord
   ///
@@ -146,11 +152,14 @@ impl CommandHandler {
       spawn(async move {
         let RocketCommand(interaction, bot_token, handler_send) = command;
 
-        let value = match interaction.interaction_type {
-          InteractionType::APPLICATION_COMMAND => command_handler.handle_command(interaction, bot_token).await.map_err(|_| ()),
-          InteractionType::MESSAGE_COMPONENT => command_handler.handle_component(interaction, bot_token).await.map_err(|_| ()),
-          InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE => command_handler.handle_autocomplete(interaction, bot_token).await.map_err(|_| ()),
-          _ => Err(())
+        let value = if let
+        InteractionType::APPLICATION_COMMAND |
+        InteractionType::MESSAGE_COMPONENT |
+        InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE |
+        InteractionType::MODAL_SUBMIT = interaction.interaction_type {
+          command_handler.handle_command(interaction, bot_token).await.map_err(|_| ())
+        } else {
+          Err(())
         };
 
         handler_send.send(value).unwrap();
@@ -179,12 +188,28 @@ impl CommandHandler {
         InteractionOptionType::ROLE => OptionValue::Role(resolved.as_ref().unwrap().roles.as_ref().unwrap().get(option.value.unwrap().as_str().unwrap()).unwrap().clone()),
         InteractionOptionType::MENTIONABLE => self.parse_mentionable(resolved, &option),
         InteractionOptionType::NUMBER => OptionValue::Number(option.value.unwrap().as_f64().unwrap()),
+        InteractionOptionType::ATTACHMENT => OptionValue::Attachment(resolved.as_ref().unwrap().attachments.as_ref().unwrap().get(option.value.unwrap().as_str().unwrap()).unwrap().clone()),
         _ => OptionValue::Other(option.value.unwrap())
       };
       if option.focused.unwrap_or_default() {
         input.focused = Some(option.name.clone());
       }
       input.args.insert(option.name, option_value);
+    }
+  }
+
+  fn parse_component_values(&self, components: Vec<Component>, input: &mut CommandInput) {
+    for component in components.into_iter() {
+      match component {
+        Component::ActionRow(action_row) => {
+          self.parse_component_values(action_row.components, input);
+        },
+        Component::TextInput(text_input) => {
+          let value = OptionValue::String(text_input.value.unwrap_or_default());
+          input.args.insert(text_input.custom_id, value);
+        },
+        _ => {}
+      }
     }
   }
 
@@ -206,8 +231,8 @@ impl CommandHandler {
     }
   }
 
-  fn parse_resolved(&self, resolved: Option<InteractionDataResolved>, command_type: ApplicationCommandType, target_id: Option<String>, mut input: &mut CommandInput) {
-    match command_type {
+  fn parse_resolved(&self, resolved: Option<InteractionDataResolved>, target_id: Option<String>, mut input: &mut CommandInput) {
+    match input.command_type.as_ref().unwrap() {
       ApplicationCommandType::USER => {
         let target_id = target_id.expect("User context menu command has no target");
         let resolved = resolved.expect("User context menu command has no resolved");
@@ -291,56 +316,39 @@ impl CommandHandler {
         })
       },
 
+      CommandResponse::Modal(modal) => {
+        Ok(InteractionCallback {
+          response_type: InteractionCallbackType::MODAL,
+          data: Some(modal.into())
+        })
+      }
+
     }
   }
 
   pub async fn handle_command(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
     let data = interaction.data.ok_or("Interaction has no data")?;
-    let name = data.name.ok_or("Command should have a name")?;
+
+    let (name, custom_id): (String, Option<String>) = match interaction.interaction_type {
+      InteractionType::APPLICATION_COMMAND | InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE => {
+        (data.name.ok_or("Command should have a name")?, None)
+      },
+      InteractionType::MESSAGE_COMPONENT | InteractionType::MODAL_SUBMIT => {
+        let custom_id = data.custom_id.ok_or("Component interaction should have a custom_id")?;
+        let (command_name, rest_id) = custom_id.as_str().split_once("/").ok_or("Invalid custom_id")?;
+        (command_name.to_string(), Some(rest_id.to_string()))
+      },
+      _ => panic!("This type shouldn't be handled here")
+    };
+
     let command = self.commands.get(&name).ok_or("Command not found")?;
     let task_command = command.clone();
 
     let mut input = CommandInput {
       interaction_type: interaction.interaction_type,
+      command_type: data.command_type,
+      component_type: data.component_type,
       command: name,
-      sub_command: None,
-      sub_command_group: None,
-      args: HashMap::new(),
-      resolved: None,
-      guild_id: interaction.guild_id,
-      channel_id: interaction.channel_id,
-      user: self.parse_user(interaction.user, &interaction.member),
-      member: interaction.member,
-      message: None,
-      target_user: None,
-      target_member: None,
-      target_message: None,
-      custom_id: None,
-      values: None,
-      focused: None,
-      locale: interaction.locale.expect("No locale in interaction"),
-      guild_locale: interaction.guild_locale,
-      rest: Rest::with_optional_token(bot_token)
-    };
-    if let Some(options) = data.options {
-      self.parse_options(options, &data.resolved, &mut input);
-    }
-    self.parse_resolved(data.resolved, data.command_type.ok_or("Command should have a command type")?, data.target_id, &mut input);
-
-    let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
-    self.format_response(response)
-  }
-
-  pub async fn handle_component(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
-    let data = interaction.data.ok_or("Interaction has no data")?;
-    let custom_id = data.custom_id.expect("Component interaction should have a custom_id");
-    let (command_name, rest_id) = custom_id.as_str().split_once("/").ok_or("Invalid custom_id")?;
-    let command = self.commands.get(command_name).ok_or("Command not found")?;
-    let task_command = command.clone();
-
-    let input = CommandInput {
-      interaction_type: interaction.interaction_type,
-      command: command_name.to_string(),
       sub_command: None,
       sub_command_group: None,
       args: HashMap::new(),
@@ -353,7 +361,7 @@ impl CommandHandler {
       target_user: None,
       target_member: None,
       target_message: None,
-      custom_id: Some(rest_id.to_string()),
+      custom_id,
       values: data.values,
       focused: None,
       locale: interaction.locale.expect("No locale in interaction"),
@@ -361,40 +369,16 @@ impl CommandHandler {
       rest: Rest::with_optional_token(bot_token)
     };
 
-    let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
-    self.format_response(response)
-  }
-
-  pub async fn handle_autocomplete(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
-    let data = interaction.data.ok_or("Interaction has no data")?;
-    let name = data.name.ok_or("Command should have a name")?;
-    let command = self.commands.get(&name).ok_or("Command not found")?;
-    let task_command = command.clone();
-
-    let mut input = CommandInput {
-      interaction_type: interaction.interaction_type,
-      command: name,
-      sub_command: None,
-      sub_command_group: None,
-      args: HashMap::new(),
-      resolved: None,
-      guild_id: interaction.guild_id,
-      channel_id: interaction.channel_id,
-      user: self.parse_user(interaction.user, &interaction.member),
-      member: interaction.member,
-      message: None,
-      target_user: None,
-      target_member: None,
-      target_message: None,
-      custom_id: None,
-      values: None,
-      focused: None,
-      locale: interaction.locale.expect("No locale in interaction"),
-      guild_locale: interaction.guild_locale,
-      rest: Rest::with_optional_token(bot_token)
-    };
     if let Some(options) = data.options {
       self.parse_options(options, &data.resolved, &mut input);
+    }
+
+    if let Some(components) = data.components {
+      self.parse_component_values(components, &mut input);
+    }
+
+    if input.command_type.is_some() {
+      self.parse_resolved(data.resolved, data.target_id, &mut input);
     }
 
     let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
@@ -408,14 +392,44 @@ impl CommandInput {
     matches!(self.interaction_type, InteractionType::APPLICATION_COMMAND)
   }
 
+  /// Returns true if the interaction is for a chat input command
+  pub fn is_chat_input(&self) -> bool {
+    self.command_type.as_ref().map_or(false, |t| matches!(t, ApplicationCommandType::CHAT_INPUT))
+  }
+
+  /// Returns true if the interaction is for a user context menu
+  pub fn is_user_context(&self) -> bool {
+    self.command_type.as_ref().map_or(false, |t| matches!(t, ApplicationCommandType::USER))
+  }
+
+  /// Returns true if the interaction is for a message context menu
+  pub fn is_message_context(&self) -> bool {
+    self.command_type.as_ref().map_or(false, |t| matches!(t, ApplicationCommandType::MESSAGE))
+  }
+
   /// Returns true if the interaction is for a message component
   pub fn is_component(&self) -> bool {
     matches!(self.interaction_type, InteractionType::MESSAGE_COMPONENT)
   }
 
+  /// Returns true if the interaction is for a clicked button
+  pub fn is_button(&self) -> bool {
+    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::BUTTON))
+  }
+
+  /// Returns true if the interaction is for a selecting from a select menu
+  pub fn is_select_menu(&self) -> bool {
+    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::SELECT_MENU))
+  }
+
   /// Returns true if the interaction is for autocompletion
   pub fn is_autocomplete(&self) -> bool {
     matches!(self.interaction_type, InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE)
+  }
+
+  /// Returns true if the interaction is for a modal submission
+  pub fn is_modal_submit(&self) -> bool {
+    matches!(self.interaction_type, InteractionType::MODAL_SUBMIT)
   }
 }
 

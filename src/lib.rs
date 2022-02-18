@@ -6,7 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 #![warn(clippy::all)]
-// #![warn(missing_docs)]
+#![warn(missing_docs)]
 
 //! A webhook-based Discord slash command library
 //!

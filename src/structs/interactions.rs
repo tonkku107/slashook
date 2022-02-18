@@ -16,19 +16,24 @@ use super::{
   embeds::Embed,
   users::User,
   guilds::{GuildMember, Role},
-  channels::{Channel, Message, MessageFlags, AllowedMentions},
-  components::{Component, ComponentType}
+  channels::{Channel, Message, MessageFlags, AllowedMentions, Attachment},
+  components::{Component, ComponentType},
+  utils::File
 };
-use crate::commands::MessageResponse;
+use crate::commands::{MessageResponse, Modal};
 
-#[doc(hidden)]
+/// Discord Application Command Types
 #[derive(Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum ApplicationCommandType {
+  /// Slash commands; a text-based command that shows up when a user types `/`
   CHAT_INPUT = 1,
+  /// A UI-based command that shows up when you right click or tap on a user
   USER = 2,
+  /// A UI-based command that shows up when you right click or tap on a message
   MESSAGE = 3,
+  /// An application command type that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -65,10 +70,17 @@ pub struct Interaction {
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum InteractionType {
+  /// Ping interaction
   PING = 1,
+  /// Application command interaction
   APPLICATION_COMMAND = 2,
+  /// Message component interaction
   MESSAGE_COMPONENT = 3,
+  /// Autocomplete interaction
   APPLICATION_COMMAND_AUTOCOMPLETE = 4,
+  /// Modal submit interaction
+  MODAL_SUBMIT = 5,
+  /// Interaction type that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -84,17 +96,25 @@ pub struct InteractionData {
   pub custom_id: Option<String>,
   pub component_type: Option<ComponentType>,
   pub values: Option<Vec<String>>,
-  pub target_id: Option<Snowflake>
+  pub target_id: Option<Snowflake>,
+  pub components: Option<Vec<Component>>
 }
 
-#[doc(hidden)]
+/// Discord Interaction Data Resolved Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct InteractionDataResolved {
+  /// The ids and User objects
   pub users: Option<HashMap<Snowflake, User>>,
+  /// The ids and partial Member objects
   pub members: Option<HashMap<Snowflake, GuildMember>>,
+  /// The ids and Role objects
   pub roles: Option<HashMap<Snowflake, Role>>,
+  /// The ids and partial Channel objects
   pub channels: Option<HashMap<Snowflake, Channel>>,
-  pub messages: Option<HashMap<Snowflake, Message>>
+  /// The ids and partial Message objects
+  pub messages: Option<HashMap<Snowflake, Message>>,
+  /// The ids and attachment objects
+  pub attachments: Option<HashMap<Snowflake, Attachment>>
 }
 
 #[doc(hidden)]
@@ -123,19 +143,30 @@ pub enum InteractionOptionType {
   ROLE = 8,
   MENTIONABLE = 9,
   NUMBER = 10,
+  ATTACHMENT = 11,
   UNKNOWN
 }
 
 /// Represents the possible values from command arguments
 #[derive(Clone, Debug)]
 pub enum OptionValue {
+  /// Represents a string value
   String(String),
+  /// Represents an integer value
   Integer(i64),
+  /// Represents a boolean value
   Boolean(bool),
+  /// Represents a user value
   User(User),
+  /// Represents a channel value
   Channel(Box<Channel>),
+  /// Represents a role channe
   Role(Role),
+  /// Represents a number value
   Number(f64),
+  /// Represents an attachment value
+  Attachment(Attachment),
+  /// Represents any unknown value
   Other(Value)
 }
 
@@ -157,7 +188,8 @@ pub enum InteractionCallbackType {
   DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5,
   DEFERRED_UPDATE_MESSAGE = 6,
   UPDATE_MESSAGE = 7,
-  APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8
+  APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8,
+  MODAL = 9
 }
 
 #[doc(hidden)]
@@ -165,26 +197,37 @@ pub enum InteractionCallbackType {
 pub struct InteractionCallbackData {
   pub tts: Option<bool>,
   pub content: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub embeds: Option<Vec<Embed>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub allowed_mentions: Option<AllowedMentions>,
   pub flags: Option<MessageFlags>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub components: Option<Vec<Component>>,
-  pub choices: Option<Vec<ApplicationCommandOptionChoice>>
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub attachments: Option<Vec<Attachment>>,
+  pub choices: Option<Vec<ApplicationCommandOptionChoice>>,
+  pub custom_id: Option<String>,
+  pub title: Option<String>,
+  #[serde(skip_serializing)]
+  pub files: Option<Vec<File>>
 }
 
 #[doc(hidden)]
 impl From<MessageResponse> for InteractionCallbackData {
   fn from(msg: MessageResponse) -> InteractionCallbackData {
-    let mut flags = MessageFlags::empty();
-    if msg.ephemeral { flags.insert(MessageFlags::EPHEMERAL) }
     InteractionCallbackData {
       tts: msg.tts,
       content: msg.content,
-      flags: Some(flags),
+      flags: msg.flags,
       embeds: msg.embeds,
       components: msg.components,
+      attachments: msg.attachments,
       allowed_mentions: msg.allowed_mentions,
-      choices: None
+      choices: None,
+      custom_id: None,
+      title: None,
+      files: msg.files
     }
   }
 }
@@ -198,8 +241,12 @@ impl From<MessageFlags> for InteractionCallbackData {
       flags: Some(flags),
       embeds: None,
       components: None,
+      attachments: None,
       allowed_mentions: None,
-      choices: None
+      choices: None,
+      custom_id: None,
+      title: None,
+      files: None
     }
   }
 }
@@ -213,9 +260,53 @@ impl From<Vec<ApplicationCommandOptionChoice>> for InteractionCallbackData {
       flags: None,
       embeds: None,
       components: None,
+      attachments: None,
       allowed_mentions: None,
-      choices: Some(results)
+      choices: Some(results),
+      custom_id: None,
+      title: None,
+      files: None
     }
+  }
+}
+
+#[doc(hidden)]
+impl From<Modal> for InteractionCallbackData {
+  fn from(modal: Modal) -> InteractionCallbackData {
+    InteractionCallbackData {
+      tts: None,
+      content: None,
+      flags: None,
+      embeds: None,
+      components: Some(modal.components),
+      attachments: None,
+      allowed_mentions: None,
+      choices: None,
+      custom_id: Some(modal.custom_id),
+      title: Some(modal.title),
+      files: None
+    }
+  }
+}
+
+/// Trait for structs that have an [Attachment](crate::structs::channels::Attachment) Vec.
+/// Functions for use with [post_files](crate::rest::Rest::post_files) and [patch_files](crate::rest::Rest::patch_files)
+pub trait Attachments {
+  /// Returns the attachments that have been set and possibly removes the originals.
+  fn take_attachments(&mut self) -> Vec<Attachment>;
+
+  /// Sets updated attachments.
+  fn set_attachments(&mut self, attachments: Vec<Attachment>) -> &mut Self;
+}
+
+impl Attachments for InteractionCallbackData {
+  fn take_attachments(&mut self) -> Vec<Attachment> {
+    self.attachments.take().unwrap_or_default()
+  }
+
+  fn set_attachments(&mut self, attachments: Vec<Attachment>) -> &mut Self {
+    self.attachments = Some(attachments);
+    self
   }
 }
 
@@ -310,6 +401,19 @@ impl OptionValue {
       _ => None
     }
   }
+
+  /// Returns true if the value is an attachment. Returns false otherwise.
+  pub fn is_attachment(&self) -> bool {
+    matches!(self, Self::Attachment(_))
+  }
+
+  /// If the value is an attachment, returns the Attachment. Returns None otherwise.
+  pub fn as_attachment(&self) -> Option<&Attachment> {
+    match self {
+      Self::Attachment(a) => Some(a),
+      _ => None
+    }
+  }
 }
 
 impl ApplicationCommandOptionChoice {
@@ -329,6 +433,7 @@ impl std::fmt::Display for OptionValue {
       Self::Channel(c) => write!(f, "\"{}\"", c.id),
       Self::Role(r) => write!(f, "\"{}\"", r.id),
       Self::Number(n) => write!(f, "{}", n),
+      Self::Attachment(a) => write!(f, "{}", a.url),
       Self::Other(o) => write!(f, "{}", o)
     }
   }

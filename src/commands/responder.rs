@@ -7,8 +7,8 @@
 
 use crate::structs::{
   embeds::Embed,
-  interactions::{InteractionCallbackData, ApplicationCommandOptionChoice},
-  channels::{Message, AllowedMentions},
+  interactions::{InteractionCallbackData, ApplicationCommandOptionChoice, Attachments},
+  channels::{Message, AllowedMentions, Attachment, MessageFlags},
   components::{Component, Components},
   utils::File
 };
@@ -28,18 +28,23 @@ pub struct MessageResponse {
   pub tts: Option<bool>,
   /// Content of the message
   pub content: Option<String>,
-  /// Should only the user receiving the message be able to see it
-  #[serde(skip_serializing)]
-  pub ephemeral: bool,
+  /// Flags of the message.\
+  /// Valid flags are [EPHEMERAL](crate::structs::channels::MessageFlags::EPHEMERAL) for interactions to only show the response to the invoking user and
+  /// [SUPPRESS_EMBEDS](crate::structs::channels::MessageFlags::SUPPRESS_EMBEDS) to hide embeds from showing in the message.
+  pub flags: Option<MessageFlags>,
   /// Up to 10 embeds to send with the response
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub embeds: Option<Vec<Embed>>,
   /// Components to send with the response
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub components: Option<Vec<Component>>,
+  /// Partial attachment objects indicating which to keep when editing.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub attachments: Option<Vec<Attachment>>,
   /// Which mentions should be parsed
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub allowed_mentions: Option<AllowedMentions>,
   /// Up to 10 files to send with the response
-  ///
-  /// Only available for follow-up responses
   #[serde(skip_serializing)]
   pub files: Option<Vec<File>>
 }
@@ -72,12 +77,30 @@ impl MessageResponse {
   /// Set the ephemeralness of the message
   /// ```
   /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::channels::MessageFlags;
   /// let response = MessageResponse::from("This is for your eyes only!")
   ///   .set_ephemeral(true);
-  /// assert_eq!(response.ephemeral, true);
+  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::EPHEMERAL), true);
   /// ```
   pub fn set_ephemeral(mut self, ephemeral: bool) -> Self {
-    self.ephemeral = ephemeral;
+    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
+    flags.set(MessageFlags::EPHEMERAL, ephemeral);
+    self.flags = Some(flags);
+    self
+  }
+
+  /// Set suppress embeds flag
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::channels::MessageFlags;
+  /// let response = MessageResponse::from("No embeds here")
+  ///   .set_suppress_embeds(true);
+  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::SUPPRESS_EMBEDS), true);
+  /// ```
+  pub fn set_suppress_embeds(mut self, suppress: bool) -> Self {
+    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
+    flags.set(MessageFlags::SUPPRESS_EMBEDS, suppress);
+    self.flags = Some(flags);
     self
   }
 
@@ -135,8 +158,10 @@ impl MessageResponse {
   /// # #[slashook::main]
   /// # async fn main() -> CmdResult {
   /// let file = TokioFile::open("cat.png").await?;
+  /// let msg_file = File::from_file("cat.png", file).await?
+  ///   .set_description("Picture of my cute cat!");
   /// let response = MessageResponse::from("Here's a picture of my cat")
-  ///   .add_file(File::from_file("cat.png", file).await?);
+  ///   .add_file(msg_file);
   /// # Ok(())
   /// # }
   /// ```
@@ -144,6 +169,58 @@ impl MessageResponse {
     let mut files = self.files.unwrap_or_default();
     files.push(file);
     self.files = Some(files);
+    self
+  }
+
+  /// Keep an existing attachment when editing
+  pub fn keep_attachment<T: ToString>(mut self, attachment_id: T) -> Self {
+    let mut attachments = self.attachments.unwrap_or_default();
+    attachments.push(Attachment::keep_with_id(attachment_id));
+    self.attachments = Some(attachments);
+    self
+  }
+}
+
+/// A modal that can be opened for user input
+#[derive(Clone, Debug)]
+pub struct Modal {
+  /// a developer-defined identifier for the component, max 100 characters
+  pub custom_id: String,
+  /// The title of the popup modal
+  pub title: String,
+  /// The components that make up the modal
+  pub components: Vec<Component>
+}
+
+impl Modal {
+  /// Creates a new modal.\
+  /// The command argument is used by the library to choose which command to run when the modal is submitted.
+  /// The custom_id is formatted as `command/id`
+  /// ```
+  /// # use slashook::commands::Modal;
+  /// let modal = Modal::new("example_command", "modal1", "Please fill this form");
+  /// ```
+  pub fn new<T: ToString, U: ToString, V: ToString>(command: T, id: U, title: V) -> Self {
+    Self {
+      custom_id: format!("{}/{}", command.to_string(), id.to_string()),
+      title: title.to_string(),
+      components: Vec::new()
+    }
+  }
+
+  /// Set the components on the modal
+  /// ```
+  /// # use slashook::commands::Modal;
+  /// # use slashook::structs::components::{Components, TextInput};
+  /// let text_input = TextInput::new()
+  ///   .set_label("Tell us something")
+  ///   .set_id("input");
+  /// let components = Components::new().add_text_input(text_input);
+  /// let modal = Modal::new("example_command", "modal1", "Please fill this form")
+  ///   .set_components(components);
+  /// ```
+  pub fn set_components(mut self, components: Components) -> Self {
+    self.components = components.components;
     self
   }
 }
@@ -154,7 +231,8 @@ pub enum CommandResponse {
   SendMessage(MessageResponse),
   DeferUpdate,
   UpdateMessage(MessageResponse),
-  AutocompleteResult(Vec<ApplicationCommandOptionChoice>)
+  AutocompleteResult(Vec<ApplicationCommandOptionChoice>),
+  Modal(Modal)
 }
 
 /// Struct with methods for responding to interactions
@@ -255,6 +333,27 @@ impl CommandResponder {
   /// ```
   pub fn autocomplete(&self, results: Vec<ApplicationCommandOptionChoice>) -> SimpleResult<()> {
     self.tx.send(CommandResponse::AutocompleteResult(results))?;
+    Ok(())
+  }
+
+  /// Respond to an interaction with a modal
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse, Modal};
+  /// # use slashook::structs::components::{Components, TextInput};
+  /// ##[command("example")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   let text_input = TextInput::new()
+  ///     .set_label("Tell us something")
+  ///     .set_id("input");
+  ///   let components = Components::new().add_text_input(text_input);
+  ///   let modal = Modal::new("example_command", "modal1", "Please fill this form")
+  ///     .set_components(components);
+  ///   return res.open_modal(modal)?;
+  /// }
+  /// ```
+  pub fn open_modal(&self, modal: Modal) -> SimpleResult<()> {
+    self.tx.send(CommandResponse::Modal(modal))?;
     Ok(())
   }
 
@@ -359,9 +458,10 @@ impl From<&str> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: Some(String::from(s)),
-      ephemeral: false,
+      flags: None,
       embeds: None,
       components: None,
+      attachments: None,
       allowed_mentions: None,
       files: None
     }
@@ -373,9 +473,10 @@ impl From<String> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: Some(s),
-      ephemeral: false,
+      flags: None,
       embeds: None,
       components: None,
+      attachments: None,
       allowed_mentions: None,
       files: None
     }
@@ -387,9 +488,10 @@ impl From<Embed> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      ephemeral: false,
+      flags: None,
       embeds: Some(vec![e]),
       components: None,
+      attachments: None,
       allowed_mentions: None,
       files: None
     }
@@ -401,11 +503,23 @@ impl From<Components> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      ephemeral: false,
+      flags: None,
       embeds: None,
       components: Some(c.components),
+      attachments: None,
       allowed_mentions: None,
       files: None
     }
+  }
+}
+
+impl Attachments for MessageResponse {
+  fn take_attachments(&mut self) -> Vec<Attachment> {
+    self.attachments.take().unwrap_or_default()
+  }
+
+  fn set_attachments(&mut self, attachments: Vec<Attachment>) -> &mut Self {
+    self.attachments = Some(attachments);
+    self
   }
 }

@@ -13,14 +13,20 @@ use serde_json::Value;
 use serde_repr::{Serialize_repr, Deserialize_repr};
 use super::emojis::Emoji;
 
-#[doc(hidden)]
+/// Discord Component Types
 #[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum ComponentType {
+  /// A container for other components
   ACTION_ROW = 1,
+  /// A button object
   BUTTON = 2,
+  /// A select menu for picking from choices
   SELECT_MENU = 3,
+  /// A text input object
+  TEXT_INPUT = 4,
+  /// A component that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -28,9 +34,15 @@ pub enum ComponentType {
 #[derive(Serialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum Component {
+  /// An Action Row component
   ActionRow(ActionRow),
+  /// A Button component
   Button(Box<Button>),
+  /// A Select Menu component
   SelectMenu(SelectMenu),
+  /// A Text Input component
+  TextInput(TextInput),
+  /// A component that hasn't been implemented yet
   Unknown
 }
 
@@ -59,18 +71,18 @@ pub struct ActionRow {
 pub struct Button {
   #[serde(rename = "type")]
   component_type: ComponentType,
-  /// A developer-defined identifier for the button, max 100 characters
-  pub custom_id: Option<String>,
-  /// Whether the button is disabled (default `false`)
-  pub disabled: Option<bool>,
-  /// The style of the Button
+  /// One of [button styles](ButtonStyle)
   pub style: ButtonStyle,
   /// Text that appears on the button, max 80 characters
   pub label: Option<String>,
   /// An emoji to be shown on the button
   pub emoji: Option<Emoji>,
+  /// A developer-defined identifier for the button, max 100 characters
+  pub custom_id: Option<String>,
   /// A url for link-style buttons
-  pub url: Option<String>
+  pub url: Option<String>,
+  /// Whether the button is disabled (default `false`)
+  pub disabled: Option<bool>
 }
 
 /// Discord Button Styles
@@ -98,9 +110,7 @@ pub struct SelectMenu {
   #[serde(rename = "type")]
   component_type: ComponentType,
   /// A developer-defined identifier for the select menu, max 100 characters
-  pub custom_id: Option<String>,
-  /// Disable the select, default false
-  pub disabled: Option<bool>,
+  pub custom_id: String,
   /// The choices in the select, max 25
   pub options: Vec<SelectOption>,
   /// Custom placeholder text if nothing is selected, max 100 characters
@@ -108,7 +118,9 @@ pub struct SelectMenu {
   /// The minimum number of items that must be chosen; default 1, min 0, max 25
   pub min_values: Option<i64>,
   /// The maximum number of items that can be chosen; default 1, max 25
-  pub max_values: Option<i64>
+  pub max_values: Option<i64>,
+  /// Disable the select, default false
+  pub disabled: Option<bool>
 }
 
 /// Choices in a Select Menu
@@ -124,6 +136,42 @@ pub struct SelectOption {
   pub emoji: Option<Emoji>,
   /// Will render this option as selected by default
   pub default: Option<bool>
+}
+
+/// A Text Input component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TextInput {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// A developer-defined identifier for the input, max 100 characters
+  pub custom_id: String,
+  /// The [Text Input Style](TextInputStyle)
+  #[serde(default)]
+  pub style: TextInputStyle,
+  /// The label for this component
+  #[serde(default)]
+  pub label: String,
+  /// The minimum input length for a text input, min 0, max 4000
+  pub min_length: Option<i64>,
+  /// The maximum input length for a text input, min 1, max 4000
+  pub max_length: Option<i64>,
+  /// Whether this component is required to be filled, default false
+  pub required: Option<bool>,
+  /// A pre-filled value for this component, max 4000 characters
+  pub value: Option<String>,
+  /// Custom placeholder text if nothing is selected, max 100 characters
+  pub placeholder: Option<String>
+}
+
+/// Discord Text Input Styles
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum TextInputStyle {
+  /// A single-line input
+  SHORT = 1,
+  /// A multi-line input
+  PARAGRAPH = 2
 }
 
 impl Components {
@@ -209,6 +257,31 @@ impl Components {
         panic!("The current row doesn't have enough space to contain this component.");
       }
       row.components.push(Component::SelectMenu(select_menu));
+      self.components.push(Component::ActionRow(row));
+    } else {
+      panic!("Component is not an Action Row");
+    }
+    self
+  }
+
+  /// Adds a text input to the last action row\
+  /// A text input takes up 5 slots of a row\
+  /// Note: text inputs are only valid for modals.
+  /// ```
+  /// # use slashook::structs::components::{Components, TextInput};
+  /// let text_input = TextInput::new();
+  /// let components = Components::new()
+  ///   .add_text_input(text_input);
+  /// ```
+  /// ## Panics
+  /// Will panic if the action row cannot fit any more text inputs
+  pub fn add_text_input(mut self, text_input: TextInput) -> Self {
+    let row = self.components.pop().expect("No action row available");
+    if let Component::ActionRow(mut row) = row {
+      if row.available_slots() < 5 {
+        panic!("The current row doesn't have enough space to contain this component.");
+      }
+      row.components.push(Component::TextInput(text_input));
       self.components.push(Component::ActionRow(row));
     } else {
       panic!("Component is not an Action Row");
@@ -335,7 +408,7 @@ impl SelectMenu {
   pub fn new() -> Self {
     Self {
       component_type: ComponentType::SELECT_MENU,
-      custom_id: None,
+      custom_id: String::from(""),
       disabled: Some(false),
       options: Vec::new(),
       placeholder: None,
@@ -351,10 +424,10 @@ impl SelectMenu {
   /// # use slashook::structs::components::SelectMenu;
   /// let select_menu = SelectMenu::new()
   ///   .set_id("example_select", "choice");
-  /// assert_eq!(select_menu.custom_id, Some(String::from("example_select/choice")));
+  /// assert_eq!(select_menu.custom_id, String::from("example_select/choice"));
   /// ```
   pub fn set_id<T: ToString, U: ToString>(mut self, command: T, id: U) -> Self {
-    self.custom_id = Some(format!("{}/{}", command.to_string(), id.to_string()));
+    self.custom_id = format!("{}/{}", command.to_string(), id.to_string());
     self
   }
 
@@ -470,6 +543,119 @@ impl SelectOption {
   }
 }
 
+impl TextInput {
+  /// Creates a new Text Input with a short style by default
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::TEXT_INPUT,
+      custom_id: String::from(""),
+      style: TextInputStyle::SHORT,
+      label: String::from(""),
+      min_length: None,
+      max_length: None,
+      required: None,
+      value: None,
+      placeholder: None
+    }
+  }
+
+  /// Set the custom_id for a text input.
+  /// ```
+  /// # use slashook::structs::components::TextInput;
+  /// let text_input = TextInput::new()
+  ///   .set_id("input");
+  /// assert_eq!(text_input.custom_id, String::from("input"));
+  /// ```
+  pub fn set_id<T: ToString>(mut self, id: T) -> Self {
+    self.custom_id = id.to_string();
+    self
+  }
+
+  /// Set the style of the text input
+  /// ```
+  /// # use slashook::structs::components::{TextInput, TextInputStyle};
+  /// let text_input = TextInput::new()
+  ///   .set_style(TextInputStyle::PARAGRAPH);
+  /// assert!(matches!(text_input.style, TextInputStyle::PARAGRAPH));
+  /// ```
+  pub fn set_style(mut self, style: TextInputStyle) -> Self {
+    self.style = style;
+    self
+  }
+
+  /// Set the label for a text input
+  /// ```
+  /// # use slashook::structs::components::TextInput;
+  /// let text_input = TextInput::new()
+  ///   .set_label("Cool text input");
+  /// assert_eq!(text_input.label, String::from("Cool text input"));
+  /// ```
+  pub fn set_label<T: ToString>(mut self, label: T) -> Self {
+    self.label = label.to_string();
+    self
+  }
+
+  /// Set the minimum length for a text input
+  /// ```
+  /// # use slashook::structs::components::TextInput;
+  /// let text_input = TextInput::new()
+  ///   .set_min_length(100);
+  /// assert_eq!(text_input.min_length, Some(100));
+  /// ```
+  pub fn set_min_length(mut self, min_length: i64) -> Self {
+    self.min_length = Some(min_length);
+    self
+  }
+
+  /// Set the minimum length for a text input
+  /// ```
+  /// # use slashook::structs::components::TextInput;
+  /// let text_input = TextInput::new()
+  ///   .set_max_length(2000);
+  /// assert_eq!(text_input.max_length, Some(2000));
+  /// ```
+  pub fn set_max_length(mut self, max_length: i64) -> Self {
+    self.max_length = Some(max_length);
+    self
+  }
+
+  /// Set the required state of the text input
+  /// ```
+  /// # use slashook::structs::components::TextInput;
+  /// let text_input = TextInput::new()
+  ///   .set_required(true);
+  /// assert_eq!(text_input.required, Some(true));
+  /// ```
+  pub fn set_required(mut self, required: bool) -> Self {
+    self.required = Some(required);
+    self
+  }
+
+  /// Set a default value for a text input
+  /// ```
+  /// # use slashook::structs::components::TextInput;
+  /// let text_input = TextInput::new()
+  ///   .set_value("Something is already written here");
+  /// assert_eq!(text_input.value, Some(String::from("Something is already written here")));
+  /// ```
+  pub fn set_value<T: ToString>(mut self, value: T) -> Self {
+    self.value = Some(value.to_string());
+    self
+  }
+
+  /// Set a placeholder for a text input
+  /// ```
+  /// # use slashook::structs::components::TextInput;
+  /// let text_input = TextInput::new()
+  ///   .set_placeholder("Write something here");
+  /// assert_eq!(text_input.placeholder, Some(String::from("Write something here")));
+  /// ```
+  pub fn set_placeholder<T: ToString>(mut self, placeholder: T) -> Self {
+    self.placeholder = Some(placeholder.to_string());
+    self
+  }
+}
+
 impl Default for Components {
   fn default() -> Self {
     Self::new()
@@ -494,6 +680,18 @@ impl Default for SelectMenu {
   }
 }
 
+impl Default for TextInput {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for TextInputStyle {
+  fn default() -> Self {
+    Self::SHORT
+  }
+}
+
 impl<'de> serde::Deserialize<'de> for Component {
   fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let value = Value::deserialize(d)?;
@@ -502,6 +700,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       1 => Component::ActionRow(ActionRow::deserialize(value).map_err(de::Error::custom)?),
       2 => Component::Button(Box::new(Button::deserialize(value).map_err(de::Error::custom)?)),
       3 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
+      4 => Component::TextInput(TextInput::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
   }

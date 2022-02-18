@@ -8,13 +8,18 @@
 //! Discord rest api handling
 
 /// Discord API base URL
-pub const API_URL: &str = "https://discord.com/api/v9";
+pub const API_URL: &str = "https://discord.com/api/v10";
 
 use serde::{Serialize, de::DeserializeOwned};
-use crate::structs::utils::File;
+use crate::structs::{
+  channels::Attachment,
+  interactions::Attachments,
+  utils::File
+};
 use reqwest::{
   StatusCode,
-  Response
+  Response,
+  multipart::{Form, Part}
 };
 use thiserror::Error;
 
@@ -53,14 +58,20 @@ async fn handle_response<T: DeserializeOwned>(res: Response) -> Result<T, RestEr
   Ok(body)
 }
 
-fn handle_multipart<U: Serialize>(json_data: U, files: Vec<File>) -> Result<reqwest::multipart::Form, RestError> {
-  let mut form_data = reqwest::multipart::Form::new()
-    .text("payload_json", serde_json::to_string(&json_data)?);
-  for file in files.into_iter() {
-    let filename = file.filename.clone();
-    let part = reqwest::multipart::Part::bytes(file.data).file_name(file.filename);
-    form_data = form_data.part(filename, part);
+fn handle_multipart<U: Serialize + Attachments>(mut json_data: U, files: Vec<File>) -> Result<Form, RestError> {
+  let mut form_data = Form::new();
+  let mut attachments = json_data.take_attachments();
+
+  for (i, file) in files.into_iter().enumerate() {
+    let part = Part::bytes(file.data).file_name(file.filename);
+    form_data = form_data.part(format!("files[{}]", i), part);
+    if let Some(description) = file.description {
+      attachments.push(Attachment::with_description(i, description));
+    }
   }
+
+  json_data.set_attachments(attachments);
+  form_data = form_data.text("payload_json", serde_json::to_string(&json_data)?);
   Ok(form_data)
 }
 
@@ -116,7 +127,7 @@ impl Rest {
   }
 
   /// Make a post request including files
-  pub async fn post_files<T: DeserializeOwned, U: Serialize>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T, RestError> {
+  pub async fn post_files<T: DeserializeOwned, U: Serialize + Attachments>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T, RestError> {
     let form_data = handle_multipart(json_data, files)?;
     let mut req = reqwest::Client::new()
       .post(format!("{}/{}", API_URL, path))
@@ -141,7 +152,7 @@ impl Rest {
   }
 
   /// Make a patch request including files
-  pub async fn patch_files<T: DeserializeOwned, U: Serialize>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T, RestError> {
+  pub async fn patch_files<T: DeserializeOwned, U: Serialize + Attachments>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T, RestError> {
     let form_data = handle_multipart(json_data, files)?;
     let mut req = reqwest::Client::new()
       .patch(format!("{}/{}", API_URL, path))
