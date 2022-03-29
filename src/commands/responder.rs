@@ -241,6 +241,7 @@ pub struct CommandResponder {
   pub(crate) tx: mpsc::UnboundedSender<CommandResponse>,
   pub(crate) id: String,
   pub(crate) token: String,
+  pub(crate) rest: Rest
 }
 
 impl CommandResponder {
@@ -369,14 +370,13 @@ impl CommandResponder {
   /// ```
   pub async fn send_followup_message<T: Into<MessageResponse>>(&self, response: T) -> Result<Message, RestError> {
     let mut response = response.into();
-    let files = response.files;
-    response.files = None;
+    let files = response.files.take();
     let msg: InteractionCallbackData = response.into();
     let path = format!("webhooks/{}/{}", self.id, self.token);
     if let Some(files) = files {
-      Rest::new().post_files(path, msg, files).await
+      self.rest.post_files(path, msg, files).await
     } else {
-      Rest::new().post(path, msg).await
+      self.rest.post(path, msg).await
     }
   }
 
@@ -393,14 +393,13 @@ impl CommandResponder {
   /// ```
   pub async fn edit_followup_message<T: Into<MessageResponse>>(&self, id: String, response: T) -> Result<Message, RestError> {
     let mut response = response.into();
-    let files = response.files;
-    response.files = None;
+    let files = response.files.take();
     let msg: InteractionCallbackData = response.into();
     let path = format!("webhooks/{}/{}/messages/{}", self.id, self.token, id);
     if let Some(files) = files {
-      Rest::new().patch_files(path, msg, files).await
+      self.rest.patch_files(path, msg, files).await
     } else {
-      Rest::new().patch(path, msg).await
+      self.rest.patch(path, msg).await
     }
   }
 
@@ -412,7 +411,7 @@ impl CommandResponder {
 
   /// Gets a follow-up message
   pub async fn get_followup_message(&self, id: String) -> Result<Message, RestError> {
-    Rest::new().get(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
+    self.rest.get(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
   }
 
   /// Gets the original message\
@@ -443,7 +442,7 @@ impl CommandResponder {
   /// }
   /// ```
   pub async fn delete_followup_message(&self, id: String) -> Result<(), RestError> {
-    Rest::new().delete(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
+    self.rest.delete(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
   }
 
   /// Deletes the original message\

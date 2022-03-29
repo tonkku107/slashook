@@ -17,6 +17,7 @@ use crate::structs::{
   utils::File
 };
 use reqwest::{
+  Client,
   StatusCode,
   Response,
   multipart::{Form, Part}
@@ -45,6 +46,7 @@ pub enum RestError {
 /// Handler for Discord API calls
 #[derive(Clone, Default)]
 pub struct Rest {
+  client: Client,
   token: Option<String>,
 }
 
@@ -78,23 +80,31 @@ fn handle_multipart<U: Serialize + Attachments>(mut json_data: U, files: Vec<Fil
 impl Rest {
   /// Creates a new Rest handler without a token
   pub fn new() -> Self {
-    Self { token: None }
+    Self {
+      client: Client::new(),
+      token: None
+    }
   }
 
   /// Creates a new Rest handler with a token
   pub fn with_token(token: String) -> Self {
-    Self { token: Some(token) }
+    Self {
+      client: Client::new(),
+      token: Some(token)
+    }
   }
 
   /// Creates a new Rest handler with or without a token
   pub fn with_optional_token(token: Option<String>) -> Self {
-    Self { token }
+    Self {
+      client: Client::new(),
+      token
+    }
   }
 
   /// Make a get request
   pub async fn get<T: DeserializeOwned>(&self, path: String) -> Result<T, RestError> {
-    let mut req = reqwest::Client::new()
-      .get(format!("{}/{}", API_URL, path));
+    let mut req = self.client.get(format!("{}/{}", API_URL, path));
     if let Some(token) = &self.token {
       req = req.header("Authorization", format!("Bot {}", token));
     }
@@ -104,8 +114,7 @@ impl Rest {
 
   /// Make a get request with query parameters
   pub async fn get_query<T: DeserializeOwned, U: Serialize>(&self, path: String, query: U) -> Result<T, RestError> {
-    let mut req = reqwest::Client::new()
-      .get(format!("{}/{}", API_URL, path))
+    let mut req = self.client.get(format!("{}/{}", API_URL, path))
       .query(&query);
     if let Some(token) = &self.token {
       req = req.header("Authorization", format!("Bot {}", token));
@@ -116,8 +125,7 @@ impl Rest {
 
   /// Make a post request
   pub async fn post<T: DeserializeOwned, U: Serialize>(&self, path: String, data: U) -> Result<T, RestError> {
-    let mut req = reqwest::Client::new()
-      .post(format!("{}/{}", API_URL, path))
+    let mut req = self.client.post(format!("{}/{}", API_URL, path))
       .json(&data);
     if let Some(token) = &self.token {
       req = req.header("Authorization", format!("Bot {}", token));
@@ -129,8 +137,7 @@ impl Rest {
   /// Make a post request including files
   pub async fn post_files<T: DeserializeOwned, U: Serialize + Attachments>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T, RestError> {
     let form_data = handle_multipart(json_data, files)?;
-    let mut req = reqwest::Client::new()
-      .post(format!("{}/{}", API_URL, path))
+    let mut req = self.client.post(format!("{}/{}", API_URL, path))
       .multipart(form_data);
     if let Some(token) = &self.token {
       req = req.header("Authorization", format!("Bot {}", token));
@@ -141,8 +148,7 @@ impl Rest {
 
   /// Make a patch request
   pub async fn patch<T: DeserializeOwned, U: Serialize>(&self, path: String, data: U) -> Result<T, RestError> {
-    let mut req = reqwest::Client::new()
-      .patch(format!("{}/{}", API_URL, path))
+    let mut req = self.client.patch(format!("{}/{}", API_URL, path))
       .json(&data);
     if let Some(token) = &self.token {
       req = req.header("Authorization", format!("Bot {}", token));
@@ -154,8 +160,7 @@ impl Rest {
   /// Make a patch request including files
   pub async fn patch_files<T: DeserializeOwned, U: Serialize + Attachments>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T, RestError> {
     let form_data = handle_multipart(json_data, files)?;
-    let mut req = reqwest::Client::new()
-      .patch(format!("{}/{}", API_URL, path))
+    let mut req = self.client.patch(format!("{}/{}", API_URL, path))
       .multipart(form_data);
     if let Some(token) = &self.token {
       req = req.header("Authorization", format!("Bot {}", token));
@@ -166,8 +171,7 @@ impl Rest {
 
   /// Make a delete request
   pub async fn delete(&self, path: String) -> Result<(), RestError> {
-    let mut req = reqwest::Client::new()
-      .delete(format!("{}/{}", API_URL, path));
+    let mut req = self.client.delete(format!("{}/{}", API_URL, path));
     if let Some(token) = &self.token {
       req = req.header("Authorization", format!("Bot {}", token));
     }

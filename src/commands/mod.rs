@@ -262,7 +262,12 @@ impl CommandHandler {
 
   async fn spawn_command(&self, command: Arc<Mutex<Command>>, id: String, token: String, input: CommandInput) -> Result<CommandResponse> {
     let (tx, mut rx) = mpsc::unbounded_channel::<CommandResponse>();
-    let responder = CommandResponder { tx, id, token };
+    let responder = CommandResponder {
+      tx,
+      id,
+      token,
+      rest: Rest::new()
+    };
 
     spawn(async move {
       let fut = command.lock().unwrap().func.call(input, responder);
@@ -335,7 +340,7 @@ impl CommandHandler {
       },
       InteractionType::MESSAGE_COMPONENT | InteractionType::MODAL_SUBMIT => {
         let custom_id = data.custom_id.ok_or("Component interaction should have a custom_id")?;
-        let (command_name, rest_id) = custom_id.as_str().split_once("/").ok_or("Invalid custom_id")?;
+        let (command_name, rest_id) = custom_id.as_str().split_once('/').ok_or("Invalid custom_id")?;
         (command_name.to_string(), Some(rest_id.to_string()))
       },
       _ => panic!("This type shouldn't be handled here")
