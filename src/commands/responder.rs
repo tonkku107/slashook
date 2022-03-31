@@ -133,7 +133,7 @@ impl MessageResponse {
   ///   .set_components(components);
   /// ```
   pub fn set_components(mut self, components: Components) -> Self {
-    self.components = Some(components.components);
+    self.components = Some(components.0);
     self
   }
 
@@ -220,7 +220,7 @@ impl Modal {
   ///   .set_components(components);
   /// ```
   pub fn set_components(mut self, components: Components) -> Self {
-    self.components = components.components;
+    self.components = components.0;
     self
   }
 }
@@ -504,7 +504,7 @@ impl From<Components> for MessageResponse {
       content: None,
       flags: None,
       embeds: None,
-      components: Some(c.components),
+      components: Some(c.0),
       attachments: None,
       allowed_mentions: None,
       files: None

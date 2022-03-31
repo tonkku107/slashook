@@ -46,12 +46,9 @@ pub enum Component {
   Unknown
 }
 
-/// A struct for adding components to a message
+/// A helper struct for building components for a message
 #[derive(Clone, Debug)]
-pub struct Components {
-  /// The components
-  pub components: Vec<Component>,
-}
+pub struct Components(pub Vec<Component>);
 
 /// An Action Row component
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -177,9 +174,7 @@ pub enum TextInputStyle {
 impl Components {
   /// Creates a new set of components with an Action Row to start off
   pub fn new() -> Self {
-    Self {
-      components: vec![Component::ActionRow(ActionRow::new())]
-    }
+    Self(vec![Component::ActionRow(ActionRow::new())])
   }
 
   /// Creates an empty set of components useful for clearing out components when editing a message
@@ -190,9 +185,7 @@ impl Components {
   ///   .set_components(Components::empty());
   /// ```
   pub fn empty() -> Self {
-    Self {
-      components: Vec::new()
-    }
+    Self(Vec::new())
   }
 
   /// Adds a new row\
@@ -209,10 +202,10 @@ impl Components {
   /// ## Panics
   /// Will panic if you try to add more than the allowed 5 rows
   pub fn add_row(mut self) -> Self {
-    if self.components.len() >= 5 {
+    if self.0.len() >= 5 {
       panic!("You can only have up to 5 action rows per message.");
     }
-    self.components.push(Component::ActionRow(ActionRow::new()));
+    self.0.push(Component::ActionRow(ActionRow::new()));
     self
   }
 
@@ -227,13 +220,13 @@ impl Components {
   /// ## Panics
   /// Will panic if the action row cannot fit any more buttons
   pub fn add_button(mut self, button: Button) -> Self {
-    let row = self.components.pop().expect("No action row available");
+    let row = self.0.pop().expect("No action row available");
     if let Component::ActionRow(mut row) = row {
       if row.available_slots() < 1 {
         panic!("The current row doesn't have enough space to contain this component.");
       }
       row.components.push(Component::Button(Box::new(button)));
-      self.components.push(Component::ActionRow(row));
+      self.0.push(Component::ActionRow(row));
     } else {
       panic!("Component is not an Action Row");
     }
@@ -251,13 +244,13 @@ impl Components {
   /// ## Panics
   /// Will panic if the action row cannot fit any more select menus
   pub fn add_select_menu(mut self, select_menu: SelectMenu) -> Self {
-    let row = self.components.pop().expect("No action row available");
+    let row = self.0.pop().expect("No action row available");
     if let Component::ActionRow(mut row) = row {
       if row.available_slots() < 5 {
         panic!("The current row doesn't have enough space to contain this component.");
       }
       row.components.push(Component::SelectMenu(select_menu));
-      self.components.push(Component::ActionRow(row));
+      self.0.push(Component::ActionRow(row));
     } else {
       panic!("Component is not an Action Row");
     }
@@ -276,13 +269,13 @@ impl Components {
   /// ## Panics
   /// Will panic if the action row cannot fit any more text inputs
   pub fn add_text_input(mut self, text_input: TextInput) -> Self {
-    let row = self.components.pop().expect("No action row available");
+    let row = self.0.pop().expect("No action row available");
     if let Component::ActionRow(mut row) = row {
       if row.available_slots() < 5 {
         panic!("The current row doesn't have enough space to contain this component.");
       }
       row.components.push(Component::TextInput(text_input));
-      self.components.push(Component::ActionRow(row));
+      self.0.push(Component::ActionRow(row));
     } else {
       panic!("Component is not an Action Row");
     }
