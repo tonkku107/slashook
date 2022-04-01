@@ -120,6 +120,18 @@ impl MessageResponse {
     self
   }
 
+  /// Clear embeds from the message. Sets embeds to an empty Vec which also clears embeds when editing.
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// let response = MessageResponse::from("Embeds cleared")
+  ///   .clear_embeds();
+  /// assert_eq!(response.embeds.unwrap().len(), 0);
+  /// ```
+  pub fn clear_embeds(mut self) -> Self {
+    self.embeds = Some(Vec::new());
+    self
+  }
+
   /// Set the components on the message
   /// ```
   /// # use slashook::commands::MessageResponse;
@@ -173,10 +185,45 @@ impl MessageResponse {
   }
 
   /// Keep an existing attachment when editing
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::utils::File;
+  /// # use slashook::tokio::fs::File as TokioFile;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg_file = File::from_file("cat.png", TokioFile::open("cat.png").await?).await?;
+  /// let msg_file2 = File::from_file("cat2.png", TokioFile::open("cat2.png").await?).await?;
+  ///
+  /// res.defer(false)?;
+  ///
+  /// let response = MessageResponse::from("Here's a picture of my cat")
+  ///   .add_file(msg_file);
+  /// let msg = res.send_followup_message(response).await?;
+  ///
+  /// let edit_response = MessageResponse::from("And I added the other cat too!")
+  ///   .keep_attachment(&msg.attachments.get(0).unwrap().id)
+  ///   .add_file(msg_file2);
+  /// res.edit_original_message(edit_response).await?;
+  /// # }
+  /// ```
   pub fn keep_attachment<T: ToString>(mut self, attachment_id: T) -> Self {
     let mut attachments = self.attachments.unwrap_or_default();
     attachments.push(Attachment::keep_with_id(attachment_id));
     self.attachments = Some(attachments);
+    self
+  }
+
+  /// Clear attachments from the message. Sets attachments to an empty Vec which also deletes attachments when editing.
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// let response = MessageResponse::from("Attachments deleted")
+  ///   .clear_attachments();
+  /// assert_eq!(response.attachments.unwrap().len(), 0);
+  /// ```
+  pub fn clear_attachments(mut self) -> Self {
+    self.attachments = Some(Vec::new());
     self
   }
 }
