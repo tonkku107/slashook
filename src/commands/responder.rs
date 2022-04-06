@@ -274,7 +274,7 @@ impl Modal {
 
 #[derive(Debug)]
 pub enum CommandResponse {
-  DeferMessage(bool),
+  DeferMessage(MessageFlags),
   SendMessage(MessageResponse),
   DeferUpdate,
   UpdateMessage(MessageResponse),
@@ -341,7 +341,9 @@ impl CommandResponder {
   /// }
   /// ```
   pub fn defer(&self, ephemeral: bool) -> SimpleResult<()> {
-    self.tx.send(CommandResponse::DeferMessage(ephemeral))?;
+    let mut flags = MessageFlags::empty();
+    flags.set(MessageFlags::EPHEMERAL, ephemeral);
+    self.tx.send(CommandResponse::DeferMessage(flags))?;
     Ok(())
   }
 
