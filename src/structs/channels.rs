@@ -559,7 +559,7 @@ impl Message {
   /// # }
   /// ```
   pub async fn fetch<T: ToString, U: ToString>(rest: &Rest, channel_id: T, message_id: U) -> Result<Self, RestError> {
-    Ok(rest.get(format!("channels/{}/messages/{}", channel_id.to_string(), message_id.to_string())).await?)
+    rest.get(format!("channels/{}/messages/{}", channel_id.to_string(), message_id.to_string())).await
   }
 
   /// Fetch multiple messages with a channel ID and options
@@ -574,7 +574,7 @@ impl Message {
   /// # }
   /// ```
   pub async fn fetch_many<T: ToString>(rest: &Rest, channel_id: T, options: MessageFetchOptions) -> Result<Vec<Self>, RestError> {
-    Ok(rest.get_query(format!("channels/{}/messages", channel_id.to_string()), options).await?)
+    rest.get_query(format!("channels/{}/messages", channel_id.to_string()), options).await
   }
 
   /// Send a new message to a channel
@@ -634,7 +634,7 @@ impl Message {
   /// # }
   /// ```
   pub async fn delete(&self, rest: &Rest) -> Result<(), RestError> {
-    Ok(rest.delete(format!("channels/{}/messages/{}", self.channel_id, self.id)).await?)
+    rest.delete(format!("channels/{}/messages/{}", self.channel_id, self.id)).await
   }
 
   /// Publish a message that was posted in an [Announcement channel](ChannelType::GUILD_NEWS)
@@ -649,7 +649,7 @@ impl Message {
   /// # }
   /// ```
   pub async fn crosspost(&self, rest: &Rest) -> Result<Message, RestError> {
-    Ok(rest.post(format!("channels/{}/messages/{}/crosspost", self.channel_id, self.id), Value::Null).await?)
+    rest.post(format!("channels/{}/messages/{}/crosspost", self.channel_id, self.id), Value::Null).await
   }
 }
 
