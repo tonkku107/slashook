@@ -6,8 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 use std::{
-  io::{Cursor, Error},
-  pin::Pin
+  io::Cursor,
 };
 use crate::structs::{
   channels::Attachment,
@@ -15,19 +14,11 @@ use crate::structs::{
 };
 use rocket::{
   http::Status,
-  response::{self, Response},
-  futures::{
-    stream::Stream,
-    task::{Context, Poll}
-  }
+  response::{self, Response}
 };
-use common_multipart_rfc7578::client::{
-  multipart::{
-    Body, Form, BoundaryGenerator
-  },
-  Error as MultipartError
+use common_multipart_rfc7578::client::multipart::{
+  Body, Form, BoundaryGenerator
 };
-use bytes::BytesMut;
 use tokio_util::io::StreamReader;
 use reqwest::multipart::Form as ReqwestForm;
 
@@ -35,23 +26,6 @@ pub struct ReqwestBoundary;
 impl BoundaryGenerator for ReqwestBoundary {
   fn generate_boundary() -> String {
     ReqwestForm::new().boundary().to_string()
-  }
-}
-
-// All this because the error type doesn't implement Into<std::io::Error> despite containing it...
-pub struct FakeBody<'a>(Body<'a>);
-impl<'a> Stream for FakeBody<'a> {
-  type Item = Result<BytesMut, Error>;
-
-  fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-    Pin::new(&mut self.0).poll_next(cx)
-      .map(|o| o.map(|r| r.map_err(|e| {
-        match e {
-          MultipartError::HeaderWrite(io) => io,
-          MultipartError::BoundaryWrite(io) => io,
-          MultipartError::ContentRead(io) => io
-        }
-    })))
   }
 }
 
@@ -74,7 +48,7 @@ pub fn handle_multipart(status: Status, mut callback: InteractionCallback) -> re
   form.add_text("payload_json", serde_json::to_string(&callback).map_err(|_| Status::InternalServerError)?);
   let content_type = form.content_type();
 
-  let body = FakeBody(form.into());
+  let body: Body = form.into();
   let stream = StreamReader::new(body);
   Response::build()
     .raw_header("Content-Type", content_type)

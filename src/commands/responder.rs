@@ -120,6 +120,18 @@ impl MessageResponse {
     self
   }
 
+  /// Clear embeds from the message. Sets embeds to an empty Vec which also clears embeds when editing.
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// let response = MessageResponse::from("Embeds cleared")
+  ///   .clear_embeds();
+  /// assert_eq!(response.embeds.unwrap().len(), 0);
+  /// ```
+  pub fn clear_embeds(mut self) -> Self {
+    self.embeds = Some(Vec::new());
+    self
+  }
+
   /// Set the components on the message
   /// ```
   /// # use slashook::commands::MessageResponse;
@@ -133,7 +145,7 @@ impl MessageResponse {
   ///   .set_components(components);
   /// ```
   pub fn set_components(mut self, components: Components) -> Self {
-    self.components = Some(components.components);
+    self.components = Some(components.0);
     self
   }
 
@@ -173,10 +185,45 @@ impl MessageResponse {
   }
 
   /// Keep an existing attachment when editing
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::utils::File;
+  /// # use slashook::tokio::fs::File as TokioFile;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg_file = File::from_file("cat.png", TokioFile::open("cat.png").await?).await?;
+  /// let msg_file2 = File::from_file("cat2.png", TokioFile::open("cat2.png").await?).await?;
+  ///
+  /// res.defer(false)?;
+  ///
+  /// let response = MessageResponse::from("Here's a picture of my cat")
+  ///   .add_file(msg_file);
+  /// let msg = res.send_followup_message(response).await?;
+  ///
+  /// let edit_response = MessageResponse::from("And I added the other cat too!")
+  ///   .keep_attachment(&msg.attachments.get(0).unwrap().id)
+  ///   .add_file(msg_file2);
+  /// res.edit_original_message(edit_response).await?;
+  /// # }
+  /// ```
   pub fn keep_attachment<T: ToString>(mut self, attachment_id: T) -> Self {
     let mut attachments = self.attachments.unwrap_or_default();
     attachments.push(Attachment::keep_with_id(attachment_id));
     self.attachments = Some(attachments);
+    self
+  }
+
+  /// Clear attachments from the message. Sets attachments to an empty Vec which also deletes attachments when editing.
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// let response = MessageResponse::from("Attachments deleted")
+  ///   .clear_attachments();
+  /// assert_eq!(response.attachments.unwrap().len(), 0);
+  /// ```
+  pub fn clear_attachments(mut self) -> Self {
+    self.attachments = Some(Vec::new());
     self
   }
 }
@@ -220,14 +267,14 @@ impl Modal {
   ///   .set_components(components);
   /// ```
   pub fn set_components(mut self, components: Components) -> Self {
-    self.components = components.components;
+    self.components = components.0;
     self
   }
 }
 
 #[derive(Debug)]
 pub enum CommandResponse {
-  DeferMessage(bool),
+  DeferMessage(MessageFlags),
   SendMessage(MessageResponse),
   DeferUpdate,
   UpdateMessage(MessageResponse),
@@ -241,6 +288,7 @@ pub struct CommandResponder {
   pub(crate) tx: mpsc::UnboundedSender<CommandResponse>,
   pub(crate) id: String,
   pub(crate) token: String,
+  pub(crate) rest: Rest
 }
 
 impl CommandResponder {
@@ -293,7 +341,9 @@ impl CommandResponder {
   /// }
   /// ```
   pub fn defer(&self, ephemeral: bool) -> SimpleResult<()> {
-    self.tx.send(CommandResponse::DeferMessage(ephemeral))?;
+    let mut flags = MessageFlags::empty();
+    flags.set(MessageFlags::EPHEMERAL, ephemeral);
+    self.tx.send(CommandResponse::DeferMessage(flags))?;
     Ok(())
   }
 
@@ -369,14 +419,13 @@ impl CommandResponder {
   /// ```
   pub async fn send_followup_message<T: Into<MessageResponse>>(&self, response: T) -> Result<Message, RestError> {
     let mut response = response.into();
-    let files = response.files;
-    response.files = None;
+    let files = response.files.take();
     let msg: InteractionCallbackData = response.into();
     let path = format!("webhooks/{}/{}", self.id, self.token);
     if let Some(files) = files {
-      Rest::new().post_files(path, msg, files).await
+      self.rest.post_files(path, msg, files).await
     } else {
-      Rest::new().post(path, msg).await
+      self.rest.post(path, msg).await
     }
   }
 
@@ -393,14 +442,13 @@ impl CommandResponder {
   /// ```
   pub async fn edit_followup_message<T: Into<MessageResponse>>(&self, id: String, response: T) -> Result<Message, RestError> {
     let mut response = response.into();
-    let files = response.files;
-    response.files = None;
+    let files = response.files.take();
     let msg: InteractionCallbackData = response.into();
     let path = format!("webhooks/{}/{}/messages/{}", self.id, self.token, id);
     if let Some(files) = files {
-      Rest::new().patch_files(path, msg, files).await
+      self.rest.patch_files(path, msg, files).await
     } else {
-      Rest::new().patch(path, msg).await
+      self.rest.patch(path, msg).await
     }
   }
 
@@ -412,7 +460,7 @@ impl CommandResponder {
 
   /// Gets a follow-up message
   pub async fn get_followup_message(&self, id: String) -> Result<Message, RestError> {
-    Rest::new().get(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
+    self.rest.get(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
   }
 
   /// Gets the original message\
@@ -443,7 +491,7 @@ impl CommandResponder {
   /// }
   /// ```
   pub async fn delete_followup_message(&self, id: String) -> Result<(), RestError> {
-    Rest::new().delete(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
+    self.rest.delete(format!("webhooks/{}/{}/messages/{}", self.id, self.token, id)).await
   }
 
   /// Deletes the original message\
@@ -505,7 +553,7 @@ impl From<Components> for MessageResponse {
       content: None,
       flags: None,
       embeds: None,
-      components: Some(c.components),
+      components: Some(c.0),
       attachments: None,
       allowed_mentions: None,
       files: None
