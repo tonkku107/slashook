@@ -128,7 +128,7 @@ pub(crate) async fn start(config: Config, sender: mpsc::UnboundedSender::<Rocket
   let figment = rocket::Config::figment()
     .merge(("address", config.ip))
     .merge(("port", config.port))
-    .merge(("ident", "Bot"))
+    .merge(("ident", crate::USER_AGENT))
     .merge(("log_level", rocket::config::LogLevel::Off));
 
   let result = rocket::custom(figment)
