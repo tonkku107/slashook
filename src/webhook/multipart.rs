@@ -29,7 +29,7 @@ impl BoundaryGenerator for ReqwestBoundary {
   }
 }
 
-pub fn handle_multipart(status: Status, mut callback: InteractionCallback) -> response::Result<'static> {
+pub fn handle_multipart(mut callback: InteractionCallback) -> response::Result<'static> {
   let mut form = Form::new::<ReqwestBoundary>();
 
   let mut data = callback.data.unwrap();
@@ -53,6 +53,5 @@ pub fn handle_multipart(status: Status, mut callback: InteractionCallback) -> re
   Response::build()
     .raw_header("Content-Type", content_type)
     .streamed_body(stream)
-    .status(status)
     .ok()
 }
