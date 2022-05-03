@@ -43,6 +43,8 @@
 //! You may now route it through a reverse proxy and set your interaction url on the Developer Portal.
 //! Be sure to also [register your commands](https://discord.com/developers/docs/interactions/application-commands#registering-a-command).
 
+pub(crate) const USER_AGENT: &str = concat!("slashook/", env!("CARGO_PKG_VERSION"));
+
 #[macro_use] extern crate rocket;
 mod webhook;
 pub mod structs;

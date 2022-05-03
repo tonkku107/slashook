@@ -37,25 +37,29 @@ enum Res {
 
 impl<'r> Responder<'r, 'static> for Res {
   fn respond_to(self, req: &'r Request<'_>) -> response::Result<'static> {
+    let mut response = Response::build();
+
     match self {
       Self::Raw{ status, json } => {
-        Response::build()
-        .merge(content::Json(json.to_string()).respond_to(req)?)
-        .status(status)
-        .ok()
+        response
+          .merge(content::Json(json.to_string()).respond_to(req)?)
+          .status(status);
       },
+
       Self::Response{ status, data } => {
-        if let Some(inner_data) = &data.data {
-          if inner_data.files.is_some() {
-            return multipart::handle_multipart(status, *data);
-          }
+        if data.data.as_ref().map_or(false, |d| d.files.is_some()) {
+          response.merge(multipart::handle_multipart(*data)?);
+        } else {
+          let json = serde_json::to_string(&data).map_err(|_| Status::InternalServerError)?;
+          response.merge(content::Json(json).respond_to(req)?);
         }
-        Response::build()
-        .merge(content::Json(serde_json::to_string(&data).map_err(|_| Status::InternalServerError)?).respond_to(req)?)
-        .status(status)
-        .ok()
+        response.status(status);
       }
     }
+
+    response
+      .raw_header("User-Agent", crate::USER_AGENT)
+      .ok()
   }
 }
 
@@ -115,20 +119,20 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
 }
 
 #[catch(404)]
-fn not_found() -> &'static str {
-  "Nothing here"
+fn not_found() -> Res {
+  Res::Raw{ status: Status::NotFound, json: json!({ "error": "Not found" }) }
 }
 
 #[catch(default)]
-fn default_error() -> &'static str {
-  "Unexpected error"
+fn default_error() -> Res {
+  Res::Raw{ status: Status::InternalServerError, json: json!({ "error": "Unexpected error" }) }
 }
 
 pub(crate) async fn start(config: Config, sender: mpsc::UnboundedSender::<RocketCommand>) {
   let figment = rocket::Config::figment()
     .merge(("address", config.ip))
     .merge(("port", config.port))
-    .merge(("ident", "Bot"))
+    .merge(("ident", crate::USER_AGENT))
     .merge(("log_level", rocket::config::LogLevel::Off));
 
   let result = rocket::custom(figment)

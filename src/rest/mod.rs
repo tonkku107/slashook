@@ -20,7 +20,8 @@ use reqwest::{
   Client,
   StatusCode,
   Response,
-  multipart::{Form, Part}
+  multipart::{Form, Part},
+  header::{HeaderMap, HeaderValue}
 };
 use thiserror::Error;
 
@@ -46,8 +47,7 @@ pub enum RestError {
 /// Handler for Discord API calls
 #[derive(Clone, Default)]
 pub struct Rest {
-  client: Client,
-  token: Option<String>,
+  client: Client
 }
 
 async fn handle_response<T: DeserializeOwned>(res: Response) -> Result<T, RestError> {
@@ -80,56 +80,51 @@ fn handle_multipart<U: Serialize + Attachments>(mut json_data: U, files: Vec<Fil
 impl Rest {
   /// Creates a new Rest handler without a token
   pub fn new() -> Self {
-    Self {
-      client: Client::new(),
-      token: None
-    }
+    Self::with_optional_token(None)
   }
 
   /// Creates a new Rest handler with a token
   pub fn with_token(token: String) -> Self {
-    Self {
-      client: Client::new(),
-      token: Some(token)
-    }
+    Self::with_optional_token(Some(token))
   }
 
   /// Creates a new Rest handler with or without a token
   pub fn with_optional_token(token: Option<String>) -> Self {
+    let mut client = Client::builder()
+      .user_agent(crate::USER_AGENT);
+
+    if let Some(token) = token {
+      let mut headers = HeaderMap::new();
+      let mut auth = HeaderValue::from_str(format!("Bot {}", token).as_str()).unwrap();
+      auth.set_sensitive(true);
+      headers.insert("Authorization", auth);
+      client = client.default_headers(headers);
+    }
+
     Self {
-      client: Client::new(),
-      token
+      client: client.build().unwrap()
     }
   }
 
   /// Make a get request
   pub async fn get<T: DeserializeOwned>(&self, path: String) -> Result<T, RestError> {
-    let mut req = self.client.get(format!("{}/{}", API_URL, path));
-    if let Some(token) = &self.token {
-      req = req.header("Authorization", format!("Bot {}", token));
-    }
+    let req = self.client.get(format!("{}/{}", API_URL, path));
     let res = req.send().await?;
     handle_response(res).await
   }
 
   /// Make a get request with query parameters
   pub async fn get_query<T: DeserializeOwned, U: Serialize>(&self, path: String, query: U) -> Result<T, RestError> {
-    let mut req = self.client.get(format!("{}/{}", API_URL, path))
+    let req = self.client.get(format!("{}/{}", API_URL, path))
       .query(&query);
-    if let Some(token) = &self.token {
-      req = req.header("Authorization", format!("Bot {}", token));
-    }
     let res = req.send().await?;
     handle_response(res).await
   }
 
   /// Make a post request
   pub async fn post<T: DeserializeOwned, U: Serialize>(&self, path: String, data: U) -> Result<T, RestError> {
-    let mut req = self.client.post(format!("{}/{}", API_URL, path))
+    let req = self.client.post(format!("{}/{}", API_URL, path))
       .json(&data);
-    if let Some(token) = &self.token {
-      req = req.header("Authorization", format!("Bot {}", token));
-    }
     let res = req.send().await?;
     handle_response(res).await
   }
@@ -137,22 +132,16 @@ impl Rest {
   /// Make a post request including files
   pub async fn post_files<T: DeserializeOwned, U: Serialize + Attachments>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T, RestError> {
     let form_data = handle_multipart(json_data, files)?;
-    let mut req = self.client.post(format!("{}/{}", API_URL, path))
+    let req = self.client.post(format!("{}/{}", API_URL, path))
       .multipart(form_data);
-    if let Some(token) = &self.token {
-      req = req.header("Authorization", format!("Bot {}", token));
-    }
     let res = req.send().await?;
     handle_response(res).await
   }
 
   /// Make a patch request
   pub async fn patch<T: DeserializeOwned, U: Serialize>(&self, path: String, data: U) -> Result<T, RestError> {
-    let mut req = self.client.patch(format!("{}/{}", API_URL, path))
+    let req = self.client.patch(format!("{}/{}", API_URL, path))
       .json(&data);
-    if let Some(token) = &self.token {
-      req = req.header("Authorization", format!("Bot {}", token));
-    }
     let res = req.send().await?;
     handle_response(res).await
   }
@@ -160,21 +149,15 @@ impl Rest {
   /// Make a patch request including files
   pub async fn patch_files<T: DeserializeOwned, U: Serialize + Attachments>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T, RestError> {
     let form_data = handle_multipart(json_data, files)?;
-    let mut req = self.client.patch(format!("{}/{}", API_URL, path))
+    let req = self.client.patch(format!("{}/{}", API_URL, path))
       .multipart(form_data);
-    if let Some(token) = &self.token {
-      req = req.header("Authorization", format!("Bot {}", token));
-    }
     let res = req.send().await?;
     handle_response(res).await
   }
 
   /// Make a delete request
   pub async fn delete(&self, path: String) -> Result<(), RestError> {
-    let mut req = self.client.delete(format!("{}/{}", API_URL, path));
-    if let Some(token) = &self.token {
-      req = req.header("Authorization", format!("Bot {}", token));
-    }
+    let req = self.client.delete(format!("{}/{}", API_URL, path));
     let res = req.send().await?;
 
     let status = res.status();
