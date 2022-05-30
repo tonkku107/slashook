@@ -28,7 +28,7 @@ use super::structs::{
   Snowflake
 };
 use super::tokio::{spawn, sync::{mpsc, oneshot}};
-pub use responder::{MessageResponse, CommandResponder, Modal};
+pub use responder::{MessageResponse, CommandResponder, Modal, InteractionResponseError};
 use responder::CommandResponse;
 use crate::rest::Rest;
 
