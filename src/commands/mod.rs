@@ -208,6 +208,11 @@ impl CommandHandler {
           let value = OptionValue::String(text_input.value.unwrap_or_default());
           input.args.insert(text_input.custom_id, value);
         },
+        Component::SelectMenu(select_menu) => {
+          let values = OptionValue::Values(select_menu.values.unwrap_or_default());
+          let (_, custom_id) = select_menu.custom_id.split_once('/').unwrap_or(("", select_menu.custom_id.as_str()));
+          input.args.insert(custom_id.to_string(), values);
+        },
         _ => {}
       }
     }
@@ -338,7 +343,7 @@ impl CommandHandler {
       },
       InteractionType::MESSAGE_COMPONENT | InteractionType::MODAL_SUBMIT => {
         let custom_id = data.custom_id.ok_or("Component interaction should have a custom_id")?;
-        let (command_name, rest_id) = custom_id.as_str().split_once('/').ok_or("Invalid custom_id")?;
+        let (command_name, rest_id) = custom_id.split_once('/').ok_or("Invalid custom_id")?;
         (command_name.to_string(), Some(rest_id.to_string()))
       },
       _ => panic!("This type shouldn't be handled here")

@@ -166,6 +166,8 @@ pub enum OptionValue {
   Number(f64),
   /// Represents an attachment value
   Attachment(Attachment),
+  /// Represents multiple string values as a vec
+  Values(Vec<String>),
   /// Represents any unknown value
   Other(Value)
 }
@@ -414,6 +416,19 @@ impl OptionValue {
       _ => None
     }
   }
+
+  /// Returns true if the value is a vec of strings
+  pub fn is_values(&self) -> bool {
+    matches!(self, Self::Values(_))
+  }
+
+  /// If the value is a vec of strings, returns them. Returns None otherwise.
+  pub fn as_values(&self) -> Option<&Vec<String>> {
+    match self {
+      Self::Values(v) => Some(v),
+      _ => None
+    }
+  }
 }
 
 impl ApplicationCommandOptionChoice {
@@ -434,6 +449,7 @@ impl std::fmt::Display for OptionValue {
       Self::Role(r) => write!(f, "\"{}\"", r.id),
       Self::Number(n) => write!(f, "{}", n),
       Self::Attachment(a) => write!(f, "{}", a.url),
+      Self::Values(v) => write!(f, "{:?}", v),
       Self::Other(o) => write!(f, "{}", o)
     }
   }
