@@ -109,6 +109,7 @@ pub struct SelectMenu {
   /// A developer-defined identifier for the select menu, max 100 characters
   pub custom_id: String,
   /// The choices in the select, max 25
+  #[serde(default)]
   pub options: Vec<SelectOption>,
   /// Custom placeholder text if nothing is selected, max 100 characters
   pub placeholder: Option<String>,
@@ -117,7 +118,9 @@ pub struct SelectMenu {
   /// The maximum number of items that can be chosen; default 1, max 25
   pub max_values: Option<i64>,
   /// Disable the select, default false
-  pub disabled: Option<bool>
+  pub disabled: Option<bool>,
+  /// Values of the chosen items from a modal interaction
+  pub values: Option<Vec<String>>
 }
 
 /// Choices in a Select Menu
@@ -406,13 +409,15 @@ impl SelectMenu {
       options: Vec::new(),
       placeholder: None,
       min_values: None,
-      max_values: None
+      max_values: None,
+      values: None,
     }
   }
 
   /// Set the custom_id for a select menu.\
   /// The command argument is used by the library to choose which command to run when the select menu is updated.
-  /// The custom_id is formatted as `command/id`
+  /// The custom_id is formatted as `command/id`\
+  /// The command name will be ignored when used in a modal.
   /// ```
   /// # use slashook::structs::components::SelectMenu;
   /// let select_menu = SelectMenu::new()
@@ -530,7 +535,7 @@ impl SelectOption {
   /// let option = SelectOption::new("Option label", "Option value")
   ///   .set_default(true);
   /// ```
-  pub fn set_default(&mut self, default: bool) -> &Self {
+  pub fn set_default(mut self, default: bool) -> Self {
     self.default = Some(default);
     self
   }
