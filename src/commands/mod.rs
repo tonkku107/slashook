@@ -173,7 +173,7 @@ impl CommandHandler {
       let option_value = match option.option_type {
         InteractionOptionType::SUB_COMMAND_GROUP => {
           input.sub_command_group = Some(option.name);
-          return self.parse_options(option.options.context("Sub command group is missing options")?, resolved, input)
+          return self.parse_options(option.options.context("Subcommand group has no subcommands")?, resolved, input)
         },
         InteractionOptionType::SUB_COMMAND => {
           input.sub_command = Some(option.name);
@@ -328,7 +328,7 @@ impl CommandHandler {
       }
     });
 
-    let response = rx.recv().await.context("Senders gone")?;
+    let response = rx.recv().await.context("Command handler finished without responding")?;
     rx.close();
 
     Ok(response)
@@ -386,17 +386,17 @@ impl CommandHandler {
 
     let (name, custom_id): (String, Option<String>) = match interaction.interaction_type {
       InteractionType::APPLICATION_COMMAND | InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE => {
-        (data.name.context("Command should have a name")?, None)
+        (data.name.context("Command interaction is missing a command name")?, None)
       },
       InteractionType::MESSAGE_COMPONENT | InteractionType::MODAL_SUBMIT => {
-        let custom_id = data.custom_id.context("Component interaction should have a custom_id")?;
-        let (command_name, rest_id) = custom_id.split_once('/').context("Invalid custom_id")?;
+        let custom_id = data.custom_id.context("Component interaction is missing a custom_id")?;
+        let (command_name, rest_id) = custom_id.split_once('/').with_context(|| format!("Received custom_id ({}) is not in the correct format", custom_id))?;
         (command_name.to_string(), Some(rest_id.to_string()))
       },
       _ => bail!("Unexpected InteractionType in handle_command")
     };
 
-    let command = self.commands.get(&name).context("Command not found")?;
+    let command = self.commands.get(&name).with_context(|| format!("Received command ({}) has no registered command handler", name))?;
     let task_command = command.clone();
 
     let mut input = CommandInput {
