@@ -324,7 +324,7 @@ impl CommandHandler {
     spawn(async move {
       let fut = command.lock().unwrap().func.call(input, responder);
       if let Err(err) = fut.await {
-        println!("Error returned from command handler: {:?}", err);
+        eprintln!("Error returned from command handler: {:?}", err);
       }
     });
 

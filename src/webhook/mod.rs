@@ -87,7 +87,7 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
   let interaction: Interaction = match serde_json::from_slice(body) {
     Ok(i) => i,
     Err(err) => {
-      println!("Received bad request body from Discord. Error: {}", err);
+      eprintln!("Received bad request body from Discord. Error: {}", err);
       return Res::Raw{ status: Status::BadRequest, json: json!({ "error": "Bad body" })}
     }
   };
@@ -112,7 +112,7 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
 
       match response {
         Err(err) => {
-          println!("Error when processing command: {:?}", err);
+          eprintln!("Error when processing command: {:?}", err);
           Res::Raw{ status: Status::InternalServerError, json: json!({ "error": "Handler failed" }) }
         },
         Ok(res) => Res::Response{ status: Status::Ok, data: Box::new(res) }
