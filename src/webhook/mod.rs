@@ -106,12 +106,15 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
     },
 
     _ => {
-      let (handler_send, handler_respond) = oneshot::channel::<Result<InteractionCallback, ()>>();
+      let (handler_send, handler_respond) = oneshot::channel::<anyhow::Result<InteractionCallback>>();
       cmd_sender.send(RocketCommand(interaction, config.bot_token.clone(), handler_send)).expect("Cannot execute handler");
       let response = handler_respond.await.unwrap();
 
       match response {
-        Err(_) => Res::Raw{ status: Status::InternalServerError, json: json!({ "error": "Handler failed" }) },
+        Err(err) => {
+          println!("Error when processing command: {:?}", err);
+          Res::Raw{ status: Status::InternalServerError, json: json!({ "error": "Handler failed" }) }
+        },
         Ok(res) => Res::Response{ status: Status::Ok, data: Box::new(res) }
       }
     }
