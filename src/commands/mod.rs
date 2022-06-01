@@ -419,7 +419,7 @@ impl CommandHandler {
       custom_id,
       values: data.values,
       focused: None,
-      locale: interaction.locale.expect("No locale in interaction"),
+      locale: interaction.locale.context("Interaction didn't include a locale")?,
       guild_locale: interaction.guild_locale,
       rest: Rest::with_optional_token(bot_token)
     };
