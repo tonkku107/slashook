@@ -31,7 +31,7 @@
 //!
 //!   #[command("ping")]
 //!   fn ping(input: CommandInput, res: CommandResponder) {
-//!     res.send_message("Pong!")?;
+//!     res.send_message("Pong!").await?;
 //!   }
 //!
 //!   let mut client = Client::new(config);

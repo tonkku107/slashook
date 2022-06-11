@@ -7,7 +7,6 @@
 
 //! Structs used in creating commands
 
-mod responder;
 use std::{
   collections::HashMap,
   sync::{Arc, Mutex},
@@ -15,6 +14,10 @@ use std::{
   future::Future
 };
 use rocket::futures::future::BoxFuture;
+use super::tokio::{spawn, sync::{mpsc, oneshot}};
+use anyhow::{anyhow, bail, Context};
+
+mod responder;
 use super::structs::{
   interactions::{
     Interaction, InteractionType, ApplicationCommandType, InteractionDataResolved, InteractionOption, InteractionOptionType,
@@ -27,12 +30,10 @@ use super::structs::{
   guilds::GuildMember,
   Snowflake
 };
-use super::tokio::{spawn, sync::{mpsc, oneshot}};
-pub use responder::{MessageResponse, CommandResponder, Modal};
+pub use responder::{MessageResponse, CommandResponder, Modal, InteractionResponseError};
 use responder::CommandResponse;
 use crate::rest::Rest;
 
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 /// The `Result` types expected from a command function
 ///
 /// Since all the responses are sent via methods on [CommandResponder], we don't expect anything special on success.
@@ -157,9 +158,9 @@ impl CommandHandler {
         InteractionType::MESSAGE_COMPONENT |
         InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE |
         InteractionType::MODAL_SUBMIT = interaction.interaction_type {
-          command_handler.handle_command(interaction, bot_token).await.map_err(|_| ())
+          command_handler.handle_command(interaction, bot_token).await
         } else {
-          Err(())
+          Err(anyhow!("Unexpected InteractionType in rocket_bridge"))
         };
 
         handler_send.send(value).unwrap();
@@ -167,35 +168,81 @@ impl CommandHandler {
     }
   }
 
-  fn parse_options(&self, options: Vec<InteractionOption>, resolved: &Option<InteractionDataResolved>, mut input: &mut CommandInput) {
+  fn parse_options(&self, options: Vec<InteractionOption>, resolved: &Option<InteractionDataResolved>, mut input: &mut CommandInput) -> anyhow::Result<()> {
     for option in options.into_iter() {
       let option_value = match option.option_type {
         InteractionOptionType::SUB_COMMAND_GROUP => {
           input.sub_command_group = Some(option.name);
-          return self.parse_options(option.options.expect("Sub command group is missing options"), resolved, input)
+          return self.parse_options(option.options.context("Subcommand group has no subcommands")?, resolved, input)
         },
         InteractionOptionType::SUB_COMMAND => {
           input.sub_command = Some(option.name);
-          if option.options.is_none() { return }
+          if option.options.is_none() { return Ok(()) }
           return self.parse_options(option.options.unwrap(), resolved, input)
         },
 
-        InteractionOptionType::STRING => OptionValue::String(option.value.unwrap().as_str().unwrap().to_string()),
-        InteractionOptionType::INTEGER => OptionValue::Integer(option.value.unwrap().as_i64().unwrap()),
-        InteractionOptionType::BOOLEAN => OptionValue::Boolean(option.value.unwrap().as_bool().unwrap()),
-        InteractionOptionType::USER => OptionValue::User(resolved.as_ref().unwrap().users.as_ref().unwrap().get(option.value.unwrap().as_str().unwrap()).unwrap().clone()),
-        InteractionOptionType::CHANNEL => OptionValue::Channel(Box::new(resolved.as_ref().unwrap().channels.as_ref().unwrap().get(option.value.unwrap().as_str().unwrap()).unwrap().clone())),
-        InteractionOptionType::ROLE => OptionValue::Role(resolved.as_ref().unwrap().roles.as_ref().unwrap().get(option.value.unwrap().as_str().unwrap()).unwrap().clone()),
-        InteractionOptionType::MENTIONABLE => self.parse_mentionable(resolved, &option),
-        InteractionOptionType::NUMBER => OptionValue::Number(option.value.unwrap().as_f64().unwrap()),
-        InteractionOptionType::ATTACHMENT => OptionValue::Attachment(resolved.as_ref().unwrap().attachments.as_ref().unwrap().get(option.value.unwrap().as_str().unwrap()).unwrap().clone()),
-        _ => OptionValue::Other(option.value.unwrap())
+        InteractionOptionType::STRING => OptionValue::String(
+          option.value.context("String option has no value")?
+          .as_str().context("String option value is not a string")?
+          .to_string()
+        ),
+        InteractionOptionType::INTEGER => OptionValue::Integer(
+          option.value.context("Integer option has no value")?
+          .as_i64().context("Integer option value is not an integer")?
+        ),
+        InteractionOptionType::BOOLEAN => OptionValue::Boolean(
+          option.value.context("Boolean option has no value")?
+          .as_bool().context("Boolean option value is not a boolean")?
+        ),
+        InteractionOptionType::USER => OptionValue::User(
+          resolved.as_ref().context("User option provided but no resolved object")?
+          .users.as_ref().context("User option provided but no resolved users object")?
+          .get(
+            option.value.context("User option has no value")?
+            .as_str().context("User option value is not a string (user id)")?
+          ).context("User option provided but no matching resolved user found")?
+          .clone()
+        ),
+        InteractionOptionType::CHANNEL => OptionValue::Channel(Box::new(
+          resolved.as_ref().context("Channel option provided but no resolved object")?
+          .channels.as_ref().context("Channel option provided but not resolved channels object")?
+          .get(
+            option.value.context("Channel option has no value")?
+            .as_str().context("Channel option value is not a string (channel id)")?
+          ).context("Channel option provided but no matching resolved channel found")?
+          .clone()
+        )),
+        InteractionOptionType::ROLE => OptionValue::Role(
+          resolved.as_ref().context("Role option provided but no resolved object")?
+          .roles.as_ref().context("Role option provided but no resolved roles object")?
+          .get(
+            option.value.context("Role option has no value")?
+            .as_str().context("Role option value is not a string (role id)")?
+          ).context("Role option provided but no matching resolved role found")?
+          .clone()
+        ),
+        InteractionOptionType::MENTIONABLE => self.parse_mentionable(resolved.as_ref().context("Mentionable option provided but no resolved object")?, &option)?,
+        InteractionOptionType::NUMBER => OptionValue::Number(
+          option.value.context("Number option has no value")?
+          .as_f64().context("Number option value is not a number")?
+        ),
+        InteractionOptionType::ATTACHMENT => OptionValue::Attachment(
+          resolved.as_ref().context("Attachment option provided but no resolved object")?
+          .attachments.as_ref().context("Attachment option provided but no resolved attachments object")?
+          .get(
+            option.value.context("Attachment option has no value")?
+            .as_str().context("Attachment option value is not a string (attachment id)")?
+          ).context("Attachment option provided but no matching resolved attachment found")?
+          .clone()
+        ),
+        _ => OptionValue::Other(option.value.unwrap_or_default())
       };
       if option.focused.unwrap_or_default() {
         input.focused = Some(option.name.clone());
       }
       input.args.insert(option.name, option_value);
     }
+    Ok(())
   }
 
   fn parse_component_values(&self, components: Vec<Component>, input: &mut CommandInput) {
@@ -213,54 +260,59 @@ impl CommandHandler {
     }
   }
 
-  fn parse_mentionable(&self, resolved: &Option<InteractionDataResolved>, option: &InteractionOption) -> OptionValue {
+  fn parse_mentionable(&self, resolved: &InteractionDataResolved, option: &InteractionOption) -> anyhow::Result<OptionValue> {
     let mut found_value = None;
-    if let Some(users) = &resolved.as_ref().unwrap().users {
-      if let Some(user) = users.get(option.value.as_ref().unwrap().as_str().unwrap()) {
+    let option_value = option.value.as_ref().context("Mentionable option has no value")?.as_str().context("Mentionable option value is not a string (user or role id)")?;
+    if let Some(users) = &resolved.users {
+      if let Some(user) = users.get(option_value) {
         found_value = Some(OptionValue::User(user.clone()))
       }
-    } else if let Some(roles) = &resolved.as_ref().unwrap().roles {
-      if let Some(role) = roles.get(option.value.as_ref().unwrap().as_str().unwrap()) {
+    }
+    if let Some(roles) = &resolved.roles {
+      if let Some(role) = roles.get(option_value) {
         found_value = Some(OptionValue::Role(role.clone()))
       }
     }
     if let Some(value) = found_value {
-      value
+      Ok(value)
     } else {
-      panic!("Could not resolve mentionable");
+      bail!("Mentionable option provided but no matching resolved user or role found");
     }
   }
 
-  fn parse_resolved(&self, resolved: Option<InteractionDataResolved>, target_id: Option<String>, mut input: &mut CommandInput) {
-    match input.command_type.as_ref().unwrap() {
+  fn parse_resolved(&self, resolved: Option<InteractionDataResolved>, target_id: Option<String>, mut input: &mut CommandInput) -> anyhow::Result<()> {
+    match input.command_type.as_ref().context("Somehow trying to parse resolved without a command type")? {
       ApplicationCommandType::USER => {
-        let target_id = target_id.expect("User context menu command has no target");
-        let resolved = resolved.expect("User context menu command has no resolved");
-        let mut resolved_users = resolved.users.expect("User context menu command has no resolved users");
-        let user = resolved_users.remove(&target_id).expect("Target user not found");
-        let mut resolved_members = resolved.members.expect("User context menu command has no resolved members");
-        let member = resolved_members.remove(&target_id).expect("Target member not found");
-        input.target_user = Some(user);
-        input.target_member = Some(member);
+        let target_id = target_id.context("User context menu command has no target")?;
+        let resolved = resolved.context("User context menu command has no resolved")?;
+        let mut resolved_users = resolved.users.context("User context menu command has no resolved users")?;
+        let user = resolved_users.remove(&target_id);
+        let mut member = None;
+        if let Some(mut resolved_members) = resolved.members {
+          member = resolved_members.remove(&target_id);
+        }
+        input.target_user = user;
+        input.target_member = member;
       },
       ApplicationCommandType::MESSAGE => {
-        let target_id = target_id.expect("Message context menu command has no target");
-        let resolved = resolved.expect("Message context menu command has no resolved");
-        let mut resolved_messages = resolved.messages.expect("Message context menu command has no resolved messages");
-        let message = resolved_messages.remove(&target_id).expect("Target message not found");
-        input.target_message = Some(message);
+        let target_id = target_id.context("Message context menu command has no target")?;
+        let resolved = resolved.context("Message context menu command has no resolved")?;
+        let mut resolved_messages = resolved.messages.context("Message context menu command has no resolved messages")?;
+        let message = resolved_messages.remove(&target_id);
+        input.target_message = message;
       },
       _ => {
         input.resolved = resolved;
       }
     }
+    Ok(())
   }
 
-  fn parse_user(&self, user: Option<User>, member: &Option<GuildMember>) -> User {
-    member.as_ref().map_or_else(|| user.unwrap(), |m| m.user.clone().unwrap())
+  fn parse_user(&self, user: Option<User>, member: &Option<GuildMember>) -> anyhow::Result<User> {
+    member.as_ref().map_or_else(|| user.context("No member or user provided"), |m| m.user.clone().context("No user object in member object"))
   }
 
-  async fn spawn_command(&self, command: Arc<Mutex<Command>>, id: String, token: String, input: CommandInput) -> Result<CommandResponse> {
+  async fn spawn_command(&self, command: Arc<Mutex<Command>>, id: String, token: String, input: CommandInput) -> anyhow::Result<CommandResponse> {
     let (tx, mut rx) = mpsc::unbounded_channel::<CommandResponse>();
     let responder = CommandResponder {
       tx,
@@ -272,79 +324,79 @@ impl CommandHandler {
     spawn(async move {
       let fut = command.lock().unwrap().func.call(input, responder);
       if let Err(err) = fut.await {
-        println!("Error returned from command handler: {:?}", err);
+        eprintln!("Error returned from command handler: {:?}", err);
       }
     });
 
-    let response = rx.recv().await.ok_or("Senders gone")?;
+    let response = rx.recv().await.context("Command handler finished without responding")?;
     rx.close();
 
     Ok(response)
   }
 
-  fn format_response(&self, response: CommandResponse) -> Result<InteractionCallback> {
+  fn format_response(&self, response: CommandResponse) -> InteractionCallback {
     match response {
       CommandResponse::DeferMessage(flags) => {
-        Ok(InteractionCallback {
+        InteractionCallback {
           response_type: InteractionCallbackType::DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
           data: Some(flags.into())
-        })
+        }
       },
 
       CommandResponse::DeferUpdate => {
-        Ok(InteractionCallback {
+        InteractionCallback {
           response_type: InteractionCallbackType::DEFERRED_UPDATE_MESSAGE,
           data: None
-        })
+        }
       }
 
       CommandResponse::SendMessage(msg) => {
-        Ok(InteractionCallback {
+        InteractionCallback {
           response_type: InteractionCallbackType::CHANNEL_MESSAGE_WITH_SOURCE,
           data: Some(msg.into())
-        })
+        }
       },
 
       CommandResponse::UpdateMessage(msg) => {
-        Ok(InteractionCallback {
+        InteractionCallback {
           response_type: InteractionCallbackType::UPDATE_MESSAGE,
           data: Some(msg.into())
-        })
+        }
       },
 
       CommandResponse::AutocompleteResult(results) => {
-        Ok(InteractionCallback {
+        InteractionCallback {
           response_type: InteractionCallbackType::APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
           data: Some(results.into())
-        })
+        }
       },
 
       CommandResponse::Modal(modal) => {
-        Ok(InteractionCallback {
+        InteractionCallback {
           response_type: InteractionCallbackType::MODAL,
           data: Some(modal.into())
-        })
+        }
       }
 
     }
   }
 
-  pub async fn handle_command(&self, interaction: Interaction, bot_token: Option<String>) -> Result<InteractionCallback> {
-    let data = interaction.data.ok_or("Interaction has no data")?;
+  pub async fn handle_command(&self, interaction: Interaction, bot_token: Option<String>) -> anyhow::Result<InteractionCallback> {
+    let data = interaction.data.context("Interaction has no data")?;
 
     let (name, custom_id): (String, Option<String>) = match interaction.interaction_type {
       InteractionType::APPLICATION_COMMAND | InteractionType::APPLICATION_COMMAND_AUTOCOMPLETE => {
-        (data.name.ok_or("Command should have a name")?, None)
+        (data.name.context("Command interaction is missing a command name")?, None)
       },
       InteractionType::MESSAGE_COMPONENT | InteractionType::MODAL_SUBMIT => {
-        let custom_id = data.custom_id.ok_or("Component interaction should have a custom_id")?;
-        let (command_name, rest_id) = custom_id.as_str().split_once('/').ok_or("Invalid custom_id")?;
+        let custom_id = data.custom_id.context("Component interaction is missing a custom_id")?;
+        let (command_name, rest_id) = custom_id.split_once('/').with_context(|| format!("Received custom_id ({}) is not in the correct format", custom_id))?;
         (command_name.to_string(), Some(rest_id.to_string()))
       },
-      _ => panic!("This type shouldn't be handled here")
+      _ => bail!("Unexpected InteractionType in handle_command")
     };
 
-    let command = self.commands.get(&name).ok_or("Command not found")?;
+    let command = self.commands.get(&name).with_context(|| format!("Received command ({}) has no registered command handler", name))?;
     let task_command = command.clone();
 
     let mut input = CommandInput {
@@ -358,7 +410,7 @@ impl CommandHandler {
       resolved: None,
       guild_id: interaction.guild_id,
       channel_id: interaction.channel_id,
-      user: self.parse_user(interaction.user, &interaction.member),
+      user: self.parse_user(interaction.user, &interaction.member)?,
       member: interaction.member,
       message: interaction.message,
       target_user: None,
@@ -367,13 +419,13 @@ impl CommandHandler {
       custom_id,
       values: data.values,
       focused: None,
-      locale: interaction.locale.expect("No locale in interaction"),
+      locale: interaction.locale.context("Interaction didn't include a locale")?,
       guild_locale: interaction.guild_locale,
       rest: Rest::with_optional_token(bot_token)
     };
 
     if let Some(options) = data.options {
-      self.parse_options(options, &data.resolved, &mut input);
+      self.parse_options(options, &data.resolved, &mut input)?;
     }
 
     if let Some(components) = data.components {
@@ -381,11 +433,11 @@ impl CommandHandler {
     }
 
     if input.command_type.is_some() {
-      self.parse_resolved(data.resolved, data.target_id, &mut input);
+      self.parse_resolved(data.resolved, data.target_id, &mut input)?;
     }
 
     let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
-    self.format_response(response)
+    Ok(self.format_response(response))
   }
 }
 
@@ -437,4 +489,4 @@ impl CommandInput {
 }
 
 #[derive(Debug)]
-pub(crate) struct RocketCommand(pub Interaction, pub Option<String>, pub oneshot::Sender::<std::result::Result<InteractionCallback, ()>>);
+pub(crate) struct RocketCommand(pub Interaction, pub Option<String>, pub oneshot::Sender::<anyhow::Result<InteractionCallback>>);

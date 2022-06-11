@@ -16,7 +16,15 @@ use serde::Serialize;
 use crate::tokio::sync::mpsc;
 use crate::rest::{Rest, RestError};
 
-type SimpleResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+/// Error for when a response failed due to the interaction having been responded to already.
+#[derive(Debug)]
+pub struct InteractionResponseError;
+impl std::fmt::Display for InteractionResponseError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Interaction has already been responded to.")
+  }
+}
+impl std::error::Error for InteractionResponseError { }
 
 /// Message that can be sent as a response to a command or other interaction
 ///
@@ -196,7 +204,7 @@ impl MessageResponse {
   /// let msg_file = File::from_file("cat.png", TokioFile::open("cat.png").await?).await?;
   /// let msg_file2 = File::from_file("cat2.png", TokioFile::open("cat2.png").await?).await?;
   ///
-  /// res.defer(false)?;
+  /// res.defer(false).await?;
   ///
   /// let response = MessageResponse::from("Here's a picture of my cat")
   ///   .add_file(msg_file);
@@ -293,37 +301,56 @@ pub struct CommandResponder {
 
 impl CommandResponder {
   /// Respond to an interaction with a message.\
-  /// Only valid for the first response. If you've already responded or deferred once, use the follow-up methods
+  /// If interaction has already been responded to, this function will call [`send_followup_message`](CommandResponder::send_followup_message) instead and a message can only be returned in this case.
   /// ```no_run
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// ##[command("example")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.send_message("Hello!")?;
+  ///   res.send_message("Hello!").await?;
   /// }
   /// ```
-  pub fn send_message<T: Into<MessageResponse>>(&self, response: T) -> SimpleResult<()> {
+  pub async fn send_message<T: Into<MessageResponse>>(&self, response: T) -> Result<Option<Message>, RestError> {
     let response = response.into();
-    self.tx.send(CommandResponse::SendMessage(response))?;
-    // TODO: Figure out why the sender doesn't realize it is closed and forward further send_message calls to send_followup_message
-    Ok(())
+    match self.tx.send(CommandResponse::SendMessage(response)) {
+      Ok(_) => {
+        self.tx.closed().await;
+        Ok(None)
+      },
+      Err(err) => {
+        if let CommandResponse::SendMessage(response) = err.0 {
+          return self.send_followup_message(response).await.map(Some);
+        }
+        Ok(None)
+      }
+    }
   }
 
   /// Respond to an interaction by editing the original message.\
-  /// Only valid for the first response to a component interaction. If you've already responded or deferred once, use the follow-up methods
+  /// If interaction has already been responded to, this function will call [`edit_original_message`](CommandResponder::edit_original_message) instead and a message can only be returned in this case.
   /// ```no_run
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// # use slashook::structs::components::{Components, Button};
   /// ##[command("example_button")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.update_message("Button was clicked!")?;
+  ///   res.update_message("Button was clicked!").await?;
   /// }
   /// ```
-  pub fn update_message<T: Into<MessageResponse>>(&self, response: T) -> SimpleResult<()> {
+  pub async fn update_message<T: Into<MessageResponse>>(&self, response: T) -> Result<Option<Message>, RestError> {
     let response = response.into();
-    self.tx.send(CommandResponse::UpdateMessage(response))?;
-    Ok(())
+    match self.tx.send(CommandResponse::UpdateMessage(response)) {
+      Ok(_) => {
+        self.tx.closed().await;
+        Ok(None)
+      },
+      Err(err) => {
+        if let CommandResponse::UpdateMessage(response) = err.0 {
+          return self.edit_original_message(response).await.map(Some);
+        }
+        Ok(None)
+      }
+    }
   }
 
   /// Give yourself more execution time.\
@@ -335,15 +362,16 @@ impl CommandResponder {
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// ##[command("example")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.defer(false)?;
+  ///   res.defer(false).await?;
   ///   // Do something that takes longer than 3s
   ///   res.send_followup_message("Thank you for your patience!").await?;
   /// }
   /// ```
-  pub fn defer(&self, ephemeral: bool) -> SimpleResult<()> {
+  pub async fn defer(&self, ephemeral: bool) -> Result<(), InteractionResponseError> {
     let mut flags = MessageFlags::empty();
     flags.set(MessageFlags::EPHEMERAL, ephemeral);
-    self.tx.send(CommandResponse::DeferMessage(flags))?;
+    self.tx.send(CommandResponse::DeferMessage(flags)).map_err(|_| InteractionResponseError)?;
+    self.tx.closed().await;
     Ok(())
   }
 
@@ -353,13 +381,14 @@ impl CommandResponder {
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// ##[command("example_button")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.defer_update()?;
+  ///   res.defer_update().await?;
   ///   // Do something that takes longer than 3s
   ///   res.edit_original_message("Finally it changed!").await?;
   /// }
   /// ```
-  pub fn defer_update(&self) -> SimpleResult<()> {
-    self.tx.send(CommandResponse::DeferUpdate)?;
+  pub async fn defer_update(&self) -> Result<(), InteractionResponseError> {
+    self.tx.send(CommandResponse::DeferUpdate).map_err(|_| InteractionResponseError)?;
+    self.tx.closed().await;
     Ok(())
   }
 
@@ -377,12 +406,13 @@ impl CommandResponder {
   ///       ApplicationCommandOptionChoice::new("An autocompleted choice", "autocomplete1"),
   ///       ApplicationCommandOptionChoice::new("Another autocompleted choice", "autocomplete2")
   ///     ];
-  ///     return res.autocomplete(choices)?;
+  ///     return res.autocomplete(choices).await?;
   ///   }
   /// }
   /// ```
-  pub fn autocomplete(&self, results: Vec<ApplicationCommandOptionChoice>) -> SimpleResult<()> {
-    self.tx.send(CommandResponse::AutocompleteResult(results))?;
+  pub async fn autocomplete(&self, results: Vec<ApplicationCommandOptionChoice>) -> Result<(), InteractionResponseError> {
+    self.tx.send(CommandResponse::AutocompleteResult(results)).map_err(|_| InteractionResponseError)?;
+    self.tx.closed().await;
     Ok(())
   }
 
@@ -399,11 +429,12 @@ impl CommandResponder {
   ///   let components = Components::new().add_text_input(text_input);
   ///   let modal = Modal::new("example_command", "modal1", "Please fill this form")
   ///     .set_components(components);
-  ///   return res.open_modal(modal)?;
+  ///   return res.open_modal(modal).await?;
   /// }
   /// ```
-  pub fn open_modal(&self, modal: Modal) -> SimpleResult<()> {
-    self.tx.send(CommandResponse::Modal(modal))?;
+  pub async fn open_modal(&self, modal: Modal) -> Result<(), InteractionResponseError> {
+    self.tx.send(CommandResponse::Modal(modal)).map_err(|_| InteractionResponseError)?;
+    self.tx.closed().await;
     Ok(())
   }
 
@@ -413,7 +444,7 @@ impl CommandResponder {
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// ##[command("example")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.send_message("First message!")?;
+  ///   res.send_message("First message!").await?;
   ///   res.send_followup_message("Second message!").await?;
   /// }
   /// ```
@@ -435,7 +466,7 @@ impl CommandResponder {
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// ##[command("example")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.send_message("First message!")?;
+  ///   res.send_message("First message!").await?;
   ///   let msg = res.send_followup_message("Second message!").await?;
   ///   res.edit_followup_message(msg.id, "Second message but edited!").await?;
   /// }
@@ -470,7 +501,7 @@ impl CommandResponder {
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// ##[command("example")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.send_message("First message!")?;
+  ///   res.send_message("First message!").await?;
   ///   let msg = res.get_original_message().await?;
   ///   println!("I responded with {}", msg.content);
   /// }
@@ -485,7 +516,7 @@ impl CommandResponder {
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// ##[command("example")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.send_message("First message!")?;
+  ///   res.send_message("First message!").await?;
   ///   let msg = res.send_followup_message("If you see me say hi").await?;
   ///   res.delete_followup_message(msg.id).await?;
   /// }

@@ -87,7 +87,7 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
   let interaction: Interaction = match serde_json::from_slice(body) {
     Ok(i) => i,
     Err(err) => {
-      println!("Received bad request body from Discord. Error: {}", err);
+      eprintln!("Received bad request body from Discord. Error: {}", err);
       return Res::Raw{ status: Status::BadRequest, json: json!({ "error": "Bad body" })}
     }
   };
@@ -106,12 +106,15 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
     },
 
     _ => {
-      let (handler_send, handler_respond) = oneshot::channel::<Result<InteractionCallback, ()>>();
+      let (handler_send, handler_respond) = oneshot::channel::<anyhow::Result<InteractionCallback>>();
       cmd_sender.send(RocketCommand(interaction, config.bot_token.clone(), handler_send)).expect("Cannot execute handler");
       let response = handler_respond.await.unwrap();
 
       match response {
-        Err(_) => Res::Raw{ status: Status::InternalServerError, json: json!({ "error": "Handler failed" }) },
+        Err(err) => {
+          eprintln!("Error when processing command: {:?}", err);
+          Res::Raw{ status: Status::InternalServerError, json: json!({ "error": "Handler failed" }) }
+        },
         Ok(res) => Res::Response{ status: Status::Ok, data: Box::new(res) }
       }
     }
