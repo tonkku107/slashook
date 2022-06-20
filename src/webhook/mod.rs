@@ -42,7 +42,7 @@ impl<'r> Responder<'r, 'static> for Res {
     match self {
       Self::Raw{ status, json } => {
         response
-          .merge(content::Json(json.to_string()).respond_to(req)?)
+          .merge(content::RawJson(json.to_string()).respond_to(req)?)
           .status(status);
       },
 
@@ -51,7 +51,7 @@ impl<'r> Responder<'r, 'static> for Res {
           response.merge(multipart::handle_multipart(*data)?);
         } else {
           let json = serde_json::to_string(&data).map_err(|_| Status::InternalServerError)?;
-          response.merge(content::Json(json).respond_to(req)?);
+          response.merge(content::RawJson(json).respond_to(req)?);
         }
         response.status(status);
       }
