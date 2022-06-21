@@ -82,7 +82,7 @@ impl Emoji {
   /// assert_eq!(normal_emoji.mention(), "👌🏻");
   /// ```
   pub fn mention(&self) -> String {
-    let fallback = String::from("");
+    let fallback = String::new();
     let name = self.name.as_ref().unwrap_or(&fallback);
     match &self.id {
       Some(id) => {
@@ -90,6 +90,15 @@ impl Emoji {
         format!("<{}:{}:{}>", animated, name, id)
       },
       None => name.to_string()
+    }
+  }
+
+  pub(crate) fn to_url_format(&self) -> String {
+    let fallback = String::new();
+    if let Some(id) = &self.id {
+      format!("{}:{}", self.name.as_ref().unwrap_or(&fallback), id)
+    } else {
+      self.name.as_ref().unwrap_or(&fallback).to_string()
     }
   }
 }
