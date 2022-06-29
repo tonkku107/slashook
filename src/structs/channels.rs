@@ -531,7 +531,7 @@ impl MessageFetchOptions {
     self
   }
 
-  /// Sets the message ID to search aafter.
+  /// Sets the message ID to search after.
   /// Also removes `around` and `before` if set.
   pub fn set_after<T: ToString>(mut self, after: T) -> Self {
     self.around = None;
@@ -541,6 +541,37 @@ impl MessageFetchOptions {
   }
 
   /// Sets the limit for the amount of messages to fetch
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+}
+
+/// Options for fetching reactions with [get_reactions](Message::get_reactions).
+#[derive(Serialize, Default)]
+pub struct ReactionFetchOptions {
+  /// Get users after this user ID
+  pub after: Option<Snowflake>,
+  /// Max number of users to return (1-100) Defaults to 25.
+  pub limit: Option<i64>,
+}
+
+impl ReactionFetchOptions {
+  /// Creates a new empty ReactionFetchOptions
+  pub fn new() -> Self {
+    Self {
+      after: None,
+      limit: None,
+    }
+  }
+
+  /// Sets the user ID to search after.
+  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
+    self.after = Some(after.to_string());
+    self
+  }
+
+  /// Sets the limit for the amount of reactions to fetch
   pub fn set_limit(mut self, limit: i64) -> Self {
     self.limit = Some(limit);
     self
@@ -650,6 +681,100 @@ impl Message {
   /// ```
   pub async fn crosspost(&self, rest: &Rest) -> Result<Message, RestError> {
     rest.post(format!("channels/{}/messages/{}/crosspost", self.channel_id, self.id), Value::Null).await
+  }
+
+  /// Add a reaction to a message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::{channels::Message, Emoji};
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = Message::create(&input.rest, "344581598878105605", "Hello!").await?;
+  /// msg.create_reaction(&input.rest, &Emoji::new_standard_emoji("👋")).await?;
+  /// # }
+  /// ```
+  pub async fn create_reaction(&self, rest: &Rest, emoji: &Emoji) -> Result<(), RestError> {
+    rest.put(format!("channels/{}/messages/{}/reactions/{}/@me", &self.channel_id, &self.id, emoji.to_url_format()), Value::Null).await
+  }
+
+  /// Remove the bot's reaction to a message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::{channels::Message, Emoji};
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = Message::create(&input.rest, "344581598878105605", "Hello!").await?;
+  /// let emoji = Emoji::new_standard_emoji("👋");
+  /// msg.create_reaction(&input.rest, &emoji).await?;
+  /// msg.delete_reaction(&input.rest, &emoji).await?;
+  /// # }
+  /// ```
+  pub async fn delete_reaction(&self, rest: &Rest, emoji: &Emoji) -> Result<(), RestError> {
+    self.delete_user_reaction(rest, emoji, "@me").await
+  }
+
+  /// Remove someone else's reaction to a message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::Emoji;
+  /// # #[command("Example Message Context")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = input.target_message.unwrap();
+  /// msg.delete_user_reaction(&input.rest, &Emoji::new_standard_emoji("👋"), input.user.id).await?;
+  /// # }
+  /// ```
+  pub async fn delete_user_reaction<T: ToString>(&self, rest: &Rest, emoji: &Emoji, user_id: T) -> Result<(), RestError> {
+    rest.delete(format!("channels/{}/messages/{}/reactions/{}/{}", &self.channel_id, &self.id, emoji.to_url_format(), user_id.to_string())).await
+  }
+
+  /// Get the users who reacted to a message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::{Emoji, channels::ReactionFetchOptions};
+  /// # #[command("Example Message Context")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = input.target_message.unwrap();
+  /// let options = ReactionFetchOptions::new().set_limit(5);
+  /// let reactions = msg.get_reactions(&input.rest, &Emoji::new_standard_emoji("👋"), options).await?;
+  /// println!("{:?}", reactions);
+  /// # }
+  /// ```
+  pub async fn get_reactions(&self, rest: &Rest, emoji: &Emoji, options: ReactionFetchOptions) -> Result<Vec<User>, RestError> {
+    rest.get_query(format!("channels/{}/messages/{}/reactions/{}", &self.channel_id, &self.id, emoji.to_url_format()), options).await
+  }
+
+  /// Delete all reactions from a message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::Emoji;
+  /// # #[command("Example Message Context")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = input.target_message.unwrap();
+  /// msg.delete_all_reactions(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn delete_all_reactions(&self, rest: &Rest) -> Result<(), RestError> {
+    rest.delete(format!("channels/{}/messages/{}/reactions", &self.channel_id, &self.id)).await
+  }
+
+  /// Delete all reactions for a single emoji from the message
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::Emoji;
+  /// # #[command("Example Message Context")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = input.target_message.unwrap();
+  /// msg.delete_all_reactions_for_emoji(&input.rest, &Emoji::new_standard_emoji("👋")).await?;
+  /// # }
+  /// ```
+  pub async fn delete_all_reactions_for_emoji(&self, rest: &Rest, emoji: &Emoji) -> Result<(), RestError> {
+    rest.delete(format!("channels/{}/messages/{}/reactions/{}", &self.channel_id, &self.id, emoji.to_url_format())).await
   }
 }
 
