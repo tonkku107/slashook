@@ -502,51 +502,6 @@ pub struct MessageFetchOptions {
   pub limit: Option<i64>,
 }
 
-impl MessageFetchOptions {
-  /// Creates a new empty MessageFetchOptions
-  pub fn new() -> Self {
-    Self {
-      around: None,
-      before: None,
-      after: None,
-      limit: None,
-    }
-  }
-
-  /// Sets the message ID to search around.
-  /// Also removes `before` and `after` if set.
-  pub fn set_around<T: ToString>(mut self, around: T) -> Self {
-    self.around = Some(around.to_string());
-    self.before = None;
-    self.after = None;
-    self
-  }
-
-  /// Sets the message ID to search before.
-  /// Also removes `around` and `after` if set.
-  pub fn set_before<T: ToString>(mut self, before: T) -> Self {
-    self.around = None;
-    self.before = Some(before.to_string());
-    self.after = None;
-    self
-  }
-
-  /// Sets the message ID to search after.
-  /// Also removes `around` and `before` if set.
-  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
-    self.around = None;
-    self.before = None;
-    self.after = Some(after.to_string());
-    self
-  }
-
-  /// Sets the limit for the amount of messages to fetch
-  pub fn set_limit(mut self, limit: i64) -> Self {
-    self.limit = Some(limit);
-    self
-  }
-}
-
 /// Options for fetching reactions with [get_reactions](Message::get_reactions).
 #[derive(Serialize, Default)]
 pub struct ReactionFetchOptions {
@@ -554,28 +509,6 @@ pub struct ReactionFetchOptions {
   pub after: Option<Snowflake>,
   /// Max number of users to return (1-100) Defaults to 25.
   pub limit: Option<i64>,
-}
-
-impl ReactionFetchOptions {
-  /// Creates a new empty ReactionFetchOptions
-  pub fn new() -> Self {
-    Self {
-      after: None,
-      limit: None,
-    }
-  }
-
-  /// Sets the user ID to search after.
-  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
-    self.after = Some(after.to_string());
-    self
-  }
-
-  /// Sets the limit for the amount of reactions to fetch
-  pub fn set_limit(mut self, limit: i64) -> Self {
-    self.limit = Some(limit);
-    self
-  }
 }
 
 impl Message {
@@ -881,6 +814,73 @@ impl AllowedMentions {
   /// Set if the replied user should be mentioned or not
   pub fn set_replied_user(mut self, b: bool) -> Self {
     self.replied_user = Some(b);
+    self
+  }
+}
+
+impl MessageFetchOptions {
+  /// Creates a new empty MessageFetchOptions
+  pub fn new() -> Self {
+    Self {
+      around: None,
+      before: None,
+      after: None,
+      limit: None,
+    }
+  }
+
+  /// Sets the message ID to search around.
+  /// Also removes `before` and `after` if set.
+  pub fn set_around<T: ToString>(mut self, around: T) -> Self {
+    self.around = Some(around.to_string());
+    self.before = None;
+    self.after = None;
+    self
+  }
+
+  /// Sets the message ID to search before.
+  /// Also removes `around` and `after` if set.
+  pub fn set_before<T: ToString>(mut self, before: T) -> Self {
+    self.around = None;
+    self.before = Some(before.to_string());
+    self.after = None;
+    self
+  }
+
+  /// Sets the message ID to search after.
+  /// Also removes `around` and `before` if set.
+  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
+    self.around = None;
+    self.before = None;
+    self.after = Some(after.to_string());
+    self
+  }
+
+  /// Sets the limit for the amount of messages to fetch
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+}
+
+impl ReactionFetchOptions {
+  /// Creates a new empty ReactionFetchOptions
+  pub fn new() -> Self {
+    Self {
+      after: None,
+      limit: None,
+    }
+  }
+
+  /// Sets the user ID to search after.
+  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
+    self.after = Some(after.to_string());
+    self
+  }
+
+  /// Sets the limit for the amount of reactions to fetch
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
     self
   }
 }
