@@ -42,14 +42,14 @@ pub struct Channel {
   /// Sorting position of the channel
   pub position: Option<i64>,
   /// Explicit permission overwrites for members and roles
-  pub permission_overwrites: Option<Vec<PermissionOverwrites>>,
+  pub permission_overwrites: Option<Vec<PermissionOverwrite>>,
   /// The name of the channel (1-100 characters)
   pub name: Option<String>,
-  /// The channel topic (0-1024 characters)
+  /// The channel topic (0-4096 characters for `GUILD_FORUM` channels, 0-1024 characters for all others)
   pub topic: Option<String>,
   /// Whether the channel is nsfw
   pub nsfw: Option<bool>,
-  /// The id of the last message sent in this channel (may not point to an existing or valid message)
+  /// The id of the last message sent in this channel (or thread for `GUILD_FORUM` channels) (may not point to an existing or valid message or thread)
   pub last_message_id: Option<Snowflake>,
   /// The bitrate (in bits) of the voice channel
   pub bitrate: Option<i64>,
@@ -59,7 +59,7 @@ pub struct Channel {
   pub rate_limit_per_user: Option<i64>,
   /// The recipients of the DM
   pub recipients: Option<Vec<User>>,
-  /// Icon hash
+  /// Icon hash of the group DM
   pub icon: Option<String>,
   /// Id of the creator of the group DM or thread
   pub owner_id: Option<Snowflake>,
@@ -71,9 +71,9 @@ pub struct Channel {
   pub last_pin_timestamp: Option<DateTime<Utc>>,
   /// [Voice region](https://discord.com/developers/docs/resources/voice#voice-region-object) id for the voice channel, automatic when set to None
   pub rtc_region: Option<String>,
-  /// The camera video quality mode of the voice channel, `AUTO` when not present
+  /// The camera [video quality mode](VideoQualityMode) of the voice channel, `AUTO` when not present
   pub video_quality_mode: Option<VideoQualityMode>,
-  /// An approximate count of messages in a thread, stops counting at 50
+  /// Number of messages (not including the initial message or deleted messages) in a thread.
   pub message_count: Option<i64>,
   /// An approximate count of users in a thread, stops counting at 50
   pub member_count: Option<i64>,
@@ -84,7 +84,21 @@ pub struct Channel {
   /// Default duration for newly created threads, in minutes, to automatically archive the thread after recent activity, can be set to: 60, 1440, 4320, 10080
   pub default_auto_archive_duration: Option<i64>,
   /// Computed permissions for the invoking user in the channel, including overwrites, only included when part of the `resolved` data received on a slash command interaction
-  pub permissions: Option<Permissions>
+  pub permissions: Option<Permissions>,
+  /// [Channel flags](ChannelFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
+  pub flags: Option<ChannelFlags>,
+  /// Number of messages ever sent in a thread, it's similar to `message_count` on message creation, but will not decrement the number when a message is deleted
+  pub total_message_sent: Option<i64>,
+  /// The set of tags that can be used in a `GUILD_FORUM` channel
+  pub available_tags: Option<Vec<ForumTag>>,
+  /// The IDs of the set of tags that have been applied to a thread in a `GUILD_FORUM` channel
+  pub applied_tags: Option<Vec<Snowflake>>,
+  /// The emoji to show in the add reaction button on a thread in a `GUILD_FORUM` channel
+  pub default_reaction_emoji: Option<DefaultReaction>,
+  /// The initial `rate_limit_per_user` to set on newly created threads in a channel. This field is copied to the thread at creation time and does not live update.
+  pub default_thread_rate_limit_per_user: Option<i64>,
+  /// The [default sort order type](SortOrderType) used to order posts in `GUILD_FORUM` channels. Defaults to `None`, which indicates a preferred sort order hasn't been set by a channel admin
+  pub default_sort_order: Option<SortOrderType>,
 }
 
 /// Discord Channel Types
@@ -120,7 +134,7 @@ pub enum ChannelType {
 
 /// Discord Permission Overwrite Object
 #[derive(Deserialize, Clone, Debug)]
-pub struct PermissionOverwrites {
+pub struct PermissionOverwrite {
   /// Role or user id
   pub id: Snowflake,
   /// Either ROLE or MEMBER
@@ -186,6 +200,53 @@ pub struct ThreadMember {
   pub join_timestamp: DateTime<Utc>,
   /// Any user-thread settings, currently only used for notifications
   pub flags: i64
+}
+
+bitflags! {
+  /// Bitflags for Discord Channel Flags
+  pub struct ChannelFlags: u32 {
+    /// This thread is pinned to the top of its parent `GUILD_FORUM` channel
+    const PINNED = 1 << 1;
+    /// Whether a tag is required to be specified when creating a thread in a `GUILD_FORUM` channel. Tags are specified in the `applied_tags` field.
+    const REQUIRE_TAG = 1 << 4;
+  }
+}
+
+/// Discord Forum Tag Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct ForumTag {
+  /// The id of the tag
+  pub id: Snowflake,
+  /// The name of the tag (0-20 characters)
+  pub name: String,
+  /// Whether this tag can only be added to or removed from threads by a member with the `MANAGE_THREADS` permission
+  pub moderated: bool,
+  /// The id of a guild's custom emoji
+  pub emoji_id: Option<Snowflake>,
+  /// The unicode character of the emoji
+  pub emoji_name: Option<String>,
+}
+
+/// Discord Default Reaction Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct DefaultReaction {
+  /// The id of a guild's custom emoji
+  pub emoji_id: Option<Snowflake>,
+  /// The unicode character of the emoji
+  pub emoji_name: Option<String>,
+}
+
+/// Discord Sort Order Types
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum SortOrderType {
+  /// Sort forum posts by activity
+  LATEST_ACTIVITY = 0,
+  /// Sort forum posts by creation time (from most recent to oldest)
+  CREATION_DATE = 1,
+  /// Sort order type that hasn't been implemented yet
+  UNKNOWN
 }
 
 /// Discord Message Object
@@ -888,6 +949,13 @@ impl ReactionFetchOptions {
 impl Default for AllowedMentions {
   fn default() -> Self {
     Self::new()
+  }
+}
+
+impl<'de> Deserialize<'de> for ChannelFlags {
+  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    let bits = u32::deserialize(d)?;
+    Ok(Self::from_bits_truncate(bits))
   }
 }
 
