@@ -169,7 +169,7 @@ impl Rest {
   }
 
   /// Make a delete request
-  pub async fn delete(&self, path: String) -> Result<(), RestError> {
+  pub async fn delete<T: DeserializeOwned + 'static>(&self, path: String) -> Result<T, RestError> {
     let req = self.client.delete(format!("{}/{}", API_URL, path));
     let res = req.send().await?;
     handle_response(res).await

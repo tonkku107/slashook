@@ -8,8 +8,231 @@
 //! Structs related to Discord guilds
 
 use serde::{Deserialize, de::Deserializer};
-use super::{Snowflake, users::User, Permissions};
+use serde_repr::Deserialize_repr;
+use super::{
+  Snowflake,
+  Emoji,
+  Permissions,
+  stickers::Sticker,
+  users::User
+};
 use chrono::{DateTime, Utc};
+use bitflags::bitflags;
+
+/// Discord Guild Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct Guild {
+  /// Guild id
+  pub id: Snowflake,
+  /// Guild name (2-100 characters, excluding trailing and leading whitespace)
+  pub name: String,
+  /// [Icon hash](https://discord.com/developers/docs/reference#image-formatting)
+  pub icon: Option<String>,
+  /// [Icon hash](https://discord.com/developers/docs/reference#image-formatting), returned when in the template object
+  pub icon_hash: Option<String>,
+  /// [Splash hash](https://discord.com/developers/docs/reference#image-formatting)
+  pub splash: Option<String>,
+  /// [Discovery splash hash](https://discord.com/developers/docs/reference#image-formatting); only present for guilds with the "DISCOVERABLE" feature
+  pub discovery_splash: Option<String>,
+  /// True if [the user](https://discord.com/developers/docs/resources/user#get-current-user-guilds) is the owner of the guild
+  pub owner: Option<bool>,
+  /// Id of owner
+  pub owner_id: Option<Snowflake>,
+  /// Total permissions for [the user](https://discord.com/developers/docs/resources/user#get-current-user-guilds) in the guild (excludes overwrites)
+  pub permissions: Option<Permissions>,
+  /// Id of afk channel
+  pub afk_channel_id: Option<Snowflake>,
+  /// Afk timeout in seconds, can be set to: 60, 300, 900, 1800, 3600
+  pub afk_timeout: Option<i64>,
+  /// True if the server widget is enabled
+  pub widget_enabled: Option<bool>,
+  /// The channel id that the widget will generate an invite to, or None if set to no invite
+  pub widget_channel_id: Option<Snowflake>,
+  /// [Verification level](VerificationLevel) required for the guild
+  pub verification_level: VerificationLevel,
+  /// Default [message notifications level](MessageNotificationsLevel)
+  pub default_message_notifications: Option<MessageNotificationsLevel>,
+  /// [Explicit content filter level](ExplicitContentFilterLevel)
+  pub explicit_content_filter: Option<ExplicitContentFilterLevel>,
+  /// Roles in the guild
+  pub roles: Option<Vec<Role>>,
+  /// Custom guild emojis
+  pub emojis: Option<Vec<Emoji>>,
+  /// Enabled guild features
+  pub features: Vec<String>,
+  /// Required [MFA level](MFALevel) for the guild
+  pub mfa_level: Option<MFALevel>,
+  /// Application id of the guild creator if it is bot-created
+  pub application_id: Option<Snowflake>,
+  /// The id of the channel where guild notices such as welcome messages and boost events are posted
+  pub system_channel_id: Option<Snowflake>,
+  /// [System channel flags](SystemChannelFlags)
+  pub system_channel_flags: Option<SystemChannelFlags>,
+  /// The id of the channel where Community guilds can display rules and/or guidelines
+  pub rules_channel_id: Option<Snowflake>,
+  /// The maximum number of presences for the guild (`None` is always returned, apart from the largest of guilds)
+  pub max_presences: Option<i64>,
+  /// The maximum number of members for the guild
+  pub max_members: Option<i64>,
+  /// The vanity url code for the guild
+  pub vanity_url_code: Option<String>,
+  /// The description of a guild
+  pub description: Option<String>,
+  /// [Banner hash](https://discord.com/developers/docs/reference#image-formatting)
+  pub banner: Option<String>,
+  /// [Premium tier](PremiumTier) (Server Boost level)
+  pub premium_tier: Option<PremiumTier>,
+  /// The number of boosts this guild currently has
+  pub premium_subscription_count: Option<i64>,
+  /// The preferred locale of a Community guild; used in server discovery and notices from Discord, and sent in interactions; defaults to "en-US"
+  pub preferred_locale: Option<String>,
+  /// The id of the channel where admins and moderators of Community guilds receive notices from Discord
+  pub public_updates_channel_id: Option<Snowflake>,
+  /// The maximum amount of users in a video channel
+  pub max_video_channel_users: Option<i64>,
+  /// Approximate number of members in this guild, returned from the `GET /guilds/<id>` endpoint when `with_counts` is `true`
+  pub approximate_member_count: Option<i64>,
+  /// Approximate number of non-offline members in this guild, returned from the `GET /guilds/<id>` endpoint when `with_counts` is `true`
+  pub approximate_presence_count: Option<i64>,
+  /// The welcome screen of a Community guild, shown to new members, returned in an [Invite](super::invites::Invite)'s guild object
+  pub welcome_screen: Option<WelcomeScreen>,
+  /// [Guild NSFW level](NSFWLevel)
+  pub nsfw_level: NSFWLevel,
+  /// Custom guild stickers
+  pub stickers: Option<Sticker>,
+  /// Whether the guild has the boost progress bar enabled
+  pub premium_progress_bar_enabled: Option<bool>,
+}
+
+/// Discord Verification Levels
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum VerificationLevel {
+  /// Unrestricted
+  NONE = 0,
+  /// Must have verified email on account
+  LOW = 1,
+  /// Must be registered on Discord for longer than 5 minutes
+  MEDIUM = 2,
+  /// Must be a member of the server for longer than 10 minutes
+  HIGH = 3,
+  /// Must have a verified phone number
+  VERY_HIGH = 4,
+  /// Verification level that hasn't been implemented yet
+  UNKNOWN
+}
+
+/// Discord Message Notifications Level
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum MessageNotificationsLevel {
+  /// Members will receive notifications for all messages by default
+  ALL_MESSAGES = 0,
+  /// Members will receive notifications only for messages that @mention them by default
+  ONLY_MENTIONS = 1,
+  /// Message notifications level that hasn't been implemented yet
+  UNKNOWN
+}
+
+/// Discord Explicit Content Filter Level
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum ExplicitContentFilterLevel {
+  /// Media content will not be scanned
+  DISABLED = 0,
+  /// Media content sent by members without roles will be scanned
+  MEMBERS_WITHOUT_ROLES = 1,
+  /// Media content sent by all members will be scanned
+  ALL_MEMBERS = 2,
+  /// Explicit content filter level that hasn't been implemented yet
+  UNKNOWN
+}
+
+/// Discord MFA Level
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum MFALevel {
+  /// Guild has no MFA/2FA requirement for moderation actions
+  NONE = 0,
+  /// Guild has a 2FA requirement for moderation actions
+  ELEVATED = 1,
+  /// MFA level that hasn't been implemented yet
+  UNKNOWN
+}
+
+bitflags! {
+  /// Bitflags for Discord System Channel Flags
+  pub struct SystemChannelFlags: u32 {
+    /// Suppress member join notifications
+    const SUPPRESS_JOIN_NOTIFICATIONS = 1 << 0;
+    /// Suppress server boost notifications
+    const SUPPRESS_PREMIUM_SUBSCRIPTIONS = 1 << 1;
+    /// Suppress server setup tips
+    const SUPPRESS_GUILD_REMINDER_NOTIFICATIONS = 1 << 2;
+    /// Hide member join sticker reply buttons
+    const SUPPRESS_JOIN_NOTIFICATION_REPLIES = 1 << 3;
+  }
+}
+
+/// Discord Premium Tier
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum PremiumTier {
+  /// Guild has not unlocked any Server Boost perks
+  NONE = 0,
+  /// Guild has unlocked Server Boost level 1 perks
+  TIER_1 = 1,
+  /// Guild has unlocked Server Boost level 2 perks
+  TIER_2 = 2,
+  /// Guild has unlocked Server Boost level 3 perks
+  TIER_3 = 3,
+  /// Premium tier that hasn't been implemented yet
+  UNKNOWN
+}
+
+/// Discord Welcome Screen Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct WelcomeScreen {
+  /// The server description shown in the welcome screen
+  pub description: Option<String>,
+  /// The channels shown in the welcome screen, up to 5
+  pub welcome_channels: Vec<WelcomeScreenChannel>,
+}
+
+/// Discord Welcome Screen Channel Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct WelcomeScreenChannel {
+  /// The channel's id
+  pub channel_id: Snowflake,
+  /// The description shown for the channel
+  pub description: String,
+  /// The [emoji id](https://discord.com/developers/docs/reference#image-formatting), if the emoji is custom
+  pub emoji_id: Option<String>,
+  /// The emoji name if custom, the unicode character if standard, or `None` if no emoji is set
+  pub emoji_name: Option<String>,
+}
+
+/// Discord Guild NSFW Level
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum NSFWLevel {
+  /// Default
+  DEFAULT = 0,
+  /// Explicit
+  EXPLICIT = 1,
+  /// Safe
+  SAFE = 2,
+  /// Age Restricted
+  AGE_RESTRICTED = 3,
+  /// NSFW level that hasn't been implemented yet
+  UNKNOWN
+}
 
 /// Discord Guild Member Object
 #[derive(Deserialize, Clone, Debug)]
@@ -77,7 +300,101 @@ pub struct RoleTags {
   pub premium_subscriber: bool
 }
 
+/// Discord Guild Scheduled Event Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildScheduledEvent {
+  /// The id of the scheduled event
+  pub id: Snowflake,
+  /// The guild id which the scheduled event belongs to
+  pub guild_id: Snowflake,
+  /// The channel id in which the scheduled event will be hosted, or `None` if scheduled entity type is `EXTERNAL`
+  pub channel_id: Option<Snowflake>,
+  /// The id of the user that created the scheduled event
+  pub creator_id: Option<Snowflake>,
+  /// The name of the scheduled event (1-100 characters)
+  pub name: String,
+  /// The description of the scheduled event (1-1000 characters)
+  pub description: Option<String>,
+  /// The time the scheduled event will start
+  pub scheduled_start_time: DateTime<Utc>,
+  /// The time the scheduled event will end, required if entity_type is `EXTERNAL`
+  pub scheduled_end_time: Option<DateTime<Utc>>,
+  /// The privacy level of the scheduled event
+  pub privacy_level: PrivacyLevel,
+  /// The status of the scheduled event
+  pub status: EventStatus,
+  /// The type of the scheduled event
+  pub entity_type: EntityType,
+  /// The id of an entity associated with a guild scheduled event
+  pub entity_id: Option<Snowflake>,
+  /// Additional metadata for the guild scheduled event
+  pub entity_metadata: Option<EntityMetadata>,
+  /// The user that created the scheduled event
+  pub creator: Option<User>,
+  /// The number of users subscribed to the scheduled event
+  pub user_count: Option<i64>,
+  /// The [cover image hash](https://discord.com/developers/docs/reference#image-formatting) of the scheduled event
+  pub image: Option<String>,
+}
+
+/// Discord Guild Scheduled Event Privacy Level
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum PrivacyLevel {
+  /// The scheduled event is only accessible to guild members
+  GUILD_ONLY = 2,
+  /// Privacy level that hasn't been implemented yet
+  UNKNOWN
+}
+
+/// Discord Guild Scheduled Event Status
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum EventStatus {
+  /// Scheduled
+  SCHEDULED = 1,
+  /// Active
+  ACTIVE = 2,
+  /// Completed
+  COMPLETED = 3,
+  /// Canceled
+  CANCELED = 4,
+  /// Status that hasn't been implemented yet
+  UNKNOWN
+}
+
+/// Discord Guild Scheduled Event Entity Types
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum EntityType {
+  /// Stage instance
+  STAGE_INSTANCE = 1,
+  /// Voice
+  VOICE = 2,
+  /// External
+  EXTERNAL = 3,
+  /// Entity type that hasn't been implemented yet
+  UNKNOWN
+}
+
+/// Discord Guild Scheduled Event Entity Metadata
+#[derive(Deserialize, Clone, Debug)]
+pub struct EntityMetadata {
+  /// Location of the event (1-100 characters)
+  pub location: Option<String>,
+}
+
 fn exists<'de, D: Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
   serde_json::Value::deserialize(d)?;
   Ok(true)
+}
+
+impl<'de> Deserialize<'de> for SystemChannelFlags {
+  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    let bits = u32::deserialize(d)?;
+    Ok(Self::from_bits_truncate(bits))
+  }
 }
