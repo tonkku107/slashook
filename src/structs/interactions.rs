@@ -21,6 +21,7 @@ use super::{
   utils::File
 };
 use crate::commands::{MessageResponse, Modal};
+use crate::commands::responder::CommandResponse;
 
 /// Discord Application Command Types
 #[derive(Deserialize_repr, Clone, Debug)]
@@ -211,6 +212,56 @@ pub struct InteractionCallbackData {
   pub title: Option<String>,
   #[serde(skip_serializing)]
   pub files: Option<Vec<File>>
+}
+
+#[doc(hidden)]
+impl From<CommandResponse> for InteractionCallback {
+  fn from(response: CommandResponse) -> InteractionCallback {
+    match response {
+      CommandResponse::DeferMessage(flags) => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+          data: Some(flags.into())
+        }
+      },
+
+      CommandResponse::DeferUpdate => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::DEFERRED_UPDATE_MESSAGE,
+          data: None
+        }
+      }
+
+      CommandResponse::SendMessage(msg) => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::CHANNEL_MESSAGE_WITH_SOURCE,
+          data: Some(msg.into())
+        }
+      },
+
+      CommandResponse::UpdateMessage(msg) => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::UPDATE_MESSAGE,
+          data: Some(msg.into())
+        }
+      },
+
+      CommandResponse::AutocompleteResult(results) => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
+          data: Some(results.into())
+        }
+      },
+
+      CommandResponse::Modal(modal) => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::MODAL,
+          data: Some(modal.into())
+        }
+      }
+
+    }
+  }
 }
 
 #[doc(hidden)]

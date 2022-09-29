@@ -17,11 +17,11 @@ use rocket::futures::future::BoxFuture;
 use super::tokio::{spawn, sync::{mpsc, oneshot}};
 use anyhow::{anyhow, bail, Context};
 
-mod responder;
+pub(crate) mod responder;
 use super::structs::{
   interactions::{
     Interaction, InteractionType, ApplicationCommandType, InteractionDataResolved, InteractionOption, InteractionOptionType,
-    InteractionCallback, InteractionCallbackType,
+    InteractionCallback,
     OptionValue
   },
   components::{Component, ComponentType},
@@ -334,53 +334,6 @@ impl CommandHandler {
     Ok(response)
   }
 
-  fn format_response(&self, response: CommandResponse) -> InteractionCallback {
-    match response {
-      CommandResponse::DeferMessage(flags) => {
-        InteractionCallback {
-          response_type: InteractionCallbackType::DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-          data: Some(flags.into())
-        }
-      },
-
-      CommandResponse::DeferUpdate => {
-        InteractionCallback {
-          response_type: InteractionCallbackType::DEFERRED_UPDATE_MESSAGE,
-          data: None
-        }
-      }
-
-      CommandResponse::SendMessage(msg) => {
-        InteractionCallback {
-          response_type: InteractionCallbackType::CHANNEL_MESSAGE_WITH_SOURCE,
-          data: Some(msg.into())
-        }
-      },
-
-      CommandResponse::UpdateMessage(msg) => {
-        InteractionCallback {
-          response_type: InteractionCallbackType::UPDATE_MESSAGE,
-          data: Some(msg.into())
-        }
-      },
-
-      CommandResponse::AutocompleteResult(results) => {
-        InteractionCallback {
-          response_type: InteractionCallbackType::APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
-          data: Some(results.into())
-        }
-      },
-
-      CommandResponse::Modal(modal) => {
-        InteractionCallback {
-          response_type: InteractionCallbackType::MODAL,
-          data: Some(modal.into())
-        }
-      }
-
-    }
-  }
-
   pub async fn handle_command(&self, interaction: Interaction, bot_token: Option<String>) -> anyhow::Result<InteractionCallback> {
     let data = interaction.data.context("Interaction has no data")?;
 
@@ -437,7 +390,7 @@ impl CommandHandler {
     }
 
     let response = self.spawn_command(task_command, interaction.application_id, interaction.token, input).await?;
-    Ok(self.format_response(response))
+    Ok(response.into())
   }
 }
 
