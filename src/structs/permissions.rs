@@ -6,6 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 use serde::de::{self, Deserialize, Deserializer};
+use serde::ser::{Serialize, Serializer};
 use bitflags::bitflags;
 
 bitflags! {
@@ -108,5 +109,11 @@ impl<'de> Deserialize<'de> for Permissions {
     let string = String::deserialize(d)?;
     let bits: u64 = string.parse().map_err(de::Error::custom)?;
     Ok(Self::from_bits_truncate(bits))
+  }
+}
+
+impl Serialize for Permissions {
+  fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_u64(self.bits())
   }
 }

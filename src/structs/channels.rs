@@ -9,18 +9,20 @@
 
 use serde::{Deserialize, de::Deserializer};
 use serde::{Serialize, ser::Serializer};
-use serde_repr::{Deserialize_repr};
-use serde_json::Value;
+use serde_repr::{Deserialize_repr, Serialize_repr};
+use serde_json::{Value, json};
 use super::{
   Snowflake,
-  users::User,
-  guilds::GuildMember,
+  applications::Application,
+  components::Component,
   embeds::Embed,
   emojis::Emoji,
-  applications::Application,
+  guilds::GuildMember,
   interactions::InteractionType,
-  components::Component,
-  permissions::Permissions
+  invites::{Invite, CreateInviteOptions},
+  permissions::Permissions,
+  stickers::StickerItem,
+  users::User,
 };
 use crate::{
   rest::{Rest, RestError},
@@ -42,14 +44,14 @@ pub struct Channel {
   /// Sorting position of the channel
   pub position: Option<i64>,
   /// Explicit permission overwrites for members and roles
-  pub permission_overwrites: Option<Vec<PermissionOverwrites>>,
+  pub permission_overwrites: Option<Vec<PermissionOverwrite>>,
   /// The name of the channel (1-100 characters)
   pub name: Option<String>,
-  /// The channel topic (0-1024 characters)
+  /// The channel topic (0-4096 characters for `GUILD_FORUM` channels, 0-1024 characters for all others)
   pub topic: Option<String>,
   /// Whether the channel is nsfw
   pub nsfw: Option<bool>,
-  /// The id of the last message sent in this channel (may not point to an existing or valid message)
+  /// The id of the last message sent in this channel (or thread for `GUILD_FORUM` channels) (may not point to an existing or valid message or thread)
   pub last_message_id: Option<Snowflake>,
   /// The bitrate (in bits) of the voice channel
   pub bitrate: Option<i64>,
@@ -59,7 +61,7 @@ pub struct Channel {
   pub rate_limit_per_user: Option<i64>,
   /// The recipients of the DM
   pub recipients: Option<Vec<User>>,
-  /// Icon hash
+  /// Icon hash of the group DM
   pub icon: Option<String>,
   /// Id of the creator of the group DM or thread
   pub owner_id: Option<Snowflake>,
@@ -71,9 +73,9 @@ pub struct Channel {
   pub last_pin_timestamp: Option<DateTime<Utc>>,
   /// [Voice region](https://discord.com/developers/docs/resources/voice#voice-region-object) id for the voice channel, automatic when set to None
   pub rtc_region: Option<String>,
-  /// The camera video quality mode of the voice channel, `AUTO` when not present
+  /// The camera [video quality mode](VideoQualityMode) of the voice channel, `AUTO` when not present
   pub video_quality_mode: Option<VideoQualityMode>,
-  /// An approximate count of messages in a thread, stops counting at 50
+  /// Number of messages (not including the initial message or deleted messages) in a thread.
   pub message_count: Option<i64>,
   /// An approximate count of users in a thread, stops counting at 50
   pub member_count: Option<i64>,
@@ -84,11 +86,25 @@ pub struct Channel {
   /// Default duration for newly created threads, in minutes, to automatically archive the thread after recent activity, can be set to: 60, 1440, 4320, 10080
   pub default_auto_archive_duration: Option<i64>,
   /// Computed permissions for the invoking user in the channel, including overwrites, only included when part of the `resolved` data received on a slash command interaction
-  pub permissions: Option<Permissions>
+  pub permissions: Option<Permissions>,
+  /// [Channel flags](ChannelFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
+  pub flags: Option<ChannelFlags>,
+  /// Number of messages ever sent in a thread, it's similar to `message_count` on message creation, but will not decrement the number when a message is deleted
+  pub total_message_sent: Option<i64>,
+  /// The set of tags that can be used in a `GUILD_FORUM` channel
+  pub available_tags: Option<Vec<ForumTag>>,
+  /// The IDs of the set of tags that have been applied to a thread in a `GUILD_FORUM` channel
+  pub applied_tags: Option<Vec<Snowflake>>,
+  /// The emoji to show in the add reaction button on a thread in a `GUILD_FORUM` channel
+  pub default_reaction_emoji: Option<DefaultReaction>,
+  /// The initial `rate_limit_per_user` to set on newly created threads in a channel. This field is copied to the thread at creation time and does not live update.
+  pub default_thread_rate_limit_per_user: Option<i64>,
+  /// The [default sort order type](SortOrderType) used to order posts in `GUILD_FORUM` channels. Defaults to `None`, which indicates a preferred sort order hasn't been set by a channel admin
+  pub default_sort_order: Option<SortOrderType>,
 }
 
 /// Discord Channel Types
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum ChannelType {
@@ -119,8 +135,8 @@ pub enum ChannelType {
 }
 
 /// Discord Permission Overwrite Object
-#[derive(Deserialize, Clone, Debug)]
-pub struct PermissionOverwrites {
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct PermissionOverwrite {
   /// Role or user id
   pub id: Snowflake,
   /// Either ROLE or MEMBER
@@ -133,7 +149,7 @@ pub struct PermissionOverwrites {
 }
 
 /// Discord Permission Overwrite Types
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum PermissionOverwriteType {
@@ -146,7 +162,7 @@ pub enum PermissionOverwriteType {
 }
 
 /// Discord Video Quality Modes
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum VideoQualityMode {
@@ -186,6 +202,62 @@ pub struct ThreadMember {
   pub join_timestamp: DateTime<Utc>,
   /// Any user-thread settings, currently only used for notifications
   pub flags: i64
+}
+
+bitflags! {
+  /// Bitflags for Discord Channel Flags
+  pub struct ChannelFlags: u32 {
+    /// This thread is pinned to the top of its parent `GUILD_FORUM` channel
+    const PINNED = 1 << 1;
+    /// Whether a tag is required to be specified when creating a thread in a `GUILD_FORUM` channel. Tags are specified in the `applied_tags` field.
+    const REQUIRE_TAG = 1 << 4;
+  }
+}
+
+/// Discord Forum Tag Object
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct ForumTag {
+  /// The id of the tag
+  pub id: Snowflake,
+  /// The name of the tag (0-20 characters)
+  pub name: String,
+  /// Whether this tag can only be added to or removed from threads by a member with the `MANAGE_THREADS` permission
+  pub moderated: bool,
+  /// The id of a guild's custom emoji
+  pub emoji_id: Option<Snowflake>,
+  /// The unicode character of the emoji
+  pub emoji_name: Option<String>,
+}
+
+/// Discord Default Reaction Object
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct DefaultReaction {
+  /// The id of a guild's custom emoji
+  pub emoji_id: Option<Snowflake>,
+  /// The unicode character of the emoji
+  pub emoji_name: Option<String>,
+}
+
+/// Discord Sort Order Types
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum SortOrderType {
+  /// Sort forum posts by activity
+  LATEST_ACTIVITY = 0,
+  /// Sort forum posts by creation time (from most recent to oldest)
+  CREATION_DATE = 1,
+  /// Sort order type that hasn't been implemented yet
+  UNKNOWN
+}
+
+/// Discord Followed Channel Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct FollowedChannel {
+  /// Source channel id
+  pub channel_id: Snowflake,
+  /// Created target webhook id
+  pub webhook_id: Snowflake,
 }
 
 /// Discord Message Object
@@ -437,32 +509,6 @@ pub struct MessageInteraction {
   pub member: Option<GuildMember>
 }
 
-/// Discord Sticker Item Object
-#[derive(Deserialize, Clone, Debug)]
-pub struct StickerItem {
-  /// Id of the sticker
-  pub id: Snowflake,
-  /// Name of the sticker
-  pub name: String,
-  /// [Type of sticker format](StickerFormatType)
-  pub format_type: StickerFormatType
-}
-
-/// Discord Sticker Format Types
-#[derive(Deserialize_repr, Clone, Debug)]
-#[repr(u8)]
-#[allow(non_camel_case_types)]
-pub enum StickerFormatType {
-  /// .png format
-  PNG = 1,
-  /// Animated .png format
-  APNG = 2,
-  /// Lottie .json format
-  LOTTIE = 3,
-  /// Sticker format type that hasn't been implemented yet
-  UNKNOWN
-}
-
 /// Discord Allowed Mentions Object
 #[derive(Serialize, Clone, Debug)]
 pub struct AllowedMentions {
@@ -488,9 +534,86 @@ pub enum AllowedMentionType {
   everyone
 }
 
+/// Parameters for modifying a channel with [modify](Channel::modify).
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct ChannelModifyOptions {
+  /// 1-100 character channel name
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub name: Option<String>,
+  /// Base64 encoded icon
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub icon: Option<String>,
+  /// The [type of channel](ChannelType); only conversion between text and announcement is supported and only in guilds with the "NEWS" feature
+  #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+  pub channel_type: Option<ChannelType>,
+  /// The position of the channel in the left-hand listing
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub position: Option<i64>,
+  /// 0-1024 character channel topic (0-4096 characters for `GUILD_FORUM` channels)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub topic: Option<String>,
+  /// Whether the channel is nsfw
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub nsfw: Option<bool>,
+  /// Amount of seconds a user has to wait before sending another message (0-21600); bots, as well as users with the permission `manage_messages` or `manage_channel`, are unaffected
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub rate_limit_per_user: Option<i64>,
+  /// The bitrate (in bits) of the voice or stage channel; min 8000
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub bitrate: Option<i64>,
+  /// The user limit of the voice channel; 0 refers to no limit, 1 to 99 refers to a user limit
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub user_limit: Option<i64>,
+  /// Channel or category-specific permissions
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub permission_overwrites: Option<Vec<PermissionOverwrite>>,
+  /// Id of the new parent category for a channel
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub parent_id: Option<Snowflake>,
+  /// Channel [voice region](https://discord.com/developers/docs/resources/voice#voice-region-object) id, automatic when set to None
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub rtc_region: Option<Option<String>>,
+  /// The camera [video quality mode](VideoQualityMode) of the voice channel
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub video_quality_mode: Option<VideoQualityMode>,
+  /// The default duration that the clients use (not the API) for newly created threads in the channel, in minutes, to automatically archive the thread after recent activity
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_auto_archive_duration: Option<i64>,
+  /// [Channel flags](ChannelFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field). Currently only `REQUIRE_TAG` is supported in forum channels and `PINNED` can only be set for threads in forum channels.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub flags: Option<ChannelFlags>,
+  /// The set of tags that can be used in a `GUILD_FORUM` channel
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub available_tags: Option<Vec<ForumTag>>,
+  /// The emoji to show in the add reaction button on a thread in a `GUILD_FORUM` channel
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_reaction_emoji: Option<DefaultReaction>,
+  /// The initial `rate_limit_per_user` to set on newly created threads in a channel. This field is copied to the thread at creation time and does not live update.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_thread_rate_limit_per_user: Option<i64>,
+  /// The [default sort order type](SortOrderType) used to order posts in `GUILD_FORUM` channels
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_sort_order: Option<SortOrderType>,
+  /// Whether the thread is archived
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub archived: Option<bool>,
+  /// The thread will stop showing in the channel list after `auto_archive_duration` minutes of inactivity, can be set to: 60, 1440, 4320, 10080
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub auto_archive_duration: Option<i64>,
+  /// Whether the thread is locked; when a thread is locked, only users with `MANAGE_THREADS` can unarchive it
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub locked: Option<bool>,
+  /// Whether non-moderators can add other non-moderators to a thread; only available on private threads
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub invitable: Option<bool>,
+  /// The IDs of the set of tags that have been applied to a thread in a `GUILD_FORUM` channel
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub applied_tags: Option<Vec<Snowflake>>,
+}
+
 /// Options for fetching multiple messages with [fetch_many](Message::fetch_many).
 /// Only one of `around`, `before`, or `after` can be passed at once.
-#[derive(Serialize, Default)]
+#[derive(Serialize, Default, Clone, Debug)]
 pub struct MessageFetchOptions {
   /// Get messages around this message ID
   pub around: Option<Snowflake>,
@@ -502,53 +625,8 @@ pub struct MessageFetchOptions {
   pub limit: Option<i64>,
 }
 
-impl MessageFetchOptions {
-  /// Creates a new empty MessageFetchOptions
-  pub fn new() -> Self {
-    Self {
-      around: None,
-      before: None,
-      after: None,
-      limit: None,
-    }
-  }
-
-  /// Sets the message ID to search around.
-  /// Also removes `before` and `after` if set.
-  pub fn set_around<T: ToString>(mut self, around: T) -> Self {
-    self.around = Some(around.to_string());
-    self.before = None;
-    self.after = None;
-    self
-  }
-
-  /// Sets the message ID to search before.
-  /// Also removes `around` and `after` if set.
-  pub fn set_before<T: ToString>(mut self, before: T) -> Self {
-    self.around = None;
-    self.before = Some(before.to_string());
-    self.after = None;
-    self
-  }
-
-  /// Sets the message ID to search after.
-  /// Also removes `around` and `before` if set.
-  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
-    self.around = None;
-    self.before = None;
-    self.after = Some(after.to_string());
-    self
-  }
-
-  /// Sets the limit for the amount of messages to fetch
-  pub fn set_limit(mut self, limit: i64) -> Self {
-    self.limit = Some(limit);
-    self
-  }
-}
-
 /// Options for fetching reactions with [get_reactions](Message::get_reactions).
-#[derive(Serialize, Default)]
+#[derive(Serialize, Default, Clone, Debug)]
 pub struct ReactionFetchOptions {
   /// Get users after this user ID
   pub after: Option<Snowflake>,
@@ -556,25 +634,156 @@ pub struct ReactionFetchOptions {
   pub limit: Option<i64>,
 }
 
-impl ReactionFetchOptions {
-  /// Creates a new empty ReactionFetchOptions
-  pub fn new() -> Self {
-    Self {
-      after: None,
-      limit: None,
-    }
+impl Channel {
+  /// Fetch a channel with a channel ID
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Channel;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
+  /// # }
+  /// ```
+  pub async fn fetch<T: ToString>(rest: &Rest, channel_id: T) -> Result<Self, RestError> {
+    rest.get(format!("channels/{}", channel_id.to_string())).await
   }
 
-  /// Sets the user ID to search after.
-  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
-    self.after = Some(after.to_string());
-    self
+  /// Edits a channel
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::{Channel, ChannelModifyOptions};
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
+  /// let options = ChannelModifyOptions::new().set_topic("Cool channel");
+  /// let modified_channel = channel.modify(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn modify(&self, rest: &Rest, options: ChannelModifyOptions) -> Result<Self, RestError> {
+    rest.patch(format!("channels/{}", self.id), options).await
   }
 
-  /// Sets the limit for the amount of reactions to fetch
-  pub fn set_limit(mut self, limit: i64) -> Self {
-    self.limit = Some(limit);
-    self
+  /// Deletes a channel
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Channel;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
+  /// channel.delete(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn delete(&self, rest: &Rest) -> Result<Self, RestError> {
+    rest.delete(format!("channels/{}", self.id)).await
+  }
+
+  /// Fetch multiple messages from this channel\
+  /// See also [`Message::fetch_many`](Message::fetch_many)
+  pub async fn fetch_messages(&self, rest: &Rest, options: MessageFetchOptions) -> Result<Vec<Message>, RestError> {
+    Message::fetch_many(rest, &self.id, options).await
+  }
+
+  /// Fetch a message from this channel with a message ID\
+  /// See also [`Message::fetch`](Message::fetch)
+  pub async fn fetch_message<T: ToString>(&self, rest: &Rest, message_id: T) -> Result<Message, RestError> {
+    Message::fetch(rest, &self.id, message_id).await
+  }
+
+  /// Send a new message to this channel\
+  /// See also [`Message::create`](Message::create)
+  pub async fn create_message<T: Into<MessageResponse>>(&self, rest: &Rest, message: T) -> Result<Message, RestError> {
+    Message::create(rest, &self.id, message).await
+  }
+
+  /// Delete multiple messages from this channel.\
+  /// 2-100 message IDs can be provided at once.
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Channel;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
+  /// let to_delete = vec![String::from("916411877410603008"), String::from("916413462467465246")];
+  /// channel.bulk_delete_messages(&input.rest, to_delete).await?;
+  /// # }
+  /// ```
+  pub async fn bulk_delete_messages(&self, rest: &Rest, messages: Vec<Snowflake>) -> Result<(), RestError> {
+    let body = json!({ "messages": messages });
+    rest.post(format!("channels/{}/messages/bulk-delete", self.id), body).await
+  }
+
+  /// Edits a permission overwrite
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::{Channel, PermissionOverwrite, PermissionOverwriteType};
+  /// # use slashook::structs::Permissions;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
+  /// let overwrite = PermissionOverwrite {
+  ///   id: String::from("53908232506183680"),
+  ///   overwrite_type: PermissionOverwriteType::MEMBER,
+  ///   allow: Permissions::SEND_MESSAGES | Permissions::ATTACH_FILES,
+  ///   deny: Permissions::empty()
+  /// };
+  /// channel.edit_channel_permission(&input.rest, overwrite).await?;
+  /// # }
+  /// ```
+  pub async fn edit_channel_permission(&self, rest: &Rest, overwrite: PermissionOverwrite) -> Result<(), RestError> {
+    rest.put(format!("channels/{}/permissions/{}", self.id, overwrite.id), overwrite).await
+  }
+
+  /// Deletes a permission overwrite
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Channel;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
+  /// channel.delete_channel_permission(&input.rest, "53908232506183680").await?;
+  /// # }
+  /// ```
+  pub async fn delete_channel_permission<T: ToString>(&self, rest: &Rest, overwrite_id: T) -> Result<(), RestError> {
+    rest.delete(format!("channels/{}/permissions/{}", self.id, overwrite_id.to_string())).await
+  }
+
+  /// Gets invites for this channel
+  pub async fn get_invites(&self, rest: &Rest) -> Result<Vec<Invite>, RestError> {
+    rest.get(format!("channels/{}/invites", self.id)).await
+  }
+
+  /// Creates a new invite for this channel
+  /// ```no_run
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Channel;
+  /// # use slashook::structs::invites::CreateInviteOptions;
+  /// # #[command("example")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
+  /// let options = CreateInviteOptions::new().set_max_uses(1);
+  /// let invite = channel.create_invite(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn create_invite(&self, rest: &Rest, options: CreateInviteOptions) -> Result<Invite, RestError> {
+    rest.post(format!("channels/{}/invites", self.id), options).await
+  }
+
+  /// Follows an announcement channel to send messages to the target channel
+  pub async fn follow<T: ToString>(&self, rest: &Rest, target_channel_id: T) -> Result<FollowedChannel, RestError> {
+    let body = json!({ "webhook_channel_id": target_channel_id.to_string() });
+    rest.post(format!("channels/{}/followers", self.id), body).await
+  }
+
+  /// Trigger a typing indicator in the channel
+  pub async fn trigger_typing(&self, rest: &Rest) -> Result<(), RestError> {
+    rest.post(format!("channels/{}/typing", self.id), Value::Null).await
   }
 }
 
@@ -885,9 +1094,267 @@ impl AllowedMentions {
   }
 }
 
+impl ChannelModifyOptions {
+  /// Creates a new empty ChannelModifyOptions
+  pub fn new() -> Self {
+    Self {
+      name: None,
+      icon: None,
+      channel_type: None,
+      position: None,
+      topic: None,
+      nsfw: None,
+      rate_limit_per_user: None,
+      bitrate: None,
+      user_limit: None,
+      permission_overwrites: None,
+      parent_id: None,
+      rtc_region: None,
+      video_quality_mode: None,
+      default_auto_archive_duration: None,
+      flags: None,
+      available_tags: None,
+      default_reaction_emoji: None,
+      default_thread_rate_limit_per_user: None,
+      default_sort_order: None,
+      archived: None,
+      auto_archive_duration: None,
+      locked: None,
+      invitable: None,
+      applied_tags: None,
+    }
+  }
+
+  /// Sets the name
+  pub fn set_name<T: ToString>(mut self, name: T) -> Self {
+    self.name = Some(name.to_string());
+    self
+  }
+
+  /// Sets the icon
+  pub fn set_icon<T: ToString>(mut self, icon: T) -> Self {
+    self.icon = Some(icon.to_string());
+    self
+  }
+
+  /// Sets the channel type
+  pub fn set_type(mut self, channel_type: ChannelType) -> Self {
+    self.channel_type = Some(channel_type);
+    self
+  }
+
+  /// Sets the position
+  pub fn set_position(mut self, position: i64) -> Self {
+    self.position = Some(position);
+    self
+  }
+
+  /// Sets the topic
+  pub fn set_topic<T: ToString>(mut self, topic: T) -> Self {
+    self.topic = Some(topic.to_string());
+    self
+  }
+
+  /// Sets nsfw
+  pub fn set_nsfw(mut self, nsfw: bool) -> Self {
+    self.nsfw = Some(nsfw);
+    self
+  }
+
+  /// Sets the rate limit per user
+  pub fn set_rate_limit_per_user(mut self, ratelimit: i64) -> Self {
+    self.rate_limit_per_user = Some(ratelimit);
+    self
+  }
+
+  /// Sets the bitrate
+  pub fn set_bitrate(mut self, bitrate: i64) -> Self {
+    self.bitrate = Some(bitrate);
+    self
+  }
+
+  /// Sets the user limit
+  pub fn set_user_limit(mut self, limit: i64) -> Self {
+    self.user_limit = Some(limit);
+    self
+  }
+
+  /// Adds a permission overwrite
+  pub fn add_permission_overwrite(mut self, overwrite: PermissionOverwrite) -> Self {
+    let mut overwrites = self.permission_overwrites.unwrap_or_default();
+    overwrites.push(overwrite);
+    self.permission_overwrites = Some(overwrites);
+    self
+  }
+
+  /// Sets the parent id
+  pub fn set_parent_id<T: ToString>(mut self, id: T) -> Self {
+    self.parent_id = Some(id.to_string());
+    self
+  }
+
+  /// Sets the RTC region
+  pub fn set_rtc_region(mut self, region: Option<String>) -> Self {
+    self.rtc_region = Some(region);
+    self
+  }
+
+  /// Sets the video quality mode
+  pub fn set_video_quality_mode(mut self, mode: VideoQualityMode) -> Self {
+    self.video_quality_mode = Some(mode);
+    self
+  }
+
+  /// Sets the default auto archive duration
+  pub fn set_default_auto_archive_duration(mut self, duration: i64) -> Self {
+    self.default_auto_archive_duration = Some(duration);
+    self
+  }
+
+  /// Sets flags
+  pub fn set_flags(mut self, flags: ChannelFlags) -> Self {
+    self.flags = Some(flags);
+    self
+  }
+
+  /// Sets available tags
+  pub fn set_available_tags(mut self, tags: Vec<ForumTag>) -> Self {
+    self.available_tags = Some(tags);
+    self
+  }
+
+  /// Sets the default reaction emoji
+  pub fn set_default_reaction_emoji(mut self, emoji: DefaultReaction) -> Self {
+    self.default_reaction_emoji = Some(emoji);
+    self
+  }
+
+  /// Sets the default thread rate limit per user
+  pub fn set_default_thread_rate_limit_per_user(mut self, ratelimit: i64) -> Self {
+    self.default_thread_rate_limit_per_user = Some(ratelimit);
+    self
+  }
+
+  /// Sets the default sort order
+  pub fn set_default_sort_order(mut self, sort_order: SortOrderType) -> Self {
+    self.default_sort_order = Some(sort_order);
+    self
+  }
+
+  /// Sets archived
+  pub fn set_archived(mut self, archived: bool) -> Self {
+    self.archived = Some(archived);
+    self
+  }
+
+  /// Sets the auto archive duration
+  pub fn set_auto_archive_duration(mut self, duration: i64) -> Self {
+    self.auto_archive_duration = Some(duration);
+    self
+  }
+
+  /// Sets locked
+  pub fn set_locked(mut self, locked: bool) -> Self {
+    self.locked = Some(locked);
+    self
+  }
+
+  /// Sets invitable
+  pub fn set_invitable(mut self, invitable: bool) -> Self {
+    self.invitable = Some(invitable);
+    self
+  }
+
+  /// Sets applied tags
+  pub fn set_applied_tags(mut self, tags: Vec<Snowflake>) -> Self {
+    self.applied_tags = Some(tags);
+    self
+  }
+}
+
+impl MessageFetchOptions {
+  /// Creates a new empty MessageFetchOptions
+  pub fn new() -> Self {
+    Self {
+      around: None,
+      before: None,
+      after: None,
+      limit: None,
+    }
+  }
+
+  /// Sets the message ID to search around.
+  /// Also removes `before` and `after` if set.
+  pub fn set_around<T: ToString>(mut self, around: T) -> Self {
+    self.around = Some(around.to_string());
+    self.before = None;
+    self.after = None;
+    self
+  }
+
+  /// Sets the message ID to search before.
+  /// Also removes `around` and `after` if set.
+  pub fn set_before<T: ToString>(mut self, before: T) -> Self {
+    self.around = None;
+    self.before = Some(before.to_string());
+    self.after = None;
+    self
+  }
+
+  /// Sets the message ID to search after.
+  /// Also removes `around` and `before` if set.
+  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
+    self.around = None;
+    self.before = None;
+    self.after = Some(after.to_string());
+    self
+  }
+
+  /// Sets the limit for the amount of messages to fetch
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+}
+
+impl ReactionFetchOptions {
+  /// Creates a new empty ReactionFetchOptions
+  pub fn new() -> Self {
+    Self {
+      after: None,
+      limit: None,
+    }
+  }
+
+  /// Sets the user ID to search after.
+  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
+    self.after = Some(after.to_string());
+    self
+  }
+
+  /// Sets the limit for the amount of reactions to fetch
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+}
+
 impl Default for AllowedMentions {
   fn default() -> Self {
     Self::new()
+  }
+}
+
+impl<'de> Deserialize<'de> for ChannelFlags {
+  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    let bits = u32::deserialize(d)?;
+    Ok(Self::from_bits_truncate(bits))
+  }
+}
+
+impl Serialize for ChannelFlags {
+  fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_u32(self.bits())
   }
 }
 
