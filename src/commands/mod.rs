@@ -120,6 +120,10 @@ pub struct CommandInput {
   ///
   /// Only included in Select Menu component interactions
   pub values: Option<Vec<String>>,
+  /// Resolved values from a select menu
+  ///
+  /// Only included in User, Role, Mentionable and Channel Select Menu component interactions
+  pub resolved_values: Option<Vec<OptionValue>>,
   /// The argument currently in focus
   ///
   /// Only included in command autocomplete interactions
@@ -221,7 +225,10 @@ impl CommandHandler {
           ).context("Role option provided but no matching resolved role found")?
           .clone()
         ),
-        InteractionOptionType::MENTIONABLE => self.parse_mentionable(resolved.as_ref().context("Mentionable option provided but no resolved object")?, &option)?,
+        InteractionOptionType::MENTIONABLE => self.parse_mentionable(
+          resolved.as_ref().context("Mentionable option provided but no resolved object")?,
+          option.value.as_ref().context("Mentionable option has no value")?.as_str().context("Mentionable option value is not a string (user or role id)")?
+        )?,
         InteractionOptionType::NUMBER => OptionValue::Number(
           option.value.context("Number option has no value")?
           .as_f64().context("Number option value is not a number")?
@@ -245,6 +252,53 @@ impl CommandHandler {
     Ok(())
   }
 
+  fn parse_select_values(&self, values: Vec<String>, resolved: &Option<InteractionDataResolved>, mut input: &mut CommandInput) -> anyhow::Result<()> {
+    let mut resolved_values = Vec::new();
+    match input.component_type.as_ref().context("Somehow trying to parse values without a component type")? {
+      ComponentType::USER_SELECT => {
+        for value in values.iter() {
+          resolved_values.push(OptionValue::User(
+            resolved.as_ref().context("User select provided but no resolved object")?
+            .users.as_ref().context("User select provided but no resolved users object")?
+            .get(value).context("User select provided but no matching resolved user found")?
+            .clone()
+          ));
+        }
+      },
+      ComponentType::ROLE_SELECT => {
+        for value in values.iter() {
+          resolved_values.push(OptionValue::Role(
+            resolved.as_ref().context("Role select provided but no resolved object")?
+            .roles.as_ref().context("Role select provided but no resolved roles object")?
+            .get(value).context("Role select provided but no matching resolved role found")?
+            .clone()
+          ));
+        }
+      },
+      ComponentType::MENTIONABLE_SELECT => {
+        for value in values.iter() {
+          resolved_values.push(
+            self.parse_mentionable(resolved.as_ref().context("Mentionable select provided but no resolved object")?, value)?
+          )
+        }
+      },
+      ComponentType::CHANNEL_SELECT => {
+        for value in values.iter() {
+          resolved_values.push(OptionValue::Channel(
+            Box::new(resolved.as_ref().context("Channel select provided but no resolved object")?
+            .channels.as_ref().context("Channel select provided but no resolved channels object")?
+            .get(value).context("Channel select provided but no matching resolved channel found")?
+            .clone())
+          ));
+        }
+      }
+      _ => {},
+    };
+    input.values = Some(values);
+    input.resolved_values = Some(resolved_values);
+    Ok(())
+  }
+
   fn parse_component_values(&self, components: Vec<Component>, input: &mut CommandInput) {
     for component in components.into_iter() {
       match component {
@@ -260,9 +314,8 @@ impl CommandHandler {
     }
   }
 
-  fn parse_mentionable(&self, resolved: &InteractionDataResolved, option: &InteractionOption) -> anyhow::Result<OptionValue> {
+  fn parse_mentionable(&self, resolved: &InteractionDataResolved, option_value: &str) -> anyhow::Result<OptionValue> {
     let mut found_value = None;
-    let option_value = option.value.as_ref().context("Mentionable option has no value")?.as_str().context("Mentionable option value is not a string (user or role id)")?;
     if let Some(users) = &resolved.users {
       if let Some(user) = users.get(option_value) {
         found_value = Some(OptionValue::User(user.clone()))
@@ -370,7 +423,8 @@ impl CommandHandler {
       target_member: None,
       target_message: None,
       custom_id,
-      values: data.values,
+      values: None,
+      resolved_values: None,
       focused: None,
       locale: interaction.locale.context("Interaction didn't include a locale")?,
       guild_locale: interaction.guild_locale,
@@ -383,6 +437,10 @@ impl CommandHandler {
 
     if let Some(components) = data.components {
       self.parse_component_values(components, &mut input);
+    }
+
+    if let Some(values) = data.values {
+      self.parse_select_values(values, &data.resolved, &mut input)?;
     }
 
     if input.command_type.is_some() {
@@ -425,9 +483,29 @@ impl CommandInput {
     self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::BUTTON))
   }
 
-  /// Returns true if the interaction is for a selecting from a select menu
-  pub fn is_select_menu(&self) -> bool {
-    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::SELECT_MENU))
+  /// Returns true if the interaction is for a string select menu
+  pub fn is_string_select(&self) -> bool {
+    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::STRING_SELECT))
+  }
+
+  /// Returns true if the interaction is for a user select menu
+  pub fn is_user_select(&self) -> bool {
+    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::USER_SELECT))
+  }
+
+  /// Returns true if the interaction is for a role select menu
+  pub fn is_role_select(&self) -> bool {
+    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::ROLE_SELECT))
+  }
+
+  /// Returns true if the interaction is for a mentionable select menu
+  pub fn is_mentionable_select(&self) -> bool {
+    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::MENTIONABLE_SELECT))
+  }
+
+  /// Returns true if the interaction is for a channel select menu
+  pub fn is_channel_select(&self) -> bool {
+    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::CHANNEL_SELECT))
   }
 
   /// Returns true if the interaction is for autocompletion
