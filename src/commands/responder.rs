@@ -35,6 +35,7 @@ pub struct MessageResponse {
   /// Should the response is TTS or not
   pub tts: Option<bool>,
   /// Content of the message
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
   /// Flags of the message.\
   /// Valid flags are [EPHEMERAL](crate::structs::channels::MessageFlags::EPHEMERAL) for interactions to only show the response to the invoking user and
