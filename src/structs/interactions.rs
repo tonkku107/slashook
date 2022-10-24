@@ -197,6 +197,7 @@ pub enum InteractionCallbackType {
 #[derive(Serialize, Clone, Debug)]
 pub struct InteractionCallbackData {
   pub tts: Option<bool>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub embeds: Option<Vec<Embed>>,
