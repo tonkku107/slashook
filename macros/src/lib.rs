@@ -9,8 +9,10 @@
 extern crate proc_macro;
 
 mod converter;
+mod attr_parser;
 
 use converter::convert_block;
+use attr_parser::Attributes;
 
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
@@ -18,12 +20,32 @@ use proc_macro2::Span;
 use devise::{Spanned, ext::SpanDiagnosticExt};
 use syn::{self, ItemFn, ReturnType, parse_macro_input, parse_quote};
 
-/// A macro that turns a function to a Command
+/// A macro that turns a function to a `Command`
 ///
-/// A command name is required as an argument.
+/// A command name is required as an argument.\
+/// You can also add additional properties for `Command` following the application command structure to sync your commands with Discord using `Client::sync_commands`.\
+/// `into` is called for every value and missing fields are filled with defaults to make things easier.\
+/// Instead of creating subcommands as options, `subcommand_groups` and `subcommands` exist.\
+/// If you're creating a "fake" command (as a separate component handler for example), you can set `ignore = true` to make sure that command isn't synced.
 /// ## Example
 /// ```ignore
-/// #[command("command name")]
+/// #[command(
+///   name = "command-name",
+///   description = "A cool command",
+///   subcommand_groups = [{
+///     name = "group-name",
+///     subcommands = [{
+///       name = "subcommand-name",
+///       description = "A cool subcommand"
+///       options = [{
+///         name = "option",
+///         description = "A cool description",
+///         option_type = InteractionOptionType::STRING,
+///         required = true
+///       }]
+///     }]
+///   }]
+/// )]
 /// fn command(input: CommandInput, res: CommandResponder) {
 ///   res.send_message("Command executed")?;
 /// }
@@ -42,7 +64,7 @@ use syn::{self, ItemFn, ReturnType, parse_macro_input, parse_quote};
 /// ```
 #[proc_macro_attribute]
 pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
-  let command_name = parse_macro_input!(attr as LitStr).value();
+  let attrs = parse_macro_input!(attr as Attributes);
   let mut function = parse_macro_input!(item as ItemFn);
   let func_ident = function.sig.ident.clone();
 
@@ -70,7 +92,8 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
     #function
     let #func_ident = slashook::commands::Command {
       func: Box::new(#func_ident),
-      name: #command_name.to_string()
+      #attrs,
+      ..Default::default()
     };
   };
   output.into()
