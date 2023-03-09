@@ -200,7 +200,7 @@ impl MessageResponse {
   /// # use slashook::commands::MessageResponse;
   /// # use slashook::structs::utils::File;
   /// # use slashook::tokio::fs::File as TokioFile;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg_file = File::from_file("cat.png", TokioFile::open("cat.png").await?).await?;
   /// let msg_file2 = File::from_file("cat2.png", TokioFile::open("cat2.png").await?).await?;
@@ -306,7 +306,7 @@ impl CommandResponder {
   /// ```no_run
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("Hello!").await?;
   /// }
@@ -333,7 +333,7 @@ impl CommandResponder {
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// # use slashook::structs::components::{Components, Button};
-  /// ##[command("example_button")]
+  /// ##[command(name = "example_button", ignore = true)]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.update_message("Button was clicked!").await?;
   /// }
@@ -361,7 +361,7 @@ impl CommandResponder {
   /// ```no_run
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.defer(false).await?;
   ///   // Do something that takes longer than 3s
@@ -380,7 +380,7 @@ impl CommandResponder {
   /// ```no_run
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example_button")]
+  /// ##[command(name = "example_button", ignore = true)]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.defer_update().await?;
   ///   // Do something that takes longer than 3s
@@ -398,7 +398,7 @@ impl CommandResponder {
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// # use slashook::structs::interactions::ApplicationCommandOptionChoice;
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   if input.is_autocomplete() {
   ///     let search = input.args.get(&input.focused.unwrap()).unwrap().as_string().unwrap();
@@ -422,7 +422,7 @@ impl CommandResponder {
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse, Modal};
   /// # use slashook::structs::components::{Components, TextInput};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   let text_input = TextInput::new()
   ///     .set_label("Tell us something")
@@ -443,7 +443,7 @@ impl CommandResponder {
   /// ```no_run
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("First message!").await?;
   ///   res.send_followup_message("Second message!").await?;
@@ -465,7 +465,7 @@ impl CommandResponder {
   /// ```no_run
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("First message!").await?;
   ///   let msg = res.send_followup_message("Second message!").await?;
@@ -500,7 +500,7 @@ impl CommandResponder {
   /// ```no_run
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("First message!").await?;
   ///   let msg = res.get_original_message().await?;
@@ -515,7 +515,7 @@ impl CommandResponder {
   /// ```no_run
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("First message!").await?;
   ///   let msg = res.send_followup_message("If you see me say hi").await?;
