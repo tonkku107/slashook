@@ -22,6 +22,7 @@ use super::{
   Permissions
 };
 use crate::{
+  rest::{Rest, RestError},
   commands::{MessageResponse, Modal, responder::CommandResponse},
 };
 
@@ -306,6 +307,18 @@ pub struct InteractionCallbackData {
   pub title: Option<String>,
   #[serde(skip_serializing)]
   pub files: Option<Vec<File>>
+}
+
+impl ApplicationCommand {
+  /// Takes a list of application commands, overwriting the existing global command list for this application.
+  pub async fn bulk_overwrite_global_commands<T: ToString>(rest: &Rest, application_id: T, commands: Vec<Self>) -> Result<Vec<Self>, RestError> {
+    rest.put(format!("/applications/{}/commands", application_id.to_string()), commands).await
+  }
+
+  /// Takes a list of application commands, overwriting the existing command list for this application for the targeted guild.
+  pub async fn bulk_overwrite_guild_commands<T: ToString, U: ToString>(rest: &Rest, application_id: T, guild_id: U, commands: Vec<Self>) -> Result<Vec<Self>, RestError> {
+    rest.put(format!("/applications/{}/guilds/{}/commands", application_id.to_string(), guild_id.to_string()), commands).await
+  }
 }
 
 #[doc(hidden)]
