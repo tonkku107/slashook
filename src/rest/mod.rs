@@ -11,8 +11,8 @@
 pub const API_URL: &str = "https://discord.com/api/v10";
 
 use std::any::TypeId;
-use serde::{Serialize, de::DeserializeOwned};
-use serde_json::Value;
+use serde::{Serialize, de::{DeserializeOwned, Error}};
+use serde_json::{Value, json};
 use crate::structs::{
   channels::Attachment,
   interactions::Attachments,
@@ -20,6 +20,7 @@ use crate::structs::{
 };
 use reqwest::{
   Client,
+  ClientBuilder,
   StatusCode,
   Response,
   multipart::{Form, Part},
@@ -83,6 +84,11 @@ fn handle_multipart<U: Serialize + Attachments>(mut json_data: U, files: Vec<Fil
 }
 
 impl Rest {
+  fn base_client_builder() -> ClientBuilder {
+    Client::builder()
+      .user_agent(crate::USER_AGENT)
+  }
+
   /// Creates a new Rest handler without a token
   pub fn new() -> Self {
     Self::with_optional_token(None)
@@ -95,12 +101,15 @@ impl Rest {
 
   /// Creates a new Rest handler with or without a token
   pub fn with_optional_token(token: Option<String>) -> Self {
-    let mut client = Client::builder()
-      .user_agent(crate::USER_AGENT);
+    let mut client = Self::base_client_builder();
 
-    if let Some(token) = token {
+    if let Some(mut token) = token {
+      if !token.starts_with("Bot") && !token.starts_with("Bearer") {
+        token = format!("Bot {}", token);
+      }
+
       let mut headers = HeaderMap::new();
-      let mut auth = HeaderValue::from_str(format!("Bot {}", token).as_str()).unwrap();
+      let mut auth = HeaderValue::from_str(token.as_str()).unwrap();
       auth.set_sensitive(true);
       headers.insert("Authorization", auth);
       client = client.default_headers(headers);
@@ -109,6 +118,26 @@ impl Rest {
     Self {
       client: client.build().unwrap()
     }
+  }
+
+  /// Creates a new Rest handler with an access token from client credentials grant
+  pub async fn with_client_credentials(client_id: String, client_secret: String, scopes: Vec<String>) -> Result<Self, RestError> {
+    let temp_client = Self::base_client_builder().build()?;
+
+    let req = temp_client.post(format!("{}/oauth2/token", API_URL)).form(&json! ({
+      "client_id": client_id,
+      "client_secret": client_secret,
+      "grant_type": "client_credentials",
+      "scope": scopes.join(" ")
+    }));
+    let res = req.send().await?;
+    let body: serde_json::Value = res.json().await?;
+
+    let token = body.get("access_token")
+      .ok_or_else(|| serde_json::Error::missing_field("access_token"))?.as_str()
+      .ok_or_else(|| serde_json::Error::custom("access_token was not a string"))?;
+
+    Ok(Self::with_token(format!("Bearer {}", token)))
   }
 
   /// Make a get request
