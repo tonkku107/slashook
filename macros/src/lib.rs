@@ -8,11 +8,15 @@
 #![warn(clippy::all)]
 extern crate proc_macro;
 
+mod converter;
+
+use converter::convert_block;
+
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
-use proc_macro2::{Span};
+use proc_macro2::Span;
 use devise::{Spanned, ext::SpanDiagnosticExt};
-use syn::{self, LitStr, ItemFn, ReturnType, Block, Stmt, Expr, parse_macro_input, parse_quote};
+use syn::{self, ItemFn, ReturnType, parse_macro_input, parse_quote};
 
 /// A macro that turns a function to a Command
 ///
@@ -96,75 +100,4 @@ pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
   quote_spanned!(block.span() => #(#attrs)* #vis #sig {
     slashook::async_main(async move #block)
   }).into()
-}
-
-fn convert_block(block: Block) -> Block {
-  let existing_statements = block.stmts;
-  let mut new_statements: Vec<Stmt> = Vec::new();
-
-  for statement in existing_statements.into_iter() {
-    let expression = match statement {
-      Stmt::Expr(expr) => expr,
-      Stmt::Semi(expr, _) => expr,
-      _ => {
-        new_statements.push(statement);
-        continue
-      }
-    };
-
-    let new_expr = convert_expr(expression);
-    new_statements.push(parse_quote!(#new_expr;));
-  }
-
-  parse_quote! {
-    {
-      #(#new_statements)*
-    }
-  }
-}
-
-fn convert_expr(expression: Expr) -> Expr {
-  match expression {
-    Expr::Return(ret) => {
-      let inner = ret.expr;
-      return parse_quote! {
-        {
-          #inner;
-          return Ok(());
-        }
-      }
-    },
-    Expr::Block(blokky) => {
-      let new_block = convert_block(blokky.block);
-      return parse_quote!(#new_block);
-    },
-    Expr::If(mut iffy) => {
-      iffy.then_branch = convert_block(iffy.then_branch);
-      iffy.else_branch = iffy.else_branch.map(|(token, expr)| (token, Box::new(convert_expr(*expr))));
-      return parse_quote!(#iffy);
-    },
-    Expr::ForLoop(mut loopy) => {
-      loopy.body = convert_block(loopy.body);
-      return parse_quote!(#loopy);
-    },
-    Expr::Loop(mut loopy) => {
-      loopy.body = convert_block(loopy.body);
-      return parse_quote!(#loopy);
-    },
-    Expr::While(mut while_loopy) => {
-      while_loopy.body = convert_block(while_loopy.body);
-      return parse_quote!(#while_loopy);
-    },
-    Expr::Match(mut matchy) => {
-      let arms = matchy.arms;
-      let mut new_arms = Vec::new();
-      for mut arm in arms.into_iter() {
-        arm.body = Box::new(convert_expr(*arm.body));
-        new_arms.push(arm);
-      }
-      matchy.arms = new_arms;
-      return parse_quote!(#matchy);
-    },
-    _ => expression
-  }
 }
