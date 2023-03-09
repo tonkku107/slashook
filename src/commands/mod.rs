@@ -18,6 +18,10 @@ use rocket::futures::future::BoxFuture;
 
 pub use responder::{MessageResponse, CommandResponder, Modal, InteractionResponseError};
 pub use handler::CommandInput;
+use crate::structs::{
+  interactions::{ApplicationCommand, ApplicationCommandType, ApplicationCommandOption, InteractionOptionType},
+  Permissions
+};
 
 /// The `Result` types expected from a command function
 ///
@@ -49,6 +53,143 @@ where
 pub struct Command {
   /// A handler function for the command
   pub func: Box<dyn AsyncCmdFn>,
-  /// The name of the command
-  pub name: String
+  /// Ignore the command when syncing commands
+  pub ignore: bool,
+  /// [Name of command](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming), 1-32 characters
+  pub name: String,
+  /// [Type of command](ApplicationCommandType), defaults to `CHAT_INPUT`
+  pub command_type: Option<ApplicationCommandType>,
+  /// Description for `CHAT_INPUT` commands, 1-100 characters. Empty string for `USER` and `MESSAGE` commands
+  pub description: String,
+  /// Parameters for the command, max of 25
+  pub options: Option<Vec<ApplicationCommandOption>>,
+  /// Set of [permissions](Permissions) represented as a bit set
+  pub default_member_permissions: Option<Permissions>,
+  /// Indicates whether the command is available in DMs with the app, only for globally-scoped commands. By default, commands are visible.
+  pub dm_permission: Option<bool>,
+  /// Indicates whether the command is age-restricted, defaults to `false`
+  pub nsfw: Option<bool>,
+  /// Subcommand groups for the command
+  pub subcommand_groups: Option<Vec<SubcommandGroup>>,
+  /// Subcommands for the command
+  pub subcommands: Option<Vec<Subcommand>>,
+}
+
+/// Struct representing subcommand groups
+#[derive(Default, Clone, Debug)]
+pub struct SubcommandGroup {
+  /// [Name of subcommand group](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming), 1-32 characters
+  pub name: String,
+  /// Description for the subcommand group
+  pub description: String,
+  /// Subcommands in the group
+  pub subcommands: Vec<Subcommand>,
+}
+
+/// Struct representing subcommands
+#[derive(Default, Clone, Debug)]
+pub struct Subcommand {
+  /// [Name of subcommand](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming), 1-32 characters
+  pub name: String,
+  /// Description for the subcommand
+  pub description: String,
+  /// Parameters for the command, max of 25
+  pub options: Vec<ApplicationCommandOption>,
+}
+
+async fn dummy (_: CommandInput, _: CommandResponder) -> CmdResult { Ok(()) }
+impl Default for Command {
+  fn default() -> Self {
+    Self {
+      func: Box::new(dummy),
+      ignore: false,
+      name: String::new(),
+      command_type: None,
+      description: String::new(),
+      options: None,
+      default_member_permissions: None,
+      dm_permission: None,
+      nsfw: None,
+      subcommand_groups: None,
+      subcommands: None
+    }
+  }
+}
+
+impl Clone for Command {
+  fn clone(&self) -> Self {
+    Self {
+      func: Box::new(dummy),
+      ignore: self.ignore.clone(),
+      name: self.name.clone(),
+      command_type: self.command_type.clone(),
+      description: self.description.clone(),
+      options: self.options.clone(),
+      default_member_permissions: self.default_member_permissions.clone(),
+      dm_permission: self.dm_permission.clone(),
+      nsfw: self.nsfw.clone(),
+      subcommand_groups: self.subcommand_groups.clone(),
+      subcommands: self.subcommands.clone(),
+    }
+  }
+}
+
+impl TryFrom<Command> for ApplicationCommand {
+  type Error = anyhow::Error;
+
+  fn try_from(value: Command) -> anyhow::Result<Self> {
+    if value.options.is_some() && (value.subcommands.is_some() || value.subcommand_groups.is_some()) {
+      anyhow::bail!("You cannot have options on the base command when using subcommands or subcommand groups");
+    }
+
+    let mut options = value.options;
+    if let Some(scgs) = value.subcommand_groups {
+      options = Some(scgs.into_iter().map(|scg| scg.into()).collect());
+    }
+    if let Some(scs) = value.subcommands {
+      let mut opts = options.unwrap_or_default();
+      opts.extend(scs.into_iter().map(|sc| sc.into()));
+      options = Some(opts);
+    }
+
+    Ok(Self {
+      id: None,
+      command_type: value.command_type,
+      application_id: None,
+      guild_id: None,
+      name: value.name,
+      description: value.description,
+      options,
+      default_member_permissions: value.default_member_permissions,
+      dm_permission: value.dm_permission,
+      nsfw: value.nsfw,
+      version: None
+    })
+  }
+}
+
+impl From<SubcommandGroup> for ApplicationCommandOption {
+  fn from(value: SubcommandGroup) -> Self {
+    let options = value.subcommands.into_iter().map(|sc| sc.into()).collect();
+
+    Self {
+      option_type: InteractionOptionType::SUB_COMMAND_GROUP,
+      name: value.name,
+      description: value.description,
+      options: Some(options),
+      ..Default::default()
+    }
+  }
+}
+
+impl From<Subcommand> for ApplicationCommandOption {
+  fn from(value: Subcommand) -> Self {
+    Self {
+      option_type: InteractionOptionType::SUB_COMMAND,
+      name: value.name,
+      description: value.description,
+      options: Some(value.options),
+      ..Default::default()
+    }
+  }
 }

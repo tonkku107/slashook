@@ -10,7 +10,7 @@ extern crate hex;
 mod signature_headers;
 mod multipart;
 
-use super::{Config, commands::RocketCommand};
+use super::{Config, commands::handler::RocketCommand};
 use super::structs::interactions::{Interaction, InteractionType, InteractionCallback, InteractionCallbackType};
 use signature_headers::SignatureHeaders;
 use rocket::{
@@ -22,7 +22,6 @@ use rocket::{
 };
 use serde_json::{Value, json};
 use ring::signature;
-
 
 enum Res {
   Raw {
