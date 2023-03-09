@@ -787,6 +787,14 @@ impl Channel {
   }
 }
 
+impl TryFrom<u8> for ChannelType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
 impl Message {
   /// Fetch a single message with a channel and message ID
   /// ```no_run

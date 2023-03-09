@@ -321,6 +321,22 @@ impl ApplicationCommand {
   }
 }
 
+impl TryFrom<u8> for ApplicationCommandType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
+impl TryFrom<u8> for InteractionOptionType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
 #[doc(hidden)]
 impl From<CommandResponse> for InteractionCallback {
   fn from(response: CommandResponse) -> InteractionCallback {
