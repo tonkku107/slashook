@@ -16,6 +16,7 @@ use anyhow::{anyhow, bail, Context};
 
 use crate::structs::{
   interactions::{
+    ApplicationCommand,
     Interaction, InteractionType, ApplicationCommandType, InteractionDataResolved, InteractionOption, InteractionOptionType,
     InteractionCallback,
     OptionValue
@@ -110,6 +111,19 @@ impl CommandHandler {
 
   pub fn add(&mut self, command: Command) {
     self.commands.insert(command.name.clone(), Arc::new(Mutex::new(command)));
+  }
+
+  pub fn convert_commands(&self) -> anyhow::Result<Vec<ApplicationCommand>> {
+    let mut vec = Vec::new();
+
+    for c in self.commands.values() {
+      let command = &*c.lock().map_err(|_| anyhow::Error::msg("Command had been poisoned"))?;
+      if !command.ignore {
+        vec.push(command.clone().try_into()?);
+      }
+    }
+
+    Ok(vec)
   }
 
   pub async fn rocket_bridge(self: &Arc<Self>, mut receiver: mpsc::UnboundedReceiver::<RocketCommand>) {
