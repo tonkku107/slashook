@@ -6,65 +6,91 @@
 // copied, modified, or distributed except according to those terms.
 
 use devise::Spanned;
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::{TokenStream, TokenTree, Span};
 use quote::{ToTokens, TokenStreamExt, quote};
-use syn::{Token, ExprAssign, Expr, Ident, bracketed, braced,
-  parse::{Parse, ParseStream, Peek}
+use syn::{
+  Token, bracketed, braced,
+  Result, Error, ExprAssign, Expr, Ident,
+  token::{Bracket, Brace},
+  parse2, parse::{Parse, ParseStream, Peek}
 };
 
 #[derive(Debug)]
 pub(crate) struct Attributes(Vec<(Ident, Expr)>);
+
 #[derive(Debug)]
-struct AttributeArray(Vec<Attributes>);
+enum Item {
+  Attributes(Attributes, Span),
+  Expr(Expr)
+}
+
+#[derive(Debug)]
+struct AttributeArray(Vec<Item>);
 
 impl Parse for Attributes {
-  fn parse(input: ParseStream) -> syn::Result<Self> {
+  fn parse(input: ParseStream) -> Result<Self> {
     let mut attrs = Vec::new();
 
     while !input.is_empty() {
       let mut segment;
 
-      if input.peek3(syn::token::Bracket) {
-        // If we have a bracket coming, we need to do some more parsing.
+      if input.peek3(Bracket) || input.peek3(Brace) {
+        // If we have a bracket or brace coming, we need to do some more parsing.
         // Check the name of the value and determine the struct type to be used. Put the name into the segment when done.
         let name: Ident = input.parse()?;
-        let struct_type = get_struct_type(&name)?;
+        let struct_type = get_struct_type(&name);
         segment = name.to_token_stream();
-        segment.extend(parse_until(input, syn::token::Bracket)?);
 
-        // Parse the tokens within brackets using a separate parser and put the resulting converted tokens into the segment.
-        let bracket_segment;
-        bracketed!(bracket_segment in input);
-        let attr_arr: AttributeArray = bracket_segment.parse()?;
-        segment.extend(attr_arr.to_tokens(struct_type));
+        if input.peek2(Bracket) {
+          segment.extend(parse_until(input, Bracket)?);
 
-        // Just to make sure everything is parsed, if there's anything here it'll probably result in a parse error later
-        segment.extend(parse_until(input, Token!(,))?);
+          // Parse the tokens within brackets using a separate parser and put the resulting converted tokens into the segment.
+          let bracket_segment;
+          bracketed!(bracket_segment in input);
+          let attr_arr: AttributeArray = bracket_segment.parse()?;
+          segment.extend(attr_arr.to_tokens(struct_type)?);
+        } else {
+          segment.extend(parse_until(input, Brace)?);
+          let span = input.span();
+
+          // Parse the tokens within braces using a this parser and put the resulting converted tokens into the segment.
+          let brace_segment;
+          braced!(brace_segment in input);
+          let item = Item::Attributes(brace_segment.parse()?, span);
+          segment.extend(item.to_tokens(&struct_type)?);
+        }
+
+        // Error if there is no comma after the brackets or braces
+        let lookahead = input.lookahead1();
+        if !lookahead.peek(Token![,]) && !input.is_empty() {
+          return Err(lookahead.error());
+        }
       } else {
         // Otherwise we can just parse what we have no problem.
         segment = parse_until(input, Token!(,))?;
       }
 
       // Parse what we just obtained as an assignment expression, aka `something = something_else`
-      let value: ExprAssign = syn::parse2(segment)?;
+      let value: ExprAssign = parse2(segment)?;
 
       let name;
       // The left expr seems to be a path based on debug logging, even if it's a single identifier...
       if let Expr::Path(expr) = *value.left {
         // Get the identifier from the path
-        name = expr.path.get_ident().ok_or_else(|| syn::Error::new(expr.path.span(), "Expected an identifier"))?.clone();
+        name = expr.path.get_ident().ok_or_else(|| Error::new(expr.path.span(), "Expected an identifier"))?.clone();
 
         // We set func in the macro, so error if someone somehow decides to add it for some reason
         if name == "func" {
-          return Err(syn::Error::new(name.span(), "Cannot set `func` here. Your handler function goes below this attribute macro."));
+          return Err(Error::new(name.span(), "Cannot set `func` here. Your handler function goes below this attribute macro."));
         }
       } else {
-        return Err(syn::Error::new(value.left.span(), "Expected identifier"));
+        return Err(Error::new(value.left.span(), "Expected identifier"));
       }
 
       let expr = *value.right;
       attrs.push((name, expr));
 
+      // Parse the comma but we don't really care about it
       if input.peek(Token!(,)) {
         let _: Token![,] = input.parse()?;
       }
@@ -81,27 +107,33 @@ impl ToTokens for Attributes {
 }
 
 impl Parse for AttributeArray {
-  fn parse(input: ParseStream) -> syn::Result<Self> {
+  fn parse(input: ParseStream) -> Result<Self> {
     let mut vec = Vec::new();
 
     while !input.is_empty() {
-      let lookahead = input.lookahead1();
+      if input.peek(Brace) {
+        // If there's a brace we need to parse the contents
+        let span = input.span();
 
-      // Make sure that there's a brace for an object ahead.
-      if lookahead.peek(syn::token::Brace) {
         let content;
         braced!(content in input);
 
         // Parse the insides of the braces with the original parser
         let attrs: Attributes = content.parse()?;
-        vec.push(attrs);
+        vec.push(Item::Attributes(attrs, span));
 
-        parse_until(input, Token![,])?;
+        // Error if there is no comma after the braces
+        let lookahead = input.lookahead1();
+        if !lookahead.peek(Token![,]) && !input.is_empty() {
+          return Err(lookahead.error());
+        }
       } else {
-        // Else we return an error
-        return Err(lookahead.error());
+        // Otherwise we just take whatever expression we got
+        let segment = parse_until(input, Token![,])?;
+        vec.push(Item::Expr(parse2(segment)?));
       }
 
+      // Parse the comma but we don't really care about it
       if input.peek(Token![,]) {
         let _: Token![,] = input.parse()?;
       }
@@ -111,26 +143,41 @@ impl Parse for AttributeArray {
   }
 }
 
-impl AttributeArray {
-  fn to_tokens(&self, struct_type: TokenStream) -> syn::Result<TokenStream> {
-    let structs = self.0.iter().map(|attrs| {
-      quote! {
-        #struct_type {
-          #attrs,
-          ..Default::default()
+impl Item {
+  fn to_tokens(&self, struct_type: &Option<TokenStream>) -> Result<TokenStream> {
+    Ok(match self {
+      Self::Attributes(attrs, span) => {
+        if struct_type.is_none() {
+          return Err(Error::new(*span, "Didn't expect an object for this field"));
         }
-      }
-    });
+
+        quote! {
+          #struct_type {
+            #attrs,
+            ..Default::default()
+          }
+        }
+      },
+      Self::Expr(expr) => quote! { #expr }
+    })
+  }
+}
+
+impl AttributeArray {
+  fn to_tokens(&self, struct_type: Option<TokenStream>) -> Result<TokenStream> {
+    let items = self.0.iter().map(|item| {
+      item.to_tokens(&struct_type)
+    }).collect::<Result<Vec<TokenStream>>>()?;
 
     Ok(quote! {
       vec![
-        #( #structs ),*
+        #( #items.try_into().unwrap() ),*
       ]
     })
   }
 }
 
-fn parse_until<E: Peek>(input: ParseStream, end: E) -> syn::Result<TokenStream> {
+fn parse_until<E: Peek>(input: ParseStream, end: E) -> Result<TokenStream> {
   let mut tokens = TokenStream::new();
   while !input.is_empty() && !input.peek(end) {
     let next: TokenTree = input.parse()?;
@@ -139,12 +186,12 @@ fn parse_until<E: Peek>(input: ParseStream, end: E) -> syn::Result<TokenStream> 
   Ok(tokens)
 }
 
-fn get_struct_type(name: &Ident) -> syn::Result<TokenStream> {
+fn get_struct_type(name: &Ident) -> Option<TokenStream> {
   match name.to_string().as_str() {
-    "options" => Ok(quote! { slashook::structs::interactions::ApplicationCommandOption }),
-    "subcommand_groups" => Ok(quote! { slashook::commands::SubcommandGroup }),
-    "subcommands" => Ok(quote! { slashook::commands::Subcommand }),
-    "choices" => Ok(quote! { slashook::structs::interactions::ApplicationCommandOptionChoice }),
-    _ => Err(syn::Error::new(name.span(), "Unexpected field for a struct array type")),
+    "options" => Some(quote! { slashook::structs::interactions::ApplicationCommandOption }),
+    "subcommand_groups" => Some(quote! { slashook::commands::SubcommandGroup }),
+    "subcommands" => Some(quote! { slashook::commands::Subcommand }),
+    "choices" => Some(quote! { slashook::structs::interactions::ApplicationCommandOptionChoice }),
+    _ => None
   }
 }
