@@ -9,10 +9,10 @@ use devise::Spanned;
 use proc_macro2::{TokenStream, TokenTree, Span};
 use quote::{ToTokens, TokenStreamExt, quote};
 use syn::{
-  Token, bracketed, braced,
-  Result, Error, ExprAssign, Expr, Ident,
+  Token, bracketed, braced, parse_quote,
+  Result, Error, ExprAssign, Expr, Ident, Path,
   token::{Bracket, Brace},
-  parse2, parse::{Parse, ParseStream, Peek}
+  parse2, parse::{Parse, ParseStream, Peek},
 };
 
 #[derive(Debug)]
@@ -144,11 +144,16 @@ impl Parse for AttributeArray {
 }
 
 impl Item {
-  fn to_tokens(&self, struct_type: &Option<TokenStream>) -> Result<TokenStream> {
+  fn to_tokens(&self, struct_type: &Option<Path>) -> Result<TokenStream> {
     Ok(match self {
       Self::Attributes(attrs, span) => {
         if struct_type.is_none() {
           return Err(Error::new(*span, "Didn't expect an object for this field"));
+        }
+
+        // Special case for HashMaps
+        if struct_type.as_ref().unwrap().segments.last().unwrap().ident == "HashMap" {
+          return Ok(attrs_to_hashmap(attrs, struct_type.as_ref().unwrap()));
         }
 
         quote! {
@@ -164,7 +169,7 @@ impl Item {
 }
 
 impl AttributeArray {
-  fn to_tokens(&self, struct_type: Option<TokenStream>) -> Result<TokenStream> {
+  fn to_tokens(&self, struct_type: Option<Path>) -> Result<TokenStream> {
     let items = self.0.iter().map(|item| {
       item.to_tokens(&struct_type)
     }).collect::<Result<Vec<TokenStream>>>()?;
@@ -186,12 +191,26 @@ fn parse_until<E: Peek>(input: ParseStream, end: E) -> Result<TokenStream> {
   Ok(tokens)
 }
 
-fn get_struct_type(name: &Ident) -> Option<TokenStream> {
+fn attrs_to_hashmap(attrs: &Attributes, struct_type: &Path) -> TokenStream {
+  let tuples = attrs.0.iter().map(|(name, value)| {
+    let name = name.to_string();
+    quote! { (#name.into(), #value.try_into().unwrap() ) }
+  });
+
+  quote! {
+    #struct_type::from([
+      #( #tuples ),*
+    ])
+  }
+}
+
+fn get_struct_type(name: &Ident) -> Option<Path> {
   match name.to_string().as_str() {
-    "options" => Some(quote! { slashook::structs::interactions::ApplicationCommandOption }),
-    "subcommand_groups" => Some(quote! { slashook::commands::SubcommandGroup }),
-    "subcommands" => Some(quote! { slashook::commands::Subcommand }),
-    "choices" => Some(quote! { slashook::structs::interactions::ApplicationCommandOptionChoice }),
+    "options" => Some(parse_quote! { slashook::structs::interactions::ApplicationCommandOption }),
+    "subcommand_groups" => Some(parse_quote! { slashook::commands::SubcommandGroup }),
+    "subcommands" => Some(parse_quote! { slashook::commands::Subcommand }),
+    "choices" => Some(parse_quote! { slashook::structs::interactions::ApplicationCommandOptionChoice }),
+    "name_localizations" | "description_localizations" => Some(parse_quote! { std::collections::HashMap }),
     _ => None
   }
 }

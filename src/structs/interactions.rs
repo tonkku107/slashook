@@ -44,10 +44,14 @@ pub struct ApplicationCommand {
   pub guild_id: Option<Snowflake>,
   /// [Name of command](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming), 1-32 characters
   pub name: String,
-  // pub name_localizations
+  /// Localization dictionary for `name` field. Values follow the same restrictions as `name`
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub name_localizations: Option<HashMap<String, String>>,
   /// Description for `CHAT_INPUT` commands, 1-100 characters. Empty string for `USER` and `MESSAGE` commands
   pub description: String,
-  // pub description_localizations
+  /// Localization dictionary for `description` field. Values follow the same restrictions as `description`
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub description_localizations: Option<HashMap<String, String>>,
   /// Parameters for the command, max of 25
   #[serde(skip_serializing_if = "Option::is_none")]
   pub options: Option<Vec<ApplicationCommandOption>>,
@@ -88,8 +92,14 @@ pub struct ApplicationCommandOption {
   pub option_type: InteractionOptionType,
   /// 1-32 character name
   pub name: String,
+  /// Localization dictionary for the `name` field. Values follow the same restrictions as `name`
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub name_localizations: Option<HashMap<String, String>>,
   /// 1-100 character description
   pub description: String,
+  /// Localization dictionary for the `description` field. Values follow the same restrictions as `description`
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub description_localizations: Option<HashMap<String, String>>,
   /// If the parameter is required or optional--default `false`
   #[serde(skip_serializing_if = "Option::is_none")]
   pub required: Option<bool>,
@@ -124,6 +134,9 @@ pub struct ApplicationCommandOption {
 pub struct ApplicationCommandOptionChoice {
   /// 1-100 character choice name
   pub name: String,
+  /// Localization dictionary for the name field. Values follow the same restrictions as name
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub name_localizations: Option<HashMap<String, String>>,
   /// Value of the choice, up to 100 characters if string
   pub value: Value,
 }
@@ -593,7 +606,11 @@ impl OptionValue {
 impl ApplicationCommandOptionChoice {
   /// Creates a new choice with a name and value
   pub fn new<T: ToString, U: Into<Value>>(name: T, value: U) -> Self {
-    Self { name: name.to_string(), value: value.into() }
+    Self {
+      name: name.to_string(),
+      name_localizations: None,
+      value: value.into()
+    }
   }
 }
 

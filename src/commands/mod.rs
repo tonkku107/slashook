@@ -12,7 +12,8 @@ pub(crate) mod handler;
 
 use std::{
   marker::Send,
-  future::Future
+  future::Future,
+  collections::HashMap,
 };
 use rocket::futures::future::BoxFuture;
 
@@ -57,10 +58,14 @@ pub struct Command {
   pub ignore: bool,
   /// [Name of command](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming), 1-32 characters
   pub name: String,
+  /// Localization dictionary for `name` field. Values follow the same restrictions as `name`
+  pub name_localizations: Option<HashMap<String, String>>,
   /// [Type of command](ApplicationCommandType), defaults to `CHAT_INPUT`
   pub command_type: Option<ApplicationCommandType>,
   /// Description for `CHAT_INPUT` commands, 1-100 characters. Empty string for `USER` and `MESSAGE` commands
   pub description: String,
+  /// Localization dictionary for `description` field. Values follow the same restrictions as `description`
+  pub description_localizations: Option<HashMap<String, String>>,
   /// Parameters for the command, max of 25
   pub options: Option<Vec<ApplicationCommandOption>>,
   /// Set of [permissions](Permissions) represented as a bit set
@@ -80,8 +85,12 @@ pub struct Command {
 pub struct SubcommandGroup {
   /// [Name of subcommand group](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming), 1-32 characters
   pub name: String,
+  /// Localization dictionary for the `name` field. Values follow the same restrictions as `name`
+  pub name_localizations: Option<HashMap<String, String>>,
   /// Description for the subcommand group
   pub description: String,
+  /// Localization dictionary for the `description` field. Values follow the same restrictions as `description`
+  pub description_localizations: Option<HashMap<String, String>>,
   /// Subcommands in the group
   pub subcommands: Vec<Subcommand>,
 }
@@ -91,8 +100,12 @@ pub struct SubcommandGroup {
 pub struct Subcommand {
   /// [Name of subcommand](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming), 1-32 characters
   pub name: String,
+  /// Localization dictionary for the `name` field. Values follow the same restrictions as `name`
+  pub name_localizations: Option<HashMap<String, String>>,
   /// Description for the subcommand
   pub description: String,
+  /// Localization dictionary for the `description` field. Values follow the same restrictions as `description`
+  pub description_localizations: Option<HashMap<String, String>>,
   /// Parameters for the command, max of 25
   pub options: Vec<ApplicationCommandOption>,
 }
@@ -104,8 +117,10 @@ impl Default for Command {
       func: Box::new(dummy),
       ignore: false,
       name: String::new(),
+      name_localizations: None,
       command_type: None,
       description: String::new(),
+      description_localizations: None,
       options: None,
       default_member_permissions: None,
       dm_permission: None,
@@ -122,8 +137,10 @@ impl Clone for Command {
       func: Box::new(dummy),
       ignore: self.ignore.clone(),
       name: self.name.clone(),
+      name_localizations: self.name_localizations.clone(),
       command_type: self.command_type.clone(),
       description: self.description.clone(),
+      description_localizations: self.description_localizations.clone(),
       options: self.options.clone(),
       default_member_permissions: self.default_member_permissions.clone(),
       dm_permission: self.dm_permission.clone(),
@@ -158,7 +175,9 @@ impl TryFrom<Command> for ApplicationCommand {
       application_id: None,
       guild_id: None,
       name: value.name,
+      name_localizations: value.name_localizations,
       description: value.description,
+      description_localizations: value.description_localizations,
       options,
       default_member_permissions: value.default_member_permissions,
       dm_permission: value.dm_permission,
@@ -175,7 +194,9 @@ impl From<SubcommandGroup> for ApplicationCommandOption {
     Self {
       option_type: InteractionOptionType::SUB_COMMAND_GROUP,
       name: value.name,
+      name_localizations: value.name_localizations,
       description: value.description,
+      description_localizations: value.description_localizations,
       options: Some(options),
       ..Default::default()
     }
@@ -187,7 +208,9 @@ impl From<Subcommand> for ApplicationCommandOption {
     Self {
       option_type: InteractionOptionType::SUB_COMMAND,
       name: value.name,
+      name_localizations: value.name_localizations,
       description: value.description,
+      description_localizations: value.description_localizations,
       options: Some(value.options),
       ..Default::default()
     }
