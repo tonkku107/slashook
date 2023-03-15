@@ -22,10 +22,12 @@ use syn::{self, ItemFn, ReturnType, parse_macro_input, parse_quote};
 
 /// A macro that turns a function to a `Command`
 ///
-/// A command name is required as an argument.\
-/// You can also add additional properties for `Command` following the application command structure to sync your commands with Discord using `Client::sync_commands`.\
+/// At minimum, a `name` field is required for basic operation.\
+/// You can also add additional fields for `Command` following the application command structure to sync your commands with Discord using `Client::sync_commands`.\
+/// These fields are formatted `name = value` and are comma separated.\
 /// `into` is called for every value and missing fields are filled with defaults to make things easier.\
-/// Instead of creating subcommands as options, `subcommand_groups` and `subcommands` exist.\
+/// Instead of creating subcommands as options, you can use `subcommand_groups` and `subcommands`.\
+/// `Vec`s of values can be constructed by simply using `[]` and comma separating the values, structs and maps can be done with `{}` following the same syntax inside.\
 /// If you're creating a "fake" command (as a separate component handler for example), you can set `ignore = true` to make sure that command isn't synced.
 /// ## Example
 /// ```ignore

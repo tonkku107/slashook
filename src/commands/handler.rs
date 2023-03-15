@@ -49,7 +49,7 @@ pub struct CommandInput {
   ///
   /// Only included in chat input commands
   pub sub_command_group: Option<String>,
-  /// Arguments or modal inputs the user of your command filled./
+  /// Arguments or modal inputs the user of your command filled.\
   /// The key is the name of the argument or custom_id of the component
   pub args: HashMap<String, OptionValue>,
   /// user, member, role, channel and message objects resolved from arguments by Discord

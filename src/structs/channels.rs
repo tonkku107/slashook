@@ -636,7 +636,7 @@ pub struct ReactionFetchOptions {
 
 impl Channel {
   /// Fetch a channel with a channel ID
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Channel;
@@ -650,7 +650,7 @@ impl Channel {
   }
 
   /// Edits a channel
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::{Channel, ChannelModifyOptions};
@@ -666,7 +666,7 @@ impl Channel {
   }
 
   /// Deletes a channel
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Channel;
@@ -700,7 +700,7 @@ impl Channel {
 
   /// Delete multiple messages from this channel.\
   /// 2-100 message IDs can be provided at once.
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Channel;
@@ -717,7 +717,7 @@ impl Channel {
   }
 
   /// Edits a permission overwrite
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::{Channel, PermissionOverwrite, PermissionOverwriteType};
@@ -739,7 +739,7 @@ impl Channel {
   }
 
   /// Deletes a permission overwrite
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Channel;
@@ -759,7 +759,7 @@ impl Channel {
   }
 
   /// Creates a new invite for this channel
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Channel;
@@ -797,7 +797,7 @@ impl TryFrom<u8> for ChannelType {
 
 impl Message {
   /// Fetch a single message with a channel and message ID
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Message;
@@ -811,7 +811,7 @@ impl Message {
   }
 
   /// Fetch multiple messages with a channel ID and options
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::{Message, MessageFetchOptions};
@@ -826,7 +826,7 @@ impl Message {
   }
 
   /// Send a new message to a channel
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Message;
@@ -848,7 +848,7 @@ impl Message {
   }
 
   /// Edit a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Message;
@@ -871,7 +871,7 @@ impl Message {
   }
 
   /// Delete a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Message;
@@ -886,7 +886,7 @@ impl Message {
   }
 
   /// Publish a message that was posted in an [Announcement channel](ChannelType::GUILD_NEWS)
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Message;
@@ -901,7 +901,7 @@ impl Message {
   }
 
   /// Add a reaction to a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::{channels::Message, Emoji};
@@ -916,7 +916,7 @@ impl Message {
   }
 
   /// Remove the bot's reaction to a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::{channels::Message, Emoji};
@@ -933,7 +933,7 @@ impl Message {
   }
 
   /// Remove someone else's reaction to a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::{Emoji, interactions::ApplicationCommandType};
@@ -948,7 +948,7 @@ impl Message {
   }
 
   /// Get the users who reacted to a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::{Emoji, channels::ReactionFetchOptions, interactions::ApplicationCommandType};
@@ -965,7 +965,7 @@ impl Message {
   }
 
   /// Delete all reactions from a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::{Emoji, interactions::ApplicationCommandType};
@@ -980,7 +980,7 @@ impl Message {
   }
 
   /// Delete all reactions for a single emoji from the message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::{Emoji, interactions::ApplicationCommandType};

@@ -43,6 +43,8 @@
 //! ```
 //! Your bot will now be listening on `http://0.0.0.0:3000/`. See [Config] for IP and port options.\
 //! You may now route it through a reverse proxy and set your interaction url on the Developer Portal.
+//!
+//! Take a look at [CommandInput](commands::CommandInput) and [CommandResponder](commands::CommandResponder) for the values and functions you have at your disposal in your functions.
 
 pub(crate) const USER_AGENT: &str = concat!("slashook/", env!("CARGO_PKG_VERSION"));
 
