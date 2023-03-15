@@ -41,14 +41,14 @@ pub struct CommandInput {
   pub component_type: Option<ComponentType>,
   /// Name of the command that was executed
   pub command: String,
-  /// Sub command that was executed
+  /// Subcommand that was executed
   ///
   /// Only included in chat input commands
-  pub sub_command: Option<String>,
-  /// Sub command group the sub command belongs in
+  pub subcommand: Option<String>,
+  /// Subcommand group the subcommand belongs in
   ///
   /// Only included in chat input commands
-  pub sub_command_group: Option<String>,
+  pub subcommand_group: Option<String>,
   /// Arguments or modal inputs the user of your command filled.\
   /// The key is the name of the argument or custom_id of the component
   pub args: HashMap<String, OptionValue>,
@@ -151,11 +151,11 @@ impl CommandHandler {
     for option in options.into_iter() {
       let option_value = match option.option_type {
         InteractionOptionType::SUB_COMMAND_GROUP => {
-          input.sub_command_group = Some(option.name);
+          input.subcommand_group = Some(option.name);
           return self.parse_options(option.options.context("Subcommand group has no subcommands")?, resolved, input)
         },
         InteractionOptionType::SUB_COMMAND => {
-          input.sub_command = Some(option.name);
+          input.subcommand = Some(option.name);
           if option.options.is_none() { return Ok(()) }
           return self.parse_options(option.options.unwrap(), resolved, input)
         },
@@ -385,8 +385,8 @@ impl CommandHandler {
       command_type: data.command_type,
       component_type: data.component_type,
       command: name,
-      sub_command: None,
-      sub_command_group: None,
+      subcommand: None,
+      subcommand_group: None,
       args: HashMap::new(),
       resolved: None,
       guild_id: interaction.guild_id,
