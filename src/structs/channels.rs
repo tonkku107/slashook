@@ -636,11 +636,11 @@ pub struct ReactionFetchOptions {
 
 impl Channel {
   /// Fetch a channel with a channel ID
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Channel;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
   /// # }
@@ -650,11 +650,11 @@ impl Channel {
   }
 
   /// Edits a channel
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::{Channel, ChannelModifyOptions};
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
   /// let options = ChannelModifyOptions::new().set_topic("Cool channel");
@@ -666,11 +666,11 @@ impl Channel {
   }
 
   /// Deletes a channel
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Channel;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
   /// channel.delete(&input.rest).await?;
@@ -700,11 +700,11 @@ impl Channel {
 
   /// Delete multiple messages from this channel.\
   /// 2-100 message IDs can be provided at once.
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Channel;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
   /// let to_delete = vec![String::from("916411877410603008"), String::from("916413462467465246")];
@@ -717,12 +717,12 @@ impl Channel {
   }
 
   /// Edits a permission overwrite
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::{Channel, PermissionOverwrite, PermissionOverwriteType};
   /// # use slashook::structs::Permissions;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
   /// let overwrite = PermissionOverwrite {
@@ -739,11 +739,11 @@ impl Channel {
   }
 
   /// Deletes a permission overwrite
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Channel;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
   /// channel.delete_channel_permission(&input.rest, "53908232506183680").await?;
@@ -759,12 +759,12 @@ impl Channel {
   }
 
   /// Creates a new invite for this channel
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Channel;
   /// # use slashook::structs::invites::CreateInviteOptions;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
   /// let options = CreateInviteOptions::new().set_max_uses(1);
@@ -787,13 +787,21 @@ impl Channel {
   }
 }
 
+impl TryFrom<u8> for ChannelType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
 impl Message {
   /// Fetch a single message with a channel and message ID
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Message;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let message = Message::fetch(&input.rest, "613430047285706767", "916413462467465246").await?;
   /// # }
@@ -803,11 +811,11 @@ impl Message {
   }
 
   /// Fetch multiple messages with a channel ID and options
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::{Message, MessageFetchOptions};
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let options = MessageFetchOptions::new().set_before("940762083820175440").set_limit(5);
   /// let messages = Message::fetch_many(&input.rest, "697138785317814292", options).await?;
@@ -818,11 +826,11 @@ impl Message {
   }
 
   /// Send a new message to a channel
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Message;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg = Message::create(&input.rest, "344581372137963522", "Hello!").await?;
   /// # }
@@ -840,11 +848,11 @@ impl Message {
   }
 
   /// Edit a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Message;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg = Message::create(&input.rest, "344581372137963522", "Hello!").await?;
   /// let edited_msg = msg.edit(&input.rest, "Bye!").await?;
@@ -863,11 +871,11 @@ impl Message {
   }
 
   /// Delete a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Message;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg = Message::create(&input.rest, "344581372137963522", "Hello!").await?;
   /// msg.delete(&input.rest).await?;
@@ -878,11 +886,11 @@ impl Message {
   }
 
   /// Publish a message that was posted in an [Announcement channel](ChannelType::GUILD_NEWS)
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::channels::Message;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg = Message::create(&input.rest, "344581598878105605", "Hello!").await?;
   /// msg.crosspost(&input.rest).await?;
@@ -893,11 +901,11 @@ impl Message {
   }
 
   /// Add a reaction to a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::{channels::Message, Emoji};
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg = Message::create(&input.rest, "344581598878105605", "Hello!").await?;
   /// msg.create_reaction(&input.rest, &Emoji::new_standard_emoji("👋")).await?;
@@ -908,11 +916,11 @@ impl Message {
   }
 
   /// Remove the bot's reaction to a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::structs::{channels::Message, Emoji};
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg = Message::create(&input.rest, "344581598878105605", "Hello!").await?;
   /// let emoji = Emoji::new_standard_emoji("👋");
@@ -925,11 +933,11 @@ impl Message {
   }
 
   /// Remove someone else's reaction to a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
-  /// # use slashook::structs::Emoji;
-  /// # #[command("Example Message Context")]
+  /// # use slashook::structs::{Emoji, interactions::ApplicationCommandType};
+  /// # #[command(name = "Example Message Context", command_type = ApplicationCommandType::MESSAGE)]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg = input.target_message.unwrap();
   /// msg.delete_user_reaction(&input.rest, &Emoji::new_standard_emoji("👋"), input.user.id).await?;
@@ -940,11 +948,11 @@ impl Message {
   }
 
   /// Get the users who reacted to a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
-  /// # use slashook::structs::{Emoji, channels::ReactionFetchOptions};
-  /// # #[command("Example Message Context")]
+  /// # use slashook::structs::{Emoji, channels::ReactionFetchOptions, interactions::ApplicationCommandType};
+  /// # #[command(name = "Example Message Context", command_type = ApplicationCommandType::MESSAGE)]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg = input.target_message.unwrap();
   /// let options = ReactionFetchOptions::new().set_limit(5);
@@ -957,11 +965,11 @@ impl Message {
   }
 
   /// Delete all reactions from a message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
-  /// # use slashook::structs::Emoji;
-  /// # #[command("Example Message Context")]
+  /// # use slashook::structs::{Emoji, interactions::ApplicationCommandType};
+  /// # #[command(name = "Example Message Context", command_type = ApplicationCommandType::MESSAGE)]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg = input.target_message.unwrap();
   /// msg.delete_all_reactions(&input.rest).await?;
@@ -972,11 +980,11 @@ impl Message {
   }
 
   /// Delete all reactions for a single emoji from the message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
-  /// # use slashook::structs::Emoji;
-  /// # #[command("Example Message Context")]
+  /// # use slashook::structs::{Emoji, interactions::ApplicationCommandType};
+  /// # #[command(name = "Example Message Context", command_type = ApplicationCommandType::MESSAGE)]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg = input.target_message.unwrap();
   /// msg.delete_all_reactions_for_emoji(&input.rest, &Emoji::new_standard_emoji("👋")).await?;

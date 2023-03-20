@@ -8,18 +8,46 @@
 #![warn(clippy::all)]
 extern crate proc_macro;
 
+mod converter;
+mod attr_parser;
+
+use converter::convert_block;
+use attr_parser::Attributes;
+
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
-use proc_macro2::{Span};
+use proc_macro2::Span;
 use devise::{Spanned, ext::SpanDiagnosticExt};
-use syn::{self, LitStr, ItemFn, ReturnType, Block, Stmt, Expr, parse_macro_input, parse_quote};
+use syn::{self, ItemFn, ReturnType, parse_macro_input, parse_quote};
 
-/// A macro that turns a function to a Command
+/// A macro that turns a function to a `Command`
 ///
-/// A command name is required as an argument.
+/// At minimum, a `name` field is required for basic operation.\
+/// You can also add additional fields for `Command` following the application command structure to sync your commands with Discord using `Client::sync_commands`.\
+/// These fields are formatted `name = value` and are comma separated.\
+/// `into` is called for every value and missing fields are filled with defaults to make things easier.\
+/// Instead of creating subcommands as options, you can use `subcommand_groups` and `subcommands`.\
+/// `Vec`s of values can be constructed by simply using `[]` and comma separating the values, structs and maps can be done with `{}` following the same syntax inside.\
+/// If you're creating a "fake" command (as a separate component handler for example), you can set `ignore = true` to make sure that command isn't synced.
 /// ## Example
 /// ```ignore
-/// #[command("command name")]
+/// #[command(
+///   name = "command-name",
+///   description = "A cool command",
+///   subcommand_groups = [{
+///     name = "group-name",
+///     subcommands = [{
+///       name = "subcommand-name",
+///       description = "A cool subcommand"
+///       options = [{
+///         name = "option",
+///         description = "A cool description",
+///         option_type = InteractionOptionType::STRING,
+///         required = true
+///       }]
+///     }]
+///   }]
+/// )]
 /// fn command(input: CommandInput, res: CommandResponder) {
 ///   res.send_message("Command executed")?;
 /// }
@@ -38,7 +66,7 @@ use syn::{self, LitStr, ItemFn, ReturnType, Block, Stmt, Expr, parse_macro_input
 /// ```
 #[proc_macro_attribute]
 pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
-  let command_name = parse_macro_input!(attr as LitStr).value();
+  let attrs = parse_macro_input!(attr as Attributes);
   let mut function = parse_macro_input!(item as ItemFn);
   let func_ident = function.sig.ident.clone();
 
@@ -66,7 +94,8 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
     #function
     let #func_ident = slashook::commands::Command {
       func: Box::new(#func_ident),
-      name: #command_name.to_string()
+      #attrs,
+      ..Default::default()
     };
   };
   output.into()
@@ -96,75 +125,4 @@ pub fn main(_: TokenStream, item: TokenStream) -> TokenStream {
   quote_spanned!(block.span() => #(#attrs)* #vis #sig {
     slashook::async_main(async move #block)
   }).into()
-}
-
-fn convert_block(block: Block) -> Block {
-  let existing_statements = block.stmts;
-  let mut new_statements: Vec<Stmt> = Vec::new();
-
-  for statement in existing_statements.into_iter() {
-    let expression = match statement {
-      Stmt::Expr(expr) => expr,
-      Stmt::Semi(expr, _) => expr,
-      _ => {
-        new_statements.push(statement);
-        continue
-      }
-    };
-
-    let new_expr = convert_expr(expression);
-    new_statements.push(parse_quote!(#new_expr;));
-  }
-
-  parse_quote! {
-    {
-      #(#new_statements)*
-    }
-  }
-}
-
-fn convert_expr(expression: Expr) -> Expr {
-  match expression {
-    Expr::Return(ret) => {
-      let inner = ret.expr;
-      return parse_quote! {
-        {
-          #inner;
-          return Ok(());
-        }
-      }
-    },
-    Expr::Block(blokky) => {
-      let new_block = convert_block(blokky.block);
-      return parse_quote!(#new_block);
-    },
-    Expr::If(mut iffy) => {
-      iffy.then_branch = convert_block(iffy.then_branch);
-      iffy.else_branch = iffy.else_branch.map(|(token, expr)| (token, Box::new(convert_expr(*expr))));
-      return parse_quote!(#iffy);
-    },
-    Expr::ForLoop(mut loopy) => {
-      loopy.body = convert_block(loopy.body);
-      return parse_quote!(#loopy);
-    },
-    Expr::Loop(mut loopy) => {
-      loopy.body = convert_block(loopy.body);
-      return parse_quote!(#loopy);
-    },
-    Expr::While(mut while_loopy) => {
-      while_loopy.body = convert_block(while_loopy.body);
-      return parse_quote!(#while_loopy);
-    },
-    Expr::Match(mut matchy) => {
-      let arms = matchy.arms;
-      let mut new_arms = Vec::new();
-      for mut arm in arms.into_iter() {
-        arm.body = Box::new(convert_expr(*arm.body));
-        new_arms.push(arm);
-      }
-      matchy.arms = new_arms;
-      return parse_quote!(#matchy);
-    },
-    _ => expression
-  }
 }

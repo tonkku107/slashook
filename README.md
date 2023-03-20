@@ -8,7 +8,6 @@ This is a WIP project. Please note breaking changes can occur within minor relea
 * REST methods for full API coverage
 * Utility methods
 * More validation library-side
-* Command sync
 * Tests and benchmarks
 
 The gateway (and by extension voice) functionality is out of scope for this project.

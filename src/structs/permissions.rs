@@ -104,6 +104,12 @@ bitflags! {
   }
 }
 
+impl From<u64> for Permissions {
+  fn from(value: u64) -> Self {
+    Self::from_bits_truncate(value)
+  }
+}
+
 impl<'de> Deserialize<'de> for Permissions {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let string = String::deserialize(d)?;

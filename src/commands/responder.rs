@@ -194,13 +194,13 @@ impl MessageResponse {
   }
 
   /// Keep an existing attachment when editing
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::commands::MessageResponse;
   /// # use slashook::structs::utils::File;
   /// # use slashook::tokio::fs::File as TokioFile;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg_file = File::from_file("cat.png", TokioFile::open("cat.png").await?).await?;
   /// let msg_file2 = File::from_file("cat2.png", TokioFile::open("cat2.png").await?).await?;
@@ -303,10 +303,10 @@ pub struct CommandResponder {
 impl CommandResponder {
   /// Respond to an interaction with a message.\
   /// If interaction has already been responded to, this function will call [`send_followup_message`](CommandResponder::send_followup_message) instead and a message can only be returned in this case.
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("Hello!").await?;
   /// }
@@ -329,11 +329,11 @@ impl CommandResponder {
 
   /// Respond to an interaction by editing the original message.\
   /// If interaction has already been responded to, this function will call [`edit_original_message`](CommandResponder::edit_original_message) instead and a message can only be returned in this case.
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// # use slashook::structs::components::{Components, Button};
-  /// ##[command("example_button")]
+  /// ##[command(name = "example_button", ignore = true)]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.update_message("Button was clicked!").await?;
   /// }
@@ -358,10 +358,10 @@ impl CommandResponder {
   /// If you don't respond within 3 seconds, Discord will disconnect and tell the user the interaction failed to run.
   /// By deferring, Discord will tell the user your bot is "thinking" and allow you to take your time. You can use the `send_followup_message` or `edit_original_message` methods to send the response.\
   /// The ephemeralness set here will be passed on to your first follow-up, no matter what ephemeralness you set there.
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.defer(false).await?;
   ///   // Do something that takes longer than 3s
@@ -377,10 +377,10 @@ impl CommandResponder {
   }
 
   /// Much like `defer` but for component interactions and it shows nothing visibly to the user.
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example_button")]
+  /// ##[command(name = "example_button", ignore = true)]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.defer_update().await?;
   ///   // Do something that takes longer than 3s
@@ -394,11 +394,14 @@ impl CommandResponder {
   }
 
   /// Respond to an autocomplete interaction with autocomplete choices
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// # use slashook::structs::interactions::ApplicationCommandOptionChoice;
-  /// ##[command("example")]
+  /// # use slashook::structs::interactions::{ApplicationCommandOptionChoice, InteractionOptionType};
+  /// ##[command(name = "example", description = "An example command", options = [{
+  ///   name = "choice", description = "Choose an option",
+  ///   autocomplete = true, option_type = InteractionOptionType::STRING
+  /// }])]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   if input.is_autocomplete() {
   ///     let search = input.args.get(&input.focused.unwrap()).unwrap().as_string().unwrap();
@@ -418,11 +421,11 @@ impl CommandResponder {
   }
 
   /// Respond to an interaction with a modal
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse, Modal};
   /// # use slashook::structs::components::{Components, TextInput};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   let text_input = TextInput::new()
   ///     .set_label("Tell us something")
@@ -440,10 +443,10 @@ impl CommandResponder {
   }
 
   /// Send more messages after the initial response
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("First message!").await?;
   ///   res.send_followup_message("Second message!").await?;
@@ -462,10 +465,10 @@ impl CommandResponder {
   }
 
   /// Edits a follow-up message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("First message!").await?;
   ///   let msg = res.send_followup_message("Second message!").await?;
@@ -497,10 +500,10 @@ impl CommandResponder {
 
   /// Gets the original message\
   /// Same as running `get_followup_message` with id of `@original`
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("First message!").await?;
   ///   let msg = res.get_original_message().await?;
@@ -512,10 +515,10 @@ impl CommandResponder {
   }
 
   /// Deletes a follow-up message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("First message!").await?;
   ///   let msg = res.send_followup_message("If you see me say hi").await?;
