@@ -14,7 +14,7 @@ use super::{
   Emoji,
   Permissions,
   stickers::Sticker,
-  users::User
+  users::User, utils::Color
 };
 use chrono::{DateTime, Utc};
 use bitflags::bitflags;
@@ -175,6 +175,10 @@ bitflags! {
     const SUPPRESS_GUILD_REMINDER_NOTIFICATIONS = 1 << 2;
     /// Hide member join sticker reply buttons
     const SUPPRESS_JOIN_NOTIFICATION_REPLIES = 1 << 3;
+    /// Suppress role subscription purchase and renewal notifications
+    const SUPPRESS_ROLE_SUBSCRIPTION_PURCHASE_NOTIFICATIONS = 1 << 4;
+    /// Hide role subscription sticker reply buttons
+    const SUPPRESS_ROLE_SUBSCRIPTION_PURCHASE_NOTIFICATION_REPLIES = 1 << 5;
   }
 }
 
@@ -246,19 +250,35 @@ pub struct GuildMember {
   /// Array of [role](Role) object ids
   pub roles: Vec<Snowflake>,
   /// When the user joined the guild
-  pub joined_at: String,
+  pub joined_at: DateTime<Utc>,
   /// When the user started [boosting](https://support.discord.com/hc/en-us/articles/360028038352-Server-Boosting-) the guild
-  pub premium_since: Option<String>,
+  pub premium_since: Option<DateTime<Utc>>,
   /// Whether the user is deafened in voice channels
   pub deaf: Option<bool>,
   /// Whether the user is muted in voice channels
   pub mute: Option<bool>,
+  /// [Guild member flags](GuildMemberFlags) represented as a bit set, defaults to 0
+  pub flags: GuildMemberFlags,
   /// Whether the user has not yet passed the guild's [Membership Screening](https://discord.com/developers/docs/resources/guild#membership-screening-object) requirements
   pub pending: Option<bool>,
   /// Total permissions of the member in the channel, including overwrites, returned when in the interaction object
   pub permissions: Option<Permissions>,
   /// When the user's [timeout](https://support.discord.com/hc/en-us/articles/4413305239191-Time-Out-FAQ) will expire and the user will be able to communicate in the guild again, None or a time in the past if the user is not timed out
   pub communication_disabled_until: Option<DateTime<Utc>>
+}
+
+bitflags! {
+  /// Discord Guild Member Flags
+  pub struct GuildMemberFlags: u32 {
+    /// Member has left and rejoined the guild
+    const DID_REJOIN = 1 << 0;
+    /// Member has completed onboarding
+    const COMPLETED_ONBOARDING = 1 << 1;
+    /// Member is exempt from guild verification requirements
+    const BYPASSES_VERIFICATION = 1 << 2;
+    /// Member has started onboarding
+    const STARTED_ONBOARDING = 1 << 3;
+  }
 }
 
 /// Discord Role Object
@@ -269,7 +289,7 @@ pub struct Role {
   /// Role name
   pub name: String,
   /// Integer representation of hexadecimal color code
-  pub color: i64,
+  pub color: Color,
   /// If this role is pinned in the user listing
   pub hoist: bool,
   /// Role [icon hash](https://discord.com/developers/docs/reference#image-formatting)
@@ -295,9 +315,17 @@ pub struct RoleTags {
   pub bot_id: Option<Snowflake>,
   /// The id of the integration this role belongs to
   pub integration_id: Option<Snowflake>,
-  /// Whether this is the guild's premium subscriber role
+  /// Whether this is the guild's Booster role
   #[serde(default, deserialize_with = "exists")]
-  pub premium_subscriber: bool
+  pub premium_subscriber: bool,
+  /// The id of this role's subscription sku and listing
+  pub subscription_listing_id: Option<Snowflake>,
+  /// Whether this role is available for purchase
+  #[serde(default, deserialize_with = "exists")]
+  pub available_for_purchase: bool,
+  /// Whether this role is a guild's linked role
+  #[serde(default, deserialize_with = "exists")]
+  pub guild_connections: bool,
 }
 
 /// Discord Guild Scheduled Event Object
@@ -393,6 +421,13 @@ fn exists<'de, D: Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
 }
 
 impl<'de> Deserialize<'de> for SystemChannelFlags {
+  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    let bits = u32::deserialize(d)?;
+    Ok(Self::from_bits_truncate(bits))
+  }
+}
+
+impl<'de> Deserialize<'de> for GuildMemberFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
     Ok(Self::from_bits_truncate(bits))
