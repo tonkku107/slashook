@@ -28,7 +28,8 @@ impl std::error::Error for InteractionResponseError { }
 
 /// Message that can be sent as a response to a command or other interaction
 ///
-/// This struct can be easily constructed from a `str`, `String`, [`Embed`](crate::structs::embeds::Embed) or [`Components`](crate::structs::components::Components)
+/// This struct can be easily constructed from a `str`, `String`, [`Embed`](crate::structs::embeds::Embed), [`Components`](crate::structs::components::Components)
+/// or [`File`](crate::structs::utils::File)
 /// with the `From` trait
 #[derive(Serialize, Clone, Debug)]
 pub struct MessageResponse {
@@ -592,6 +593,36 @@ impl From<Components> for MessageResponse {
       attachments: None,
       allowed_mentions: None,
       files: None
+    }
+  }
+}
+
+impl From<File> for MessageResponse {
+  fn from(f: File) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      flags: None,
+      embeds: None,
+      components: None,
+      attachments: None,
+      allowed_mentions: None,
+      files: Some(vec![f])
+    }
+  }
+}
+
+impl From<Vec<File>> for MessageResponse {
+  fn from(f: Vec<File>) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      flags: None,
+      embeds: None,
+      components: None,
+      attachments: None,
+      allowed_mentions: None,
+      files: Some(f)
     }
   }
 }
