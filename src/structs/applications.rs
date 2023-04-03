@@ -51,7 +51,7 @@ pub struct Application {
   pub slug: Option<String>,
   /// The application's default rich presence invite [cover image hash](https://discord.com/developers/docs/reference#image-formatting)
   pub cover_image: Option<String>,
-  /// The application's public [flags](https://discord.com/developers/docs/resources/application#application-object-application-flags)
+  /// The application's public [flags](ApplicationFlags)
   pub flags: Option<ApplicationFlags>,
   /// Settings for the application's default in-app authorization link, if enabled
   pub install_params: Option<InstallParams>,

@@ -14,7 +14,8 @@ use super::{
   Emoji,
   Permissions,
   stickers::Sticker,
-  users::User, utils::Color
+  users::User,
+  utils::Color
 };
 use chrono::{DateTime, Utc};
 use bitflags::bitflags;
@@ -288,7 +289,7 @@ pub struct Role {
   pub id: Snowflake,
   /// Role name
   pub name: String,
-  /// Integer representation of hexadecimal color code
+  /// Role color
   pub color: Color,
   /// If this role is pinned in the user listing
   pub hoist: bool,

@@ -350,7 +350,7 @@ pub struct Message {
   /// A generally increasing integer (there may be gaps or duplicates) that represents the approximate position of the message in a thread, it can be used to estimate the relative position of the message in a thread in company with `total_message_sent` on parent thread
   pub position: Option<i64>,
   /// Data of the role subscription purchase or renewal that prompted this ROLE_SUBSCRIPTION_PURCHASE message
-  pub role_subcription_data: Option<RoleSubscriptionData>,
+  pub role_subscription_data: Option<RoleSubscriptionData>,
 }
 
 /// Discord Channel Mention Object

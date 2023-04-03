@@ -95,7 +95,7 @@ pub enum PremiumType {
   NITRO_CLASSIC = 1,
   /// User has Nitro
   NITRO = 2,
-  /// User hhas Nitro Basic
+  /// User has Nitro Basic
   NITRO_BASIC = 3,
   /// A premium type that hasn't been implemented yet
   UNKNOWN
