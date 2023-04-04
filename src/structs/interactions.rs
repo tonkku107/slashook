@@ -156,6 +156,7 @@ pub struct Interaction {
   pub token: String,
   pub version: u8,
   pub message: Option<Message>,
+  pub app_permissions: Option<Permissions>,
   pub locale: Option<String>,
   pub guild_locale: Option<String>
 }
@@ -188,10 +189,11 @@ pub struct InteractionData {
   pub command_type: Option<ApplicationCommandType>,
   pub resolved: Option<InteractionDataResolved>,
   pub options: Option<Vec<InteractionOption>>,
+  pub guild_id: Option<Snowflake>,
+  pub target_id: Option<Snowflake>,
   pub custom_id: Option<String>,
   pub component_type: Option<ComponentType>,
   pub values: Option<Vec<String>>,
-  pub target_id: Option<Snowflake>,
   pub components: Option<Vec<Component>>
 }
 

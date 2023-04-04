@@ -25,7 +25,8 @@ use crate::structs::{
   channels::Message,
   users::User,
   guilds::GuildMember,
-  Snowflake
+  Snowflake,
+  Permissions
 };
 use super::{Command, responder::{CommandResponder, CommandResponse}};
 use crate::rest::Rest;
@@ -90,6 +91,8 @@ pub struct CommandInput {
   ///
   /// Only included in command autocomplete interactions
   pub focused: Option<String>,
+  /// Permissions the app or bot has within the channel the interaction was sent from
+  pub app_permissions: Option<Permissions>,
   /// The selected [language](https://discord.com/developers/docs/reference#locales) of the user
   pub locale: String,
   /// The guild's preferred locale
@@ -401,6 +404,7 @@ impl CommandHandler {
       values: None,
       resolved_values: None,
       focused: None,
+      app_permissions: interaction.app_permissions,
       locale: interaction.locale.context("Interaction didn't include a locale")?,
       guild_locale: interaction.guild_locale,
       rest: Rest::with_optional_token(bot_token)

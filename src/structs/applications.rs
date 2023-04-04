@@ -8,10 +8,11 @@
 //! Structs related to Discord applications
 
 use serde::{Deserialize, de::Deserializer};
-use serde_repr::{Deserialize_repr};
+use serde_repr::Deserialize_repr;
 use super::{
   Snowflake,
-  users::User
+  users::User,
+  Permissions
 };
 use bitflags::bitflags;
 
@@ -38,8 +39,6 @@ pub struct Application {
   pub privacy_policy_url: Option<String>,
   /// Partial user object containing info on the owner of the application
   pub owner: Option<User>,
-  /// If this application is a game sold on Discord, this field will be the summary field for the store page of its primary sku
-  pub summary: String,
   /// The hex encoded key for verification in interactions and the GameSDK's [GetTicket](https://discord.com/developers/docs/game-sdk/applications#getticket)
   pub verify_key: String,
   /// If the application belongs to a team, this will be the list of the members of that team
@@ -52,30 +51,47 @@ pub struct Application {
   pub slug: Option<String>,
   /// The application's default rich presence invite [cover image hash](https://discord.com/developers/docs/reference#image-formatting)
   pub cover_image: Option<String>,
-  /// The application's public [flags](https://discord.com/developers/docs/resources/application#application-object-application-flags)
-  pub flags: Option<ApplicationFlags>
+  /// The application's public [flags](ApplicationFlags)
+  pub flags: Option<ApplicationFlags>,
+  /// Settings for the application's default in-app authorization link, if enabled
+  pub install_params: Option<InstallParams>,
+  /// The application's default custom authorization link, if enabled
+  pub custom_install_url: Option<String>,
+  /// The application's role connection verification entry point, which when configured will render the app as a verification method in the guild role verification configuration
+  pub role_connections_verification_url: Option<String>,
 }
 
 bitflags! {
   /// Bitflags for Discord Application Flags
   pub struct ApplicationFlags: u32 {
-    /// Has presence intent
+    /// Intent required for bots in **100 or more servers** to receive `presence_update` events
     const GATEWAY_PRESENCE = 1 << 12;
-    /// Enabled unverified presence intent
+    /// Intent required for bots in under 100 servers to receive `presence_update` events, found in Bot Settings
     const GATEWAY_PRESENCE_LIMITED = 1 << 13;
-    /// Has server members intent
+    /// Intent required for bots in **100 or more servers** to receive member-related events like `guild_member_add`. See list of member-related events [under `GUILD_MEMBERS`](https://discord.com/developers/docs/topics/gateway#list-of-intents)
     const GATEWAY_GUILD_MEMBERS = 1 << 14;
-    /// Enabled unverified server members intent
+    /// Intent required for bots in under 100 servers to receive member-related events like `guild_member_add`, found in Bot Settings. See list of member-related events [under `GUILD_MEMBERS`](https://discord.com/developers/docs/topics/gateway#list-of-intents)
     const GATEWAY_GUILD_MEMBERS_LIMITED = 1 << 15;
-    /// Increased guild limit for applications pending verification
+    /// Indicates unusual growth of an app that prevents verification
     const VERIFICATION_PENDING_GUILD_LIMIT = 1 << 16;
-    /// Embedded activity
+    /// Indicates if an app is embedded within the Discord client (currently unavailable publicly)
     const EMBEDDED = 1 << 17;
-    /// Has message content intent
+    /// Intent required for bots in **100 or more servers** to receive [message content](https://support-dev.discord.com/hc/en-us/articles/4404772028055)
     const GATEWAY_MESSAGE_CONTENT = 1 << 18;
-    /// Enabled unverified message content intent
+    /// Intent required for bots in under 100 servers to receive [message content](https://support-dev.discord.com/hc/en-us/articles/4404772028055), found in Bot Settings
     const GATEWAY_MESSAGE_CONTENT_LIMITED = 1 << 19;
+    /// Indicates if an app has registered global [application commands](super::interactions::ApplicationCommand)
+    const APPLICATION_COMMAND_BADGE = 1 << 23;
   }
+}
+
+/// Discord Install Params Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct InstallParams {
+  /// The [scopes](https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes) to add the application to the server with
+  pub scopes: Vec<String>,
+  /// The [permissions](Permissions) to request for the bot role
+  pub permissions: Permissions
 }
 
 /// Discord Team Object

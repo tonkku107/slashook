@@ -79,6 +79,8 @@ bitflags! {
     const CERTIFIED_MODERATOR = 1 << 18;
     /// Bot uses only [HTTP interactions](https://discord.com/developers/docs/interactions/receiving-and-responding#receiving-an-interaction) and is shown in the online member list
     const BOT_HTTP_INTERACTIONS = 1 << 19;
+    /// User is an [Active Developer](https://support-dev.discord.com/hc/articles/10113997751447)
+    const ACTIVE_DEVELOPER = 1 << 22;
   }
 }
 
@@ -93,6 +95,8 @@ pub enum PremiumType {
   NITRO_CLASSIC = 1,
   /// User has Nitro
   NITRO = 2,
+  /// User has Nitro Basic
+  NITRO_BASIC = 3,
   /// A premium type that hasn't been implemented yet
   UNKNOWN
 }

@@ -39,9 +39,9 @@ bitflags! {
     const PRIORITY_SPEAKER = 1 << 8;
     /// Allows the user to go live
     const STREAM = 1 << 9;
-    /// Allows guild members to view a channel, which includes reading messages in text channels
+    /// Allows guild members to view a channel, which includes reading messages in text channels and joining voice channels
     const VIEW_CHANNEL = 1 << 10;
-    /// Allows for sending messages in a channel (does not allow sending messages in threads)
+    /// Allows for sending messages in a channel and creating threads in a forum (does not allow sending messages in threads)
     const SEND_MESSAGES = 1 << 11;
     /// Allows for sending of `/tts` messages
     const SEND_TTS_MESSAGES = 1 << 12;
@@ -53,7 +53,7 @@ bitflags! {
     const ATTACH_FILES = 1 << 15;
     /// Allows for reading of message history
     const READ_MESSAGE_HISTORY = 1 << 16;
-    /// Allows for using the @everyone tag to notify all users in a channel, and the @here tag to notify all online users in a channel
+    /// Allows for using the `@everyone` tag to notify all users in a channel, and the `@here` tag to notify all online users in a channel
     const MENTION_EVERYONE = 1 << 17;
     /// Allows the usage of custom emojis from other servers
     const USE_EXTERNAL_EMOJIS = 1 << 18;

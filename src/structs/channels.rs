@@ -67,6 +67,8 @@ pub struct Channel {
   pub owner_id: Option<Snowflake>,
   /// Application id of the group DM creator if it is bot-created
   pub application_id: Option<Snowflake>,
+  /// For group DM channels: whether the channel is managed by an application via the `gdm.join` OAuth2 scope
+  pub managed: Option<bool>,
   /// For guild channels: id of the parent category for a channel (each parent category can contain up to 50 channels), for threads: id of the text channel this thread was created
   pub parent_id: Option<Snowflake>,
   /// When the last pinned message was pinned. This may be `None` in events such as `GUILD_CREATE` when a message is not pinned.
@@ -83,7 +85,7 @@ pub struct Channel {
   pub thread_metadata: Option<ThreadMetadata>,
   /// Thread member object for the current user, if they have joined the thread, only included on certain API endpoints
   pub member: Option<ThreadMember>,
-  /// Default duration for newly created threads, in minutes, to automatically archive the thread after recent activity, can be set to: 60, 1440, 4320, 10080
+  /// Default duration, copied onto newly created threads, in minutes, threads will stop showing in the channel list after the specified period of inactivity, can be set to: 60, 1440, 4320, 10080
   pub default_auto_archive_duration: Option<i64>,
   /// Computed permissions for the invoking user in the channel, including overwrites, only included when part of the `resolved` data received on a slash command interaction
   pub permissions: Option<Permissions>,
@@ -101,6 +103,8 @@ pub struct Channel {
   pub default_thread_rate_limit_per_user: Option<i64>,
   /// The [default sort order type](SortOrderType) used to order posts in `GUILD_FORUM` channels. Defaults to `None`, which indicates a preferred sort order hasn't been set by a channel admin
   pub default_sort_order: Option<SortOrderType>,
+  /// The [default forum layout view](ForumLayoutType) used to display posts in `GUILD_FORUM` channels. Defaults to `NOT_SET`, which indicates a layout view has not been set by a channel admin
+  pub default_forum_layout: Option<ForumLayoutType>,
 }
 
 /// Discord Channel Types
@@ -118,18 +122,20 @@ pub enum ChannelType {
   GROUP_DM = 3,
   /// An [organizational category](https://support.discord.com/hc/en-us/articles/115001580171-Channel-Categories-101) that contains up to 50 channels
   GUILD_CATEGORY = 4,
-  /// A channel that [users can follow and crosspost into their own server](https://support.discord.com/hc/en-us/articles/360032008192)
-  GUILD_NEWS = 5,
-  /// A channel in which game developers can [sell their game on Discord](https://discord.com/developers/docs/game-and-server-management/special-channels)
-  GUILD_STORE = 6,
-  /// A temporary sub-channel within a GUILD_NEWS channel
-  GUILD_NEWS_THREAD = 10,
-  /// A temporary sub-channel within a GUILD_TEXT channel
+  /// A channel that [users can follow and crosspost into their own server](https://support.discord.com/hc/en-us/articles/360032008192) (formerly news channels)
+  GUILD_ANNOUNCEMENT = 5,
+  /// A temporary sub-channel within a GUILD_ANNOUNCEMENT channel
+  ANNOUNCEMENT_THREAD = 10,
+  /// A temporary sub-channel within a GUILD_TEXT or GUILD_FORUM channel
   GUILD_PUBLIC_THREAD = 11,
   /// A temporary sub-channel within a GUILD_TEXT channel that is only viewable by those invited and those with the MANAGE_THREADS permission
   GUILD_PRIVATE_THREAD = 12,
   /// A voice channel for [hosting events with an audience](https://support.discord.com/hc/en-us/articles/1500005513722)
   GUILD_STAGE_VOICE = 13,
+  /// The channel in a [hub](https://support.discord.com/hc/en-us/articles/4406046651927-Discord-Student-Hubs-FAQ) containing the listed servers
+  GUILD_DIRECTORY = 14,
+  /// Channel that can only contain threads
+  GUILD_FORUM = 15,
   /// Channel type that hasn't been implemented yet
   UNKNOWN
 }
@@ -179,7 +185,7 @@ pub enum VideoQualityMode {
 pub struct ThreadMetadata {
   /// Whether the thread is archived
   pub archived: bool,
-  /// Duration in minutes to automatically archive the thread after recent activity, can be set to: 60, 1440, 4320, 10080
+  /// The thread will stop showing in the channel list after `auto_archive_duration` minutes of inactivity, can be set to: 60, 1440, 4320, 10080
   pub auto_archive_duration: i64,
   /// Timestamp when the thread's archive status was last changed, used for calculating recent activity
   pub archive_timestamp: DateTime<Utc>,
@@ -198,10 +204,12 @@ pub struct ThreadMember {
   pub id: Option<Snowflake>,
   /// The id of the user
   pub user_id: Option<Snowflake>,
-  /// The time the current user last joined the thread
+  /// Time the user last joined the thread
   pub join_timestamp: DateTime<Utc>,
   /// Any user-thread settings, currently only used for notifications
-  pub flags: i64
+  pub flags: i64,
+  /// Additional information about the user
+  pub member: Option<GuildMember>,
 }
 
 bitflags! {
@@ -248,6 +256,21 @@ pub enum SortOrderType {
   /// Sort forum posts by creation time (from most recent to oldest)
   CREATION_DATE = 1,
   /// Sort order type that hasn't been implemented yet
+  UNKNOWN
+}
+
+/// Discord Sort Order Types
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum ForumLayoutType {
+  /// No default has been set for forum channel
+  NOT_SET = 0,
+  /// Display posts as a list
+  LIST_VIEW = 1,
+  /// Display posts as a collection of tiles
+  GALLERY_VIEW = 2,
+  /// Forum layout type that hasn't been implemented yet
   UNKNOWN
 }
 
@@ -323,7 +346,11 @@ pub struct Message {
   /// Sent if the message contains components like buttons, action rows, or other interactive components
   pub components: Option<Vec<Component>>,
   /// Sent if the message contains stickers
-  pub sticker_items: Option<Vec<StickerItem>>
+  pub sticker_items: Option<Vec<StickerItem>>,
+  /// A generally increasing integer (there may be gaps or duplicates) that represents the approximate position of the message in a thread, it can be used to estimate the relative position of the message in a thread in company with `total_message_sent` on parent thread
+  pub position: Option<i64>,
+  /// Data of the role subscription purchase or renewal that prompted this ROLE_SUBSCRIPTION_PURCHASE message
+  pub role_subscription_data: Option<RoleSubscriptionData>,
 }
 
 /// Discord Channel Mention Object
@@ -396,15 +423,15 @@ pub enum MessageType {
   /// A message was pinned
   CHANNEL_PINNED_MESSAGE = 6,
   /// A new member joined a server
-  GUILD_MEMBER_JOIN = 7,
+  USER_JOIN = 7,
   /// A member boosted the server
-  USER_PREMIUM_GUILD_SUBSCRIPTION = 8,
+  GUILD_BOOST = 8,
   /// A member boosted the server and reached tier 1
-  USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_1 = 9,
+  GUILD_BOOST_TIER_1 = 9,
   /// A member boosted the server and reached tier 2
-  USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_2 = 10,
+  GUILD_BOOST_TIER_2 = 10,
   /// A member boosted the server and reached tier 3
-  USER_PREMIUM_GUILD_SUBSCRIPTION_TIER_3 = 11,
+  GUILD_BOOST_TIER_3 = 11,
   /// A news channel followed
   CHANNEL_FOLLOW_ADD = 12,
   /// Server is no longer qualified for discovery
@@ -427,6 +454,22 @@ pub enum MessageType {
   GUILD_INVITE_REMINDER = 22,
   /// Message was sent from a context menu command
   CONTEXT_MENU_COMMAND = 23,
+  /// AutoMod alert message
+  AUTO_MODERATION_ACTION = 24,
+  /// User purchased a server subscription
+  ROLE_SUBSCRIPTION_PURCHASE = 25,
+  /// Interaction premium upsell
+  INTERACTION_PREMIUM_UPSELL = 26,
+  /// A stage event was started
+  STAGE_START = 27,
+  /// A stage event was ended
+  STAGE_END = 28,
+  /// Someone became a speaker
+  STAGE_SPEAKER = 29,
+  /// Stage topic was changed
+  STAGE_TOPIC = 31,
+  /// Application premium subscription
+  GUILD_APPLICATION_PREMIUM_SUBSCRIPTION = 32,
   /// A message type that hasn't been implemented yet
   UNKNOWN
 }
@@ -490,6 +533,10 @@ bitflags! {
     const EPHEMERAL = 1 << 6;
     /// This message is an Interaction Response and the bot is "thinking"
     const LOADING = 1 << 7;
+    /// This message failed to mention some roles and add their members to the thread
+    const FAILED_TO_MENTION_SOME_ROLES_IN_THREAD = 1 << 8;
+    /// This message will not trigger push and desktop notifications
+    const SUPPRESS_NOTIFICATIONS = 1 << 12;
   }
 }
 
@@ -532,6 +579,19 @@ pub enum AllowedMentionType {
   users,
   /// Allowed to mention @everyone and @here
   everyone
+}
+
+/// Discord Role Subscription Data Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct RoleSubscriptionData {
+  /// The id of the sku and listing that the user is subscribed to
+  pub role_subscription_listing_id: Snowflake,
+  /// The name of the tier that the user is subscribed to
+  pub tier_name: String,
+  /// The cumulative number of months that the user has been subscribed for
+  pub total_months_subscribed: i64,
+  /// Whether this notification is for a renewal rather than a new purchase
+  pub is_renewal: bool,
 }
 
 /// Parameters for modifying a channel with [modify](Channel::modify).
@@ -594,6 +654,9 @@ pub struct ChannelModifyOptions {
   /// The [default sort order type](SortOrderType) used to order posts in `GUILD_FORUM` channels
   #[serde(skip_serializing_if = "Option::is_none")]
   pub default_sort_order: Option<SortOrderType>,
+  /// The [default forum layout type](ForumLayoutType) used to display posts in `GUILD_FORUM` channels
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_forum_layout: Option<ForumLayoutType>,
   /// Whether the thread is archived
   #[serde(skip_serializing_if = "Option::is_none")]
   pub archived: Option<bool>,
@@ -885,7 +948,7 @@ impl Message {
     rest.delete(format!("channels/{}/messages/{}", self.channel_id, self.id)).await
   }
 
-  /// Publish a message that was posted in an [Announcement channel](ChannelType::GUILD_NEWS)
+  /// Publish a message that was posted in an [Announcement channel](ChannelType::GUILD_ANNOUNCEMENT)
   /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
@@ -1125,6 +1188,7 @@ impl ChannelModifyOptions {
       default_reaction_emoji: None,
       default_thread_rate_limit_per_user: None,
       default_sort_order: None,
+      default_forum_layout: None,
       archived: None,
       auto_archive_duration: None,
       locked: None,
@@ -1246,6 +1310,12 @@ impl ChannelModifyOptions {
   /// Sets the default sort order
   pub fn set_default_sort_order(mut self, sort_order: SortOrderType) -> Self {
     self.default_sort_order = Some(sort_order);
+    self
+  }
+
+  /// Sets the default forum layout
+  pub fn set_default_forum_layout(mut self, forum_layout: ForumLayoutType) -> Self {
+    self.default_forum_layout = Some(forum_layout);
     self
   }
 
