@@ -582,6 +582,21 @@ impl From<Embed> for MessageResponse {
   }
 }
 
+impl From<Vec<Embed>> for MessageResponse {
+  fn from(e: Vec<Embed>) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      flags: None,
+      embeds: Some(e),
+      components: None,
+      attachments: None,
+      allowed_mentions: None,
+      files: None
+    }
+  }
+}
+
 impl From<Components> for MessageResponse {
   fn from(c: Components) -> MessageResponse {
     MessageResponse {
