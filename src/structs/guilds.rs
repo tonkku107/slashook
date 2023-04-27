@@ -167,6 +167,7 @@ pub enum MFALevel {
 
 bitflags! {
   /// Bitflags for Discord System Channel Flags
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct SystemChannelFlags: u32 {
     /// Suppress member join notifications
     const SUPPRESS_JOIN_NOTIFICATIONS = 1 << 0;
@@ -270,6 +271,7 @@ pub struct GuildMember {
 
 bitflags! {
   /// Discord Guild Member Flags
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct GuildMemberFlags: u32 {
     /// Member has left and rejoined the guild
     const DID_REJOIN = 1 << 0;
@@ -424,13 +426,13 @@ fn exists<'de, D: Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
 impl<'de> Deserialize<'de> for SystemChannelFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
-    Ok(Self::from_bits_truncate(bits))
+    Ok(Self::from_bits_retain(bits))
   }
 }
 
 impl<'de> Deserialize<'de> for GuildMemberFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
-    Ok(Self::from_bits_truncate(bits))
+    Ok(Self::from_bits_retain(bits))
   }
 }

@@ -18,6 +18,7 @@ bitflags! {
   /// assert_eq!(permissions.contains(Permissions::SEND_MESSAGES), true);
   /// assert_eq!(permissions.contains(Permissions::MANAGE_MESSAGES), false);
   /// ```
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct Permissions: u64 {
     /// Allows creation of instant invites
     const CREATE_INSTANT_INVITE = 1 << 0;
@@ -79,8 +80,8 @@ bitflags! {
     const MANAGE_ROLES = 1 << 28;
     /// Allows management and editing of webhooks
     const MANAGE_WEBHOOKS = 1 << 29;
-    /// Allows management and editing of emojis and stickers
-    const MANAGE_EMOJIS_AND_STICKERS = 1 << 30;
+    /// Allows management and editing of emojis, stickers, and soundboard sounds
+    const MANAGE_GUILD_EXPERSSIONS = 1 << 30;
     /// Allows members to use application commands, including slash commands and context menu commands.
     const USE_APPLICATION_COMMANDS = 1 << 31;
     /// Allows for requesting to speak in stage channels.
@@ -97,16 +98,24 @@ bitflags! {
     const USE_EXTERNAL_STICKERS = 1 << 37;
     /// Allows for sending messages in threads
     const SEND_MESSAGES_IN_THREADS = 1 << 38;
-    /// Allows for launching activities (applications with the [`EMBEDDED`](crate::structs::applications::ApplicationFlags::EMBEDDED) flag) in a voice channel
-    const START_EMBEDDED_ACTIVITIES = 1 << 39;
+    /// Allows for using Activities (applications with the [`EMBEDDED`](crate::structs::applications::ApplicationFlags::EMBEDDED) flag) in a voice channel
+    const USE_EMBEDDED_ACTIVITIES = 1 << 39;
     /// Allows for timing out users to prevent them from sending or reacting to messages in chat and threads, and from speaking in voice and stage channels
     const MODERATE_MEMBERS = 1 << 40;
+    /// Allows for viewing role subscription insights
+    const VIEW_CREATOR_MONETIZATION_ANALYTICS = 1 << 41;
+    /// Allows for using soundboard in a voice channel
+    const USE_SOUNDBOARD = 1 << 42;
+    /// Allows the usage of custom soundboard sounds from other servers
+    const USE_EXTERNAL_SOUNDS = 1 << 45;
+    /// Allows sending voice messages
+    const SEND_VOICE_MESSAGES = 1 << 46;
   }
 }
 
 impl From<u64> for Permissions {
   fn from(value: u64) -> Self {
-    Self::from_bits_truncate(value)
+    Self::from_bits_retain(value)
   }
 }
 
@@ -114,12 +123,12 @@ impl<'de> Deserialize<'de> for Permissions {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let string = String::deserialize(d)?;
     let bits: u64 = string.parse().map_err(de::Error::custom)?;
-    Ok(Self::from_bits_truncate(bits))
+    Ok(Self::from_bits_retain(bits))
   }
 }
 
 impl Serialize for Permissions {
   fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
-    s.serialize_u64(self.bits())
+    s.collect_str(&self.bits())
   }
 }
