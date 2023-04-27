@@ -580,7 +580,7 @@ impl SelectOption {
   /// let option = SelectOption::new("Option label", "Option value")
   ///   .set_default(true);
   /// ```
-  pub fn set_default(&mut self, default: bool) -> &Self {
+  pub fn set_default(mut self, default: bool) -> Self {
     self.default = Some(default);
     self
   }
