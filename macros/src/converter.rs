@@ -13,8 +13,7 @@ pub(crate) fn convert_block(block: Block) -> Block {
 
   for statement in existing_statements.into_iter() {
     let expression = match statement {
-      Stmt::Expr(expr) => expr,
-      Stmt::Semi(expr, _) => expr,
+      Stmt::Expr(expr, _) => expr,
       _ => {
         new_statements.push(statement);
         continue
