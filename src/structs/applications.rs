@@ -63,6 +63,7 @@ pub struct Application {
 
 bitflags! {
   /// Bitflags for Discord Application Flags
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct ApplicationFlags: u32 {
     /// Intent required for bots in **100 or more servers** to receive `presence_update` events
     const GATEWAY_PRESENCE = 1 << 12;
@@ -138,6 +139,6 @@ pub enum TeamMembershipState {
 impl<'de> Deserialize<'de> for ApplicationFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
-    Ok(Self::from_bits_truncate(bits))
+    Ok(Self::from_bits_retain(bits))
   }
 }

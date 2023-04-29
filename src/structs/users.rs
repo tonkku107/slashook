@@ -50,6 +50,7 @@ pub struct User {
 
 bitflags! {
   /// Bitflags for Discord User Flags
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct UserFlags: u32 {
     /// Discord Employee
     const STAFF = 1 << 0;
@@ -116,7 +117,7 @@ impl User {
 impl<'de> Deserialize<'de> for UserFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
-    Ok(Self::from_bits_truncate(bits))
+    Ok(Self::from_bits_retain(bits))
   }
 }
 

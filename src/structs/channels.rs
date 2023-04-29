@@ -214,6 +214,7 @@ pub struct ThreadMember {
 
 bitflags! {
   /// Bitflags for Discord Channel Flags
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct ChannelFlags: u32 {
     /// This thread is pinned to the top of its parent `GUILD_FORUM` channel
     const PINNED = 1 << 1;
@@ -516,6 +517,7 @@ pub struct MessageReference {
 
 bitflags! {
   /// Bitflags for Discord Message Flags
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct MessageFlags: u32 {
     /// This message has been published to subscribed channels (via Channel Following)
     const CROSSPOSTED = 1 << 0;
@@ -1426,7 +1428,7 @@ impl Default for AllowedMentions {
 impl<'de> Deserialize<'de> for ChannelFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
-    Ok(Self::from_bits_truncate(bits))
+    Ok(Self::from_bits_retain(bits))
   }
 }
 
@@ -1439,7 +1441,7 @@ impl Serialize for ChannelFlags {
 impl<'de> Deserialize<'de> for MessageFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
-    Ok(Self::from_bits_truncate(bits))
+    Ok(Self::from_bits_retain(bits))
   }
 }
 
