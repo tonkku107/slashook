@@ -150,7 +150,7 @@ impl CommandHandler {
     }
   }
 
-  fn parse_options(&self, options: Vec<InteractionOption>, resolved: &Option<InteractionDataResolved>, mut input: &mut CommandInput) -> anyhow::Result<()> {
+  fn parse_options(&self, options: Vec<InteractionOption>, resolved: &Option<InteractionDataResolved>, input: &mut CommandInput) -> anyhow::Result<()> {
     for option in options.into_iter() {
       let option_value = match option.option_type {
         InteractionOptionType::SUB_COMMAND_GROUP => {
@@ -230,7 +230,7 @@ impl CommandHandler {
     Ok(())
   }
 
-  fn parse_select_values(&self, values: Vec<String>, resolved: &Option<InteractionDataResolved>, mut input: &mut CommandInput) -> anyhow::Result<()> {
+  fn parse_select_values(&self, values: Vec<String>, resolved: &Option<InteractionDataResolved>, input: &mut CommandInput) -> anyhow::Result<()> {
     let mut resolved_values = Vec::new();
     match input.component_type.as_ref().context("Somehow trying to parse values without a component type")? {
       ComponentType::USER_SELECT => {
@@ -311,7 +311,7 @@ impl CommandHandler {
     }
   }
 
-  fn parse_resolved(&self, resolved: Option<InteractionDataResolved>, target_id: Option<String>, mut input: &mut CommandInput) -> anyhow::Result<()> {
+  fn parse_resolved(&self, resolved: Option<InteractionDataResolved>, target_id: Option<String>, input: &mut CommandInput) -> anyhow::Result<()> {
     match input.command_type.as_ref().context("Somehow trying to parse resolved without a command type")? {
       ApplicationCommandType::USER => {
         let target_id = target_id.context("User context menu command has no target")?;
