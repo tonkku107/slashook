@@ -135,16 +135,16 @@ impl Clone for Command {
   fn clone(&self) -> Self {
     Self {
       func: Box::new(dummy),
-      ignore: self.ignore.clone(),
+      ignore: self.ignore,
       name: self.name.clone(),
       name_localizations: self.name_localizations.clone(),
       command_type: self.command_type.clone(),
       description: self.description.clone(),
       description_localizations: self.description_localizations.clone(),
       options: self.options.clone(),
-      default_member_permissions: self.default_member_permissions.clone(),
-      dm_permission: self.dm_permission.clone(),
-      nsfw: self.nsfw.clone(),
+      default_member_permissions: self.default_member_permissions,
+      dm_permission: self.dm_permission,
+      nsfw: self.nsfw,
       subcommand_groups: self.subcommand_groups.clone(),
       subcommands: self.subcommands.clone(),
     }

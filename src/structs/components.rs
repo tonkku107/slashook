@@ -735,14 +735,14 @@ impl Default for TextInputStyle {
   }
 }
 
-impl Into<ComponentType> for SelectMenuType {
-  fn into(self) -> ComponentType {
-    match self {
-      SelectMenuType::STRING => ComponentType::STRING_SELECT,
-      SelectMenuType::USER => ComponentType::USER_SELECT,
-      SelectMenuType::ROLE => ComponentType::ROLE_SELECT,
-      SelectMenuType::MENTIONABLE => ComponentType::MENTIONABLE_SELECT,
-      SelectMenuType::CHANNEL => ComponentType::CHANNEL_SELECT,
+impl From<SelectMenuType> for ComponentType {
+  fn from(menu_type: SelectMenuType) -> Self {
+    match menu_type {
+      SelectMenuType::STRING => Self::STRING_SELECT,
+      SelectMenuType::USER => Self::USER_SELECT,
+      SelectMenuType::ROLE => Self::ROLE_SELECT,
+      SelectMenuType::MENTIONABLE => Self::MENTIONABLE_SELECT,
+      SelectMenuType::CHANNEL => Self::CHANNEL_SELECT,
     }
   }
 }

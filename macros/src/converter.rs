@@ -35,7 +35,7 @@ fn convert_expr(expression: Expr) -> Expr {
   match expression {
     Expr::Return(ret) => {
       let inner = ret.expr;
-      return parse_quote! {
+      parse_quote! {
         {
           #inner;
           return Ok(());
@@ -44,24 +44,24 @@ fn convert_expr(expression: Expr) -> Expr {
     },
     Expr::Block(blokky) => {
       let new_block = convert_block(blokky.block);
-      return parse_quote!(#new_block);
+      parse_quote!(#new_block)
     },
     Expr::If(mut iffy) => {
       iffy.then_branch = convert_block(iffy.then_branch);
       iffy.else_branch = iffy.else_branch.map(|(token, expr)| (token, Box::new(convert_expr(*expr))));
-      return parse_quote!(#iffy);
+      parse_quote!(#iffy)
     },
     Expr::ForLoop(mut loopy) => {
       loopy.body = convert_block(loopy.body);
-      return parse_quote!(#loopy);
+      parse_quote!(#loopy)
     },
     Expr::Loop(mut loopy) => {
       loopy.body = convert_block(loopy.body);
-      return parse_quote!(#loopy);
+      parse_quote!(#loopy)
     },
     Expr::While(mut while_loopy) => {
       while_loopy.body = convert_block(while_loopy.body);
-      return parse_quote!(#while_loopy);
+      parse_quote!(#while_loopy)
     },
     Expr::Match(mut matchy) => {
       let arms = matchy.arms;
@@ -71,7 +71,7 @@ fn convert_expr(expression: Expr) -> Expr {
         new_arms.push(arm);
       }
       matchy.arms = new_arms;
-      return parse_quote!(#matchy);
+      parse_quote!(#matchy)
     },
     _ => expression
   }
