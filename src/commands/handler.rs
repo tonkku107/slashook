@@ -22,7 +22,7 @@ use crate::structs::{
     OptionValue
   },
   components::{Component, ComponentType},
-  channels::Message,
+  channels::{Channel, Message},
   users::User,
   guilds::GuildMember,
   Snowflake,
@@ -61,6 +61,8 @@ pub struct CommandInput {
   pub guild_id: Option<Snowflake>,
   /// The ID of the channel the command was sent from
   pub channel_id: Option<Snowflake>,
+  /// The channel the command was sent from
+  pub channel: Option<Channel>,
   /// The user that ran the command
   pub user: User,
   /// If the command was executed in a guild, the member object of the user
@@ -394,6 +396,7 @@ impl CommandHandler {
       resolved: None,
       guild_id: interaction.guild_id,
       channel_id: interaction.channel_id,
+      channel: interaction.channel,
       user: self.parse_user(interaction.user, &interaction.member)?,
       member: interaction.member,
       message: interaction.message,
