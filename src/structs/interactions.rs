@@ -150,6 +150,7 @@ pub struct Interaction {
   pub interaction_type: InteractionType,
   pub data: Option<InteractionData>,
   pub guild_id: Option<Snowflake>,
+  pub channel: Option<Channel>,
   pub channel_id: Option<Snowflake>,
   pub member: Option<GuildMember>,
   pub user: Option<User>,
