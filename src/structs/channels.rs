@@ -18,7 +18,7 @@ use super::{
   embeds::Embed,
   emojis::Emoji,
   guilds::GuildMember,
-  interactions::InteractionType,
+  interactions::{InteractionType, InteractionDataResolved},
   invites::{Invite, CreateInviteOptions},
   permissions::Permissions,
   stickers::StickerItem,
@@ -352,6 +352,8 @@ pub struct Message {
   pub position: Option<i64>,
   /// Data of the role subscription purchase or renewal that prompted this ROLE_SUBSCRIPTION_PURCHASE message
   pub role_subscription_data: Option<RoleSubscriptionData>,
+  /// Data for users, members, channels, and roles in the message's [auto-populated select menus](crate::structs::components::SelectMenu)
+  pub resolved: Option<InteractionDataResolved>,
 }
 
 /// Discord Channel Mention Object
