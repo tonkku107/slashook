@@ -574,13 +574,14 @@ pub struct AllowedMentions {
 /// Discord Allowed Mention Types
 #[derive(Serialize, Clone, Debug)]
 #[allow(non_camel_case_types)]
+#[serde(rename_all = "lowercase")]
 pub enum AllowedMentionType {
   /// Allowed to mention roles
-  roles,
+  ROLES,
   /// Allowed to mention users
-  users,
+  USERS,
   /// Allowed to mention @everyone and @here
-  everyone
+  CHANNELS
 }
 
 /// Discord Role Subscription Data Object
@@ -1115,7 +1116,7 @@ impl AllowedMentions {
   /// ```
   /// # use slashook::commands::MessageResponse;
   /// # use slashook::structs::channels::{AllowedMentions, AllowedMentionType};
-  /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::users);
+  /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::USERS);
   /// let response = MessageResponse::from("<@1234> Get pinged. Not @everyone or <@&1235> tho.")
   ///   .set_allowed_mentions(allowed_mentions);
   /// ```
