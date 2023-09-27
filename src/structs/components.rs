@@ -180,12 +180,15 @@ pub struct DefaultValue {
 #[allow(non_camel_case_types)]
 #[serde(rename_all = "lowercase")]
 pub enum DefaultValueType {
-  /// id represents user
+  /// ID represents user
   USER,
-  /// id represents role
+  /// ID represents role
   ROLE,
-  /// id represents channel
+  /// ID represents channel
   CHANNEL,
+  /// Representation that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
 }
 
 /// A Text Input component
