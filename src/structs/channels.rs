@@ -18,7 +18,7 @@ use super::{
   embeds::Embed,
   emojis::Emoji,
   guilds::GuildMember,
-  interactions::InteractionType,
+  interactions::{InteractionType, InteractionDataResolved},
   invites::{Invite, CreateInviteOptions},
   permissions::Permissions,
   stickers::StickerItem,
@@ -352,6 +352,8 @@ pub struct Message {
   pub position: Option<i64>,
   /// Data of the role subscription purchase or renewal that prompted this ROLE_SUBSCRIPTION_PURCHASE message
   pub role_subscription_data: Option<RoleSubscriptionData>,
+  /// Data for users, members, channels, and roles in the message's [auto-populated select menus](crate::structs::components::SelectMenu)
+  pub resolved: Option<InteractionDataResolved>,
 }
 
 /// Discord Channel Mention Object
@@ -574,13 +576,14 @@ pub struct AllowedMentions {
 /// Discord Allowed Mention Types
 #[derive(Serialize, Clone, Debug)]
 #[allow(non_camel_case_types)]
+#[serde(rename_all = "lowercase")]
 pub enum AllowedMentionType {
   /// Allowed to mention roles
-  roles,
+  ROLES,
   /// Allowed to mention users
-  users,
+  USERS,
   /// Allowed to mention @everyone and @here
-  everyone
+  CHANNELS
 }
 
 /// Discord Role Subscription Data Object
@@ -1115,7 +1118,7 @@ impl AllowedMentions {
   /// ```
   /// # use slashook::commands::MessageResponse;
   /// # use slashook::structs::channels::{AllowedMentions, AllowedMentionType};
-  /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::users);
+  /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::USERS);
   /// let response = MessageResponse::from("<@1234> Get pinged. Not @everyone or <@&1235> tho.")
   ///   .set_allowed_mentions(allowed_mentions);
   /// ```

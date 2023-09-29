@@ -163,7 +163,7 @@ impl MessageResponse {
   /// ```
   /// # use slashook::commands::MessageResponse;
   /// # use slashook::structs::channels::{AllowedMentions, AllowedMentionType};
-  /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::users);
+  /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::USERS);
   /// let response = MessageResponse::from("<@1234> Get pinged. Not @everyone or <@&1235> tho.")
   ///   .set_allowed_mentions(allowed_mentions);
   /// ```

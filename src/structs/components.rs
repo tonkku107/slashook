@@ -14,6 +14,7 @@ use serde_repr::{Serialize_repr, Deserialize_repr};
 use super::{
   channels::ChannelType,
   Emoji,
+  Snowflake
 };
 
 /// Discord Component Types
@@ -125,6 +126,8 @@ pub struct SelectMenu {
   pub channel_types: Option<Vec<ChannelType>>,
   /// Custom placeholder text if nothing is selected, max 100 characters
   pub placeholder: Option<String>,
+  /// List of default values for auto-populated select menu components; number of default values must be in the range defined by `min_values` and `max_values`
+  pub default_values: Option<Vec<DefaultValue>>,
   /// The minimum number of items that must be chosen; default 1, min 0, max 25
   pub min_values: Option<i64>,
   /// The maximum number of items that can be chosen; default 1, max 25
@@ -160,6 +163,32 @@ pub struct SelectOption {
   pub emoji: Option<Emoji>,
   /// Will render this option as selected by default
   pub default: Option<bool>
+}
+
+/// Discord Select Default Value Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DefaultValue {
+  /// ID of a user, role, or channel
+  pub id: Snowflake,
+  #[serde(rename = "type")]
+  /// Type of value that `id` represents
+  pub value_type: DefaultValueType
+}
+
+/// Discord Select Default Value Type
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[allow(non_camel_case_types)]
+#[serde(rename_all = "lowercase")]
+pub enum DefaultValueType {
+  /// ID represents user
+  USER,
+  /// ID represents role
+  ROLE,
+  /// ID represents channel
+  CHANNEL,
+  /// Representation that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
 }
 
 /// A Text Input component
@@ -433,6 +462,7 @@ impl SelectMenu {
       options: None,
       channel_types: None,
       placeholder: None,
+      default_values: None,
       min_values: None,
       max_values: None
     }
@@ -507,6 +537,23 @@ impl SelectMenu {
   /// ```
   pub fn set_placeholder<T: ToString>(mut self, placeholder: T) -> Self {
     self.placeholder = Some(placeholder.to_string());
+    self
+  }
+
+  /// Add a default value to a select menu
+  /// ```
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType, SelectOption, DefaultValueType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::MENTIONABLE)
+  ///   .add_default_value("189365301488517121", DefaultValueType::USER)
+  ///   .add_default_value("344579593916907520", DefaultValueType::ROLE);
+  /// ```
+  pub fn add_default_value<T: ToString>(mut self, id: T, value_type: DefaultValueType) -> Self {
+    let mut default_values = self.default_values.unwrap_or_default();
+    default_values.push(DefaultValue {
+      id: id.to_string(),
+      value_type,
+    });
+    self.default_values = Some(default_values);
     self
   }
 
