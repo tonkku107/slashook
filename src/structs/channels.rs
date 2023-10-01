@@ -853,6 +853,52 @@ impl Channel {
   pub async fn trigger_typing(&self, rest: &Rest) -> Result<(), RestError> {
     rest.post(format!("channels/{}/typing", self.id), Value::Null).await
   }
+
+  /// Get all pinned messages in the channel
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = input.channel.unwrap();
+  /// let pinned_messages = channel.get_pinned_messages(&input.rest).await?;
+  /// let ids = pinned_messages.into_iter().map(|m| m.id).collect::<Vec<String>>().join(", ");
+  /// res.send_message(ids).await?;
+  /// # }
+  /// ```
+  pub async fn get_pinned_messages(&self, rest: &Rest) -> Result<Vec<Message>, RestError> {
+    rest.get(format!("channels/{}/pins", self.id)).await
+  }
+
+  /// Pin a message to the channel
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Channel;
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
+  /// channel.pin_message(&input.rest, "1130579253067534356").await?;
+  /// # }
+  /// ```
+  pub async fn pin_message<T: ToString>(&self, rest: &Rest, message_id: T) -> Result<(), RestError> {
+    rest.put(format!("channels/{}/pins/{}", self.id, message_id.to_string()), Value::Null).await
+  }
+
+  /// Unpin a message from the channel
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::Channel;
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
+  /// channel.unpin_message(&input.rest, "1130579253067534356").await?;
+  /// # }
+  /// ```
+  pub async fn unpin_message<T: ToString>(&self, rest: &Rest, message_id: T) -> Result<(), RestError> {
+    rest.delete(format!("channels/{}/pins/{}", self.id, message_id.to_string())).await
+  }
 }
 
 impl TryFrom<u8> for ChannelType {
@@ -1060,6 +1106,36 @@ impl Message {
   /// ```
   pub async fn delete_all_reactions_for_emoji(&self, rest: &Rest, emoji: &Emoji) -> Result<(), RestError> {
     rest.delete(format!("channels/{}/messages/{}/reactions/{}", &self.channel_id, &self.id, emoji.to_url_format())).await
+  }
+
+  /// Pin the message to the channel
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::interactions::ApplicationCommandType;
+  /// # #[command(name = "Example Message Context", command_type = ApplicationCommandType::MESSAGE)]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = input.target_message.unwrap();
+  /// msg.pin(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn pin(&self, rest: &Rest) -> Result<(), RestError> {
+    rest.put(format!("channels/{}/pins/{}", self.channel_id, self.id), Value::Null).await
+  }
+
+  /// Unpin the message from the channel
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::interactions::ApplicationCommandType;
+  /// # #[command(name = "Example Message Context", command_type = ApplicationCommandType::MESSAGE)]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = input.target_message.unwrap();
+  /// msg.unpin(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn unpin(&self, rest: &Rest) -> Result<(), RestError> {
+    rest.delete(format!("channels/{}/pins/{}", self.channel_id, self.id)).await
   }
 }
 
