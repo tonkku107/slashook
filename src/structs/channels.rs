@@ -18,7 +18,7 @@ use super::{
   embeds::Embed,
   emojis::Emoji,
   guilds::GuildMember,
-  interactions::{InteractionType, InteractionDataResolved},
+  interactions::{InteractionType, InteractionDataResolved, Attachments},
   invites::{Invite, CreateInviteOptions},
   permissions::Permissions,
   stickers::StickerItem,
@@ -105,6 +105,8 @@ pub struct Channel {
   pub default_sort_order: Option<SortOrderType>,
   /// The [default forum layout view](ForumLayoutType) used to display posts in `GUILD_FORUM` channels. Defaults to `NOT_SET`, which indicates a layout view has not been set by a channel admin
   pub default_forum_layout: Option<ForumLayoutType>,
+  /// A nested message object returned when creating forum or media posts
+  pub message: Option<Box<Message>>,
 }
 
 /// Discord Channel Types
@@ -702,6 +704,57 @@ pub struct ReactionFetchOptions {
   pub limit: Option<i64>,
 }
 
+/// Options for creating threads
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct ThreadCreateOptions {
+  /// 1-100 character channel name
+  pub name: String,
+  /// The thread will stop showing in the channel list after `auto_archive_duration` minutes of inactivity, can be set to: 60, 1440, 4320, 10080
+  pub auto_archive_duration: Option<i64>,
+  /// The [type of thread](ChannelType) to create.
+  #[serde(rename = "type")]
+  pub thread_type: Option<ChannelType>,
+  /// Whether non-moderators can add other non-moderators to a thread; only available when creating a private thread
+  pub invitable: Option<bool>,
+  /// Amount of seconds a user has to wait before sending another message (0-21600)
+  pub rate_limit_per_user: Option<i64>,
+  /// Contents of the first message in the forum/media thread. Required to create a thread in a `GUILD_FORUM` or a `GUILD_MEDIA` channel
+  pub message: Option<MessageResponse>,
+  /// The IDs of the set of tags that have been applied to a thread in a `GUILD_FORUM` or a `GUILD_MEDIA` channel
+  pub applied_tags: Option<Vec<Snowflake>>,
+}
+
+/// Options for fetching thread members
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct ThreadMemberOptions {
+  /// Whether to include a [guild member](GuildMember) object for each thread member
+  pub with_member: Option<bool>,
+  /// Get thread members after this user ID
+  pub after: Option<Snowflake>,
+  /// Max number of thread members to return (1-100). Defaults to 100.
+  pub limit: Option<i64>,
+}
+
+/// Options for fetching a list of threads
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct ThreadListOptions {
+  /// Returns threads archived before this timestamp
+  pub before: Option<DateTime<Utc>>,
+  /// Optional maximum number of threads to return
+  pub limit: Option<i64>,
+}
+
+/// Discord thread list response object
+#[derive(Deserialize, Clone, Debug)]
+pub struct ThreadListResponse {
+  /// The threads
+  pub threads: Vec<Channel>,
+  /// A thread member object for each returned thread the current user has joined
+  pub members: Vec<ThreadMember>,
+  /// Whether there are potentially additional threads that could be returned on a subsequent call
+  pub has_more: bool
+}
+
 impl Channel {
   /// Fetch a channel with a channel ID
   /// ```
@@ -899,13 +952,119 @@ impl Channel {
   pub async fn unpin_message<T: ToString>(&self, rest: &Rest, message_id: T) -> Result<(), RestError> {
     rest.delete(format!("channels/{}/pins/{}", self.id, message_id.to_string())).await
   }
-}
 
-impl TryFrom<u8> for ChannelType {
-  type Error = serde_json::Error;
+  /// Starts a thread, forum post or media post in the channel
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::{ChannelType, ThreadCreateOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = input.channel.unwrap();
+  /// // In a regular channel
+  /// let options = ThreadCreateOptions::new("A thread")
+  ///   .set_thread_type(ChannelType::GUILD_PUBLIC_THREAD);
+  /// channel.start_thread(&input.rest, options).await?;
+  /// // In a forum or media channel
+  /// let options2 = ThreadCreateOptions::new("A post")
+  ///   .set_message("Hello!");
+  /// channel.start_thread(&input.rest, options2).await?;
+  /// # }
+  /// ```
+  pub async fn start_thread(&self, rest: &Rest, mut options: ThreadCreateOptions) -> Result<Channel, RestError> {
+    let path = format!("channels/{}/threads", self.id);
 
-  fn try_from(value: u8) -> Result<Self, Self::Error> {
-    serde_json::from_value(value.into())
+    if let Some(files) = options.message.as_mut().and_then(|m| m.files.take()) {
+      rest.post_files(path, options, files).await
+    } else {
+      rest.post(path, options).await
+    }
+  }
+
+  /// Adds the bot user to the thread
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let thread = input.args.get("thread").unwrap().as_channel().unwrap();
+  /// thread.join_thread(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn join_thread(&self, rest: &Rest) -> Result<(), RestError> {
+    self.add_thread_member(rest, "@me").await
+  }
+
+  /// Adds another member to a thread
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::{ThreadCreateOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = input.channel.unwrap();
+  /// let thread = channel.start_thread(&input.rest, ThreadCreateOptions::new("A thread")).await?;
+  /// thread.add_thread_member(&input.rest, input.user.id).await?;
+  /// # }
+  /// ```
+  pub async fn add_thread_member<T: ToString>(&self, rest: &Rest, user_id: T) -> Result<(), RestError> {
+    rest.put(format!("channels/{}/thread-members/{}", self.id, user_id.to_string()), Value::Null).await
+  }
+
+  /// Removes the bot user from the thread
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::{ThreadCreateOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let channel = input.channel.unwrap();
+  /// let thread = channel.start_thread(&input.rest, ThreadCreateOptions::new("A thread")).await?;
+  /// thread.leave_thread(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn leave_thread(&self, rest: &Rest) -> Result<(), RestError> {
+    self.remove_thread_member(rest, "@me").await
+  }
+
+  /// Removes another member from the thread
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let thread = input.args.get("thread").unwrap().as_channel().unwrap();
+  /// let user = input.args.get("user").unwrap().as_user().unwrap();
+  /// thread.remove_thread_member(&input.rest, &user.id).await?;
+  /// # }
+  /// ```
+  pub async fn remove_thread_member<T: ToString>(&self, rest: &Rest, user_id: T) -> Result<(), RestError> {
+    rest.delete(format!("channels/{}/thread-members/{}", self.id, user_id.to_string())).await
+  }
+
+  /// Gets a thread member object for the specified user
+  pub async fn get_thread_member<T: ToString>(&self, rest: &Rest, user_id: T, options: ThreadMemberOptions) -> Result<ThreadMember, RestError> {
+    rest.get_query(format!("channels/{}/thread-members/{}", self.id, user_id.to_string()), options).await
+  }
+
+  /// Lists thread members. Results will be paginated if `with_member` is set to true
+  pub async fn list_thread_members(&self, rest: &Rest, options: ThreadMemberOptions) -> Result<Vec<ThreadMember>, RestError> {
+    rest.get_query(format!("channels/{}/thread-members", self.id), options).await
+  }
+
+  /// Gets archived threads in the channel that are public
+  pub async fn list_public_archived_threads(&self, rest: &Rest, options: ThreadListOptions) -> Result<ThreadListResponse, RestError> {
+    rest.get_query(format!("channels/{}/threads/archived/public", self.id), options).await
+  }
+
+  /// Gets archived threads in the channel that are private
+  pub async fn list_private_archived_threads(&self, rest: &Rest, options: ThreadListOptions) -> Result<ThreadListResponse, RestError> {
+    rest.get_query(format!("channels/{}/threads/archived/private", self.id), options).await
+  }
+
+  /// Gets archived threads in the channel that are private and the user has joined
+  pub async fn list_joined_private_archived_threads(&self, rest: &Rest, options: ThreadListOptions) -> Result<ThreadListResponse, RestError> {
+    rest.get_query(format!("channels/{}/users/@me/threads/archived/private", self.id), options).await
   }
 }
 
@@ -951,13 +1110,11 @@ impl Message {
   /// ```
   pub async fn create<T: ToString, U: Into<MessageResponse>>(rest: &Rest, channel_id: T, message: U) -> Result<Self, RestError> {
     let mut message = message.into();
-    let files = message.files;
-    message.files = None;
     let path = format!("channels/{}/messages", channel_id.to_string());
-    if let Some(files) = files {
-      Ok(rest.post_files(path, message, files).await?)
+    if let Some(files) = message.files.take() {
+      rest.post_files(path, message, files).await
     } else {
-      Ok(rest.post(path, message).await?)
+      rest.post(path, message).await
     }
   }
 
@@ -974,13 +1131,11 @@ impl Message {
   /// ```
   pub async fn edit<T: Into<MessageResponse>>(&self, rest: &Rest, message: T) -> Result<Message, RestError> {
     let mut message = message.into();
-    let files = message.files;
-    message.files = None;
     let path = format!("channels/{}/messages/{}", self.channel_id, self.id);
-    if let Some(files) = files {
-      Ok(rest.patch_files(path, message, files).await?)
+    if let Some(files) = message.files.take() {
+      rest.patch_files(path, message, files).await
     } else {
-      Ok(rest.patch(path, message).await?)
+      rest.patch(path, message).await
     }
   }
 
@@ -1136,6 +1291,21 @@ impl Message {
   /// ```
   pub async fn unpin(&self, rest: &Rest) -> Result<(), RestError> {
     rest.delete(format!("channels/{}/pins/{}", self.channel_id, self.id)).await
+  }
+
+  /// Start a thread from the message
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::{channels::ThreadCreateOptions, interactions::ApplicationCommandType};
+  /// # #[command(name = "Example Message Context", command_type = ApplicationCommandType::MESSAGE)]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = input.target_message.unwrap();
+  /// msg.start_thread(&input.rest, ThreadCreateOptions::new("A thread")).await?;
+  /// # }
+  /// ```
+  pub async fn start_thread(&self, rest: &Rest, options: ThreadCreateOptions) -> Result<Channel, RestError> {
+    rest.post(format!("channels/{}/messages/{}/threads", self.channel_id, self.id), options).await
   }
 }
 
@@ -1498,9 +1668,113 @@ impl ReactionFetchOptions {
   }
 }
 
-impl Default for AllowedMentions {
-  fn default() -> Self {
-    Self::new()
+impl ThreadCreateOptions {
+  /// Creates a new ThreadCreateOptions with a name
+  pub fn new<T: ToString>(name: T) -> Self {
+    Self {
+      name: name.to_string(),
+      auto_archive_duration: None,
+      thread_type: None,
+      invitable: None,
+      rate_limit_per_user: None,
+      message: None,
+      applied_tags: None,
+    }
+  }
+
+  /// Sets the auto archive duration
+  pub fn set_auto_archive_duration(mut self, duration: i64) -> Self {
+    self.auto_archive_duration = Some(duration);
+    self
+  }
+
+  /// Sets the thread type
+  pub fn set_thread_type(mut self, thread_type: ChannelType) -> Self {
+    self.thread_type = Some(thread_type);
+    self
+  }
+
+  /// Sets invitable
+  pub fn set_invitable(mut self, invitable: bool) -> Self {
+    self.invitable = Some(invitable);
+    self
+  }
+
+  /// Sets the rate limit per user
+  pub fn set_rate_limit_per_user(mut self, ratelimit: i64) -> Self {
+    self.rate_limit_per_user = Some(ratelimit);
+    self
+  }
+
+  /// Sets the message
+  pub fn set_message<T: Into<MessageResponse>>(mut self, message: T) -> Self {
+    self.message = Some(message.into());
+    self
+  }
+
+  /// Sets applied tags
+  pub fn set_applied_tags(mut self, tags: Vec<Snowflake>) -> Self {
+    self.applied_tags = Some(tags);
+    self
+  }
+}
+
+impl ThreadMemberOptions {
+  /// Creates a new ThreadMemberOptions
+  pub fn new() -> Self {
+    Self {
+      with_member: None,
+      after: None,
+      limit: None,
+    }
+  }
+
+  /// Sets with member
+  pub fn set_with_member(mut self, with_member: bool) -> Self {
+    self.with_member = Some(with_member);
+    self
+  }
+
+  /// Sets after
+  pub fn set_after(mut self, after: Snowflake) -> Self {
+    self.after = Some(after);
+    self
+  }
+
+  /// Sets the limit
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+}
+
+impl ThreadListOptions {
+  /// Creates a new ThreadListOptions
+  pub fn new() -> Self {
+    Self {
+      before: None,
+      limit: None,
+    }
+  }
+
+  /// Sets before
+  pub fn set_before(mut self, before: DateTime<Utc>) -> Self {
+    self.before = Some(before);
+    self
+  }
+
+  /// Sets the limit
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+}
+
+impl TryFrom<u8> for ChannelType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
   }
 }
 
@@ -1527,5 +1801,22 @@ impl<'de> Deserialize<'de> for MessageFlags {
 impl Serialize for MessageFlags {
   fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_u32(self.bits())
+  }
+}
+
+impl Default for AllowedMentions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Attachments for ThreadCreateOptions {
+  fn take_attachments(&mut self) -> Vec<Attachment> {
+    self.message.as_mut().and_then(|m| m.attachments.take()).unwrap_or_default()
+  }
+
+  fn set_attachments(&mut self, attachments: Vec<Attachment>) -> &mut Self {
+    self.message.as_mut().and_then(|m| m.attachments.replace(attachments));
+    self
   }
 }
