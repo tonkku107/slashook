@@ -42,7 +42,7 @@ pub enum SKUType {
   /// System-generated group for each SUBSCRIPTION SKU created
   SUBSCRIPTION_GROUP = 6,
   /// An SKU type that hasn't been implemented yet
-  UNKNOWN
+  UNKNOWN,
 }
 
 bitflags! {
@@ -90,7 +90,7 @@ pub enum EntitlementType {
   /// Entitlement was purchased as an app subscription
   APPLICATION_SUBSCRIPTION = 8,
   /// An entitlement type that hasn't been implemented yet
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Options for fetching entitlements

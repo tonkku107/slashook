@@ -290,7 +290,7 @@ pub enum CommandResponse {
   UpdateMessage(MessageResponse),
   AutocompleteResult(Vec<ApplicationCommandOptionChoice>),
   Modal(Modal),
-  PremiumRequired
+  PremiumRequired,
 }
 
 /// Struct with methods for responding to interactions

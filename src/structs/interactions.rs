@@ -407,7 +407,7 @@ impl From<CommandResponse> for InteractionCallback {
           response_type: InteractionCallbackType::PREMIUM_REQUIRED,
           data: None
         }
-      }
+      },
 
     }
   }
