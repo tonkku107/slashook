@@ -450,7 +450,7 @@ impl CommandResponder {
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// ##[command(name = "premium", description = "An example premium command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   if !input.entitlements.ok_or("No entitlements")?.iter().any(|e| e.sku_id == "1180218955160375406") {
+  ///   if !input.entitlements.iter().any(|e| e.sku_id == "1180218955160375406") {
   ///     return res.premium_required().await?;
   ///   }
   ///   res.send_message(MessageResponse::from("cool premium content").set_ephemeral(true)).await?;

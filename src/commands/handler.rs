@@ -103,7 +103,7 @@ pub struct CommandInput {
   /// The guild's preferred locale
   pub guild_locale: Option<String>,
   /// For [monetized apps](https://discord.com/developers/docs/monetization/overview), any entitlements for the invoking user, representing access to premium [SKUs](https://discord.com/developers/docs/monetization/skus)
-  pub entitlements: Option<Vec<Entitlement>>,
+  pub entitlements: Vec<Entitlement>,
   /// Handler for Discord API calls
   pub rest: Rest,
 }

@@ -161,7 +161,7 @@ pub struct Interaction {
   pub app_permissions: Option<Permissions>,
   pub locale: Option<String>,
   pub guild_locale: Option<String>,
-  pub entitlements: Option<Vec<Entitlement>>,
+  pub entitlements: Vec<Entitlement>,
 }
 
 /// Discord Interaction Types
