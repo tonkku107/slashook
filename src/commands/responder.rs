@@ -289,7 +289,8 @@ pub enum CommandResponse {
   DeferUpdate,
   UpdateMessage(MessageResponse),
   AutocompleteResult(Vec<ApplicationCommandOptionChoice>),
-  Modal(Modal)
+  Modal(Modal),
+  PremiumRequired
 }
 
 /// Struct with methods for responding to interactions
@@ -439,6 +440,24 @@ impl CommandResponder {
   /// ```
   pub async fn open_modal(&self, modal: Modal) -> Result<(), InteractionResponseError> {
     self.tx.send(CommandResponse::Modal(modal)).map_err(|_| InteractionResponseError)?;
+    self.tx.closed().await;
+    Ok(())
+  }
+
+  /// Respond to an interaction with a premium upsell
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
+  /// ##[command(name = "premium", description = "An example premium command")]
+  /// fn example(input: CommandInput, res: CommandResponder) {
+  ///   if !input.entitlements.ok_or("No entitlements")?.iter().any(|e| e.sku_id == "1180218955160375406") {
+  ///     return res.premium_required().await?;
+  ///   }
+  ///   res.send_message(MessageResponse::from("cool premium content").set_ephemeral(true)).await?;
+  /// }
+  /// ```
+  pub async fn premium_required(&self) -> Result<(), InteractionResponseError> {
+    self.tx.send(CommandResponse::PremiumRequired).map_err(|_| InteractionResponseError)?;
     self.tx.closed().await;
     Ok(())
   }
