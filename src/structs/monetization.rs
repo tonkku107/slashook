@@ -37,7 +37,7 @@ pub struct SKU {
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum SKUType {
-  ///	Represents a recurring subscription
+  /// Represents a recurring subscription
   SUBSCRIPTION = 5,
   /// System-generated group for each SUBSCRIPTION SKU created
   SUBSCRIPTION_GROUP = 6,
