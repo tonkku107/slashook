@@ -18,6 +18,7 @@ use super::{
   guilds::{GuildMember, Role},
   channels::{Channel, Message, MessageFlags, AllowedMentions, Attachment, ChannelType},
   components::{Component, ComponentType},
+  monetization::Entitlement,
   utils::File,
   Permissions
 };
@@ -159,7 +160,8 @@ pub struct Interaction {
   pub message: Option<Message>,
   pub app_permissions: Option<Permissions>,
   pub locale: Option<String>,
-  pub guild_locale: Option<String>
+  pub guild_locale: Option<String>,
+  pub entitlements: Vec<Entitlement>,
 }
 
 /// Discord Interaction Types
@@ -300,7 +302,8 @@ pub enum InteractionCallbackType {
   DEFERRED_UPDATE_MESSAGE = 6,
   UPDATE_MESSAGE = 7,
   APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8,
-  MODAL = 9
+  MODAL = 9,
+  PREMIUM_REQUIRED = 10,
 }
 
 #[doc(hidden)]
@@ -397,7 +400,14 @@ impl From<CommandResponse> for InteractionCallback {
           response_type: InteractionCallbackType::MODAL,
           data: Some(modal.into())
         }
-      }
+      },
+
+      CommandResponse::PremiumRequired => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::PREMIUM_REQUIRED,
+          data: None
+        }
+      },
 
     }
   }
@@ -479,7 +489,7 @@ impl From<Modal> for InteractionCallbackData {
   }
 }
 
-/// Trait for structs that have an [Attachment](crate::structs::channels::Attachment) Vec.
+/// Trait for structs that have an [Attachment] Vec.
 /// Functions for use with [post_files](crate::rest::Rest::post_files) and [patch_files](crate::rest::Rest::patch_files)
 pub trait Attachments {
   /// Returns the attachments that have been set and possibly removes the originals.

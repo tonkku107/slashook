@@ -25,6 +25,7 @@ use crate::structs::{
   channels::{Channel, Message},
   users::User,
   guilds::GuildMember,
+  monetization::Entitlement,
   Snowflake,
   Permissions
 };
@@ -57,6 +58,8 @@ pub struct CommandInput {
   ///
   /// Not included in context menu commands, see the `target_*` fields.
   pub resolved: Option<InteractionDataResolved>,
+  /// The ID of the application this interaction is for
+  pub application_id: Snowflake,
   /// The ID of the guild the command was sent from
   pub guild_id: Option<Snowflake>,
   /// The ID of the channel the command was sent from
@@ -99,6 +102,8 @@ pub struct CommandInput {
   pub locale: String,
   /// The guild's preferred locale
   pub guild_locale: Option<String>,
+  /// For [monetized apps](https://discord.com/developers/docs/monetization/overview), any entitlements for the invoking user, representing access to premium [SKUs](https://discord.com/developers/docs/monetization/skus)
+  pub entitlements: Vec<Entitlement>,
   /// Handler for Discord API calls
   pub rest: Rest,
 }
@@ -394,6 +399,7 @@ impl CommandHandler {
       subcommand_group: None,
       args: HashMap::new(),
       resolved: None,
+      application_id: interaction.application_id.clone(),
       guild_id: interaction.guild_id,
       channel_id: interaction.channel_id,
       channel: interaction.channel,
@@ -410,6 +416,7 @@ impl CommandHandler {
       app_permissions: interaction.app_permissions,
       locale: interaction.locale.context("Interaction didn't include a locale")?,
       guild_locale: interaction.guild_locale,
+      entitlements: interaction.entitlements,
       rest: Rest::with_optional_token(bot_token)
     };
 
