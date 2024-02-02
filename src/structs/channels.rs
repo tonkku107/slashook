@@ -550,12 +550,12 @@ bitflags! {
     /// This message will not trigger push and desktop notifications
     const SUPPRESS_NOTIFICATIONS = 1 << 12;
     /// This message is a voice message
-    const IS_VOICE_MESSAGE = 1 << 12;
+    const IS_VOICE_MESSAGE = 1 << 13;
   }
 }
 
 bitflags! {
-  /// Bitflags for Discord Message Flags
+  /// Bitflags for Discord Attachment Flags
   #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct AttachmentFlags: u32 {
     /// This attachment has been edited using the remix feature on mobile
@@ -1364,13 +1364,13 @@ impl Attachment {
     }
   }
 
-  /// Sets the duration of the file in seconds (currently for voice messages)
+  /// Sets the duration of the file in seconds
   pub fn set_duration_secs(mut self, duration_secs: f64) -> Self {
     self.duration_secs = Some(duration_secs);
     self
   }
 
-  /// Sets the waveform of the file (currently for voice messages)
+  /// Sets the waveform of the file
   pub fn set_waveform<T: ToString>(mut self, waveform: T) -> Self {
     self.waveform = Some(waveform.to_string());
     self
