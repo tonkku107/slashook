@@ -1364,18 +1364,6 @@ impl Attachment {
       flags: None
     }
   }
-
-  /// Sets the duration of the file in seconds
-  pub fn set_duration_secs(mut self, duration_secs: f64) -> Self {
-    self.duration_secs = Some(duration_secs);
-    self
-  }
-
-  /// Sets the waveform of the file
-  pub fn set_waveform<T: ToString>(mut self, waveform: T) -> Self {
-    self.waveform = Some(waveform.to_string());
-    self
-  }
 }
 
 impl AllowedMentions {
