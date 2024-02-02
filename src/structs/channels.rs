@@ -23,6 +23,7 @@ use super::{
   permissions::Permissions,
   stickers::StickerItem,
   users::User,
+  utils::File,
 };
 use crate::{
   rest::{Rest, RestError},
@@ -1346,11 +1347,11 @@ impl Attachment {
     }
   }
 
-  pub(crate) fn with_description<T: ToString, U: ToString>(id: T, description: U) -> Self {
+  pub(crate) fn from_file(id: Snowflake, file: &File) -> Self {
     Self {
-      id: id.to_string(),
+      id,
       filename: String::from(""),
-      description: Some(description.to_string()),
+      description: file.description.clone(),
       content_type: None,
       size: 0,
       url: String::from(""),
@@ -1358,8 +1359,8 @@ impl Attachment {
       height: None,
       width: None,
       ephemeral: None,
-      duration_secs: None,
-      waveform: None,
+      duration_secs: file.duration_secs,
+      waveform: file.waveform.clone(),
       flags: None
     }
   }

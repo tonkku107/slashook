@@ -114,6 +114,25 @@ impl MessageResponse {
     self
   }
 
+  /// Set voice message flag
+  /// ```no_run
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::{channels::MessageFlags, utils::File};
+  /// # use slashook::tokio::fs::File as TokioFile;
+  /// let file = TokioFile::open("audio.ogg").await?;
+  /// let audio_file = File::from_file("audio.ogg", file).await?
+  ///   .set_duration_secs(1.1799999475479126)
+  ///   .set_waveform("AAM1YAAAAAAAAAA=");
+  /// let response = MessageResponse::from(audio_file).set_as_voice_message(true);
+  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::IS_VOICE_MESSAGE), true);
+  /// ```
+  pub fn set_as_voice_message(mut self, is_voice_message: bool) -> Self {
+    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
+    flags.set(MessageFlags::IS_VOICE_MESSAGE, is_voice_message);
+    self.flags = Some(flags);
+    self
+  }
+
   /// Add an embed to the message
   /// ```
   /// # use slashook::commands::MessageResponse;
