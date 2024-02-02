@@ -116,15 +116,19 @@ impl MessageResponse {
 
   /// Set voice message flag
   /// ```no_run
-  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::commands::{MessageResponse, CmdResult};
   /// # use slashook::structs::{channels::MessageFlags, utils::File};
   /// # use slashook::tokio::fs::File as TokioFile;
+  /// # #[slashook::main]
+  /// # async fn main() -> CmdResult {
   /// let file = TokioFile::open("audio.ogg").await?;
   /// let audio_file = File::from_file("audio.ogg", file).await?
   ///   .set_duration_secs(1.1799999475479126)
   ///   .set_waveform("AAM1YAAAAAAAAAA=");
   /// let response = MessageResponse::from(audio_file).set_as_voice_message(true);
   /// assert_eq!(response.flags.unwrap().contains(MessageFlags::IS_VOICE_MESSAGE), true);
+  /// # Ok(())
+  /// # }
   /// ```
   pub fn set_as_voice_message(mut self, is_voice_message: bool) -> Self {
     let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
