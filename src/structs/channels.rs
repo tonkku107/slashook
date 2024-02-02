@@ -23,6 +23,7 @@ use super::{
   permissions::Permissions,
   stickers::StickerItem,
   users::User,
+  utils::File,
 };
 use crate::{
   rest::{Rest, RestError},
@@ -394,7 +395,13 @@ pub struct Attachment {
   /// Width of file (if image)
   pub width: Option<i64>,
   /// Whether this attachment is ephemeral
-  pub ephemeral: Option<bool>
+  pub ephemeral: Option<bool>,
+  /// The duration of the audio file (currently for voice messages)
+  pub duration_secs: Option<f64>,
+  /// Base64 encoded bytearray representing a sampled waveform (currently for voice messages)
+  pub waveform: Option<String>,
+  /// [Attachment flags](AttachmentFlags) combined as a bitfield
+  pub flags: Option<AttachmentFlags>
 }
 
 /// Discord Reaction Object
@@ -543,6 +550,17 @@ bitflags! {
     const FAILED_TO_MENTION_SOME_ROLES_IN_THREAD = 1 << 8;
     /// This message will not trigger push and desktop notifications
     const SUPPRESS_NOTIFICATIONS = 1 << 12;
+    /// This message is a voice message
+    const IS_VOICE_MESSAGE = 1 << 13;
+  }
+}
+
+bitflags! {
+  /// Bitflags for Discord Attachment Flags
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
+  pub struct AttachmentFlags: u32 {
+    /// This attachment has been edited using the remix feature on mobile
+    const IS_REMIX = 1 << 2;
   }
 }
 
@@ -1322,22 +1340,28 @@ impl Attachment {
       proxy_url: String::from(""),
       height: None,
       width: None,
-      ephemeral: None
+      ephemeral: None,
+      duration_secs: None,
+      waveform: None,
+      flags: None
     }
   }
 
-  pub(crate) fn with_description<T: ToString, U: ToString>(id: T, description: U) -> Self {
+  pub(crate) fn from_file(id: Snowflake, file: &File) -> Self {
     Self {
-      id: id.to_string(),
+      id,
       filename: String::from(""),
-      description: Some(description.to_string()),
+      description: file.description.clone(),
       content_type: None,
       size: 0,
       url: String::from(""),
       proxy_url: String::from(""),
       height: None,
       width: None,
-      ephemeral: None
+      ephemeral: None,
+      duration_secs: file.duration_secs,
+      waveform: file.waveform.clone(),
+      flags: None
     }
   }
 }
@@ -1799,6 +1823,19 @@ impl<'de> Deserialize<'de> for MessageFlags {
 }
 
 impl Serialize for MessageFlags {
+  fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_u32(self.bits())
+  }
+}
+
+impl<'de> Deserialize<'de> for AttachmentFlags {
+  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    let bits = u32::deserialize(d)?;
+    Ok(Self::from_bits_retain(bits))
+  }
+}
+
+impl Serialize for AttachmentFlags {
   fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_u32(self.bits())
   }

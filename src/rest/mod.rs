@@ -71,11 +71,9 @@ fn handle_multipart<U: Serialize + Attachments>(mut json_data: U, files: Vec<Fil
   let mut attachments = json_data.take_attachments();
 
   for (i, file) in files.into_iter().enumerate() {
+    attachments.push(Attachment::from_file(i.to_string(), &file));
     let part = Part::bytes(file.data).file_name(file.filename);
     form_data = form_data.part(format!("files[{}]", i), part);
-    if let Some(description) = file.description {
-      attachments.push(Attachment::with_description(i, description));
-    }
   }
 
   json_data.set_attachments(attachments);
