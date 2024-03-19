@@ -185,7 +185,7 @@ pub struct Interaction {
   pub token: String,
   pub version: u8,
   pub message: Option<Message>,
-  pub app_permissions: Option<Permissions>,
+  pub app_permissions: Permissions,
   pub locale: Option<String>,
   pub guild_locale: Option<String>,
   pub entitlements: Vec<Entitlement>,

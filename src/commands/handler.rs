@@ -97,7 +97,7 @@ pub struct CommandInput {
   /// Only included in command autocomplete interactions
   pub focused: Option<String>,
   /// Permissions the app or bot has within the channel the interaction was sent from
-  pub app_permissions: Option<Permissions>,
+  pub app_permissions: Permissions,
   /// The selected [language](https://discord.com/developers/docs/reference#locales) of the user
   pub locale: String,
   /// The guild's preferred locale
