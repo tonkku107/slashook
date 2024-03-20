@@ -49,6 +49,7 @@ pub struct ApplicationCommand {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub name_localizations: Option<HashMap<String, String>>,
   /// Description for `CHAT_INPUT` commands, 1-100 characters. Empty string for `USER` and `MESSAGE` commands
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub description: Option<String>,
   /// Localization dictionary for `description` field. Values follow the same restrictions as `description`
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -158,7 +159,7 @@ pub enum IntegrationType {
   UNKNOWN
 }
 
-/// Discord Integration Owners
+/// Discord Integration Owners Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct IntegrationOwners {
   /// ID of the authorizing guild. Value will be 0 if used in the bot's DM channel

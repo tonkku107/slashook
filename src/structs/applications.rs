@@ -106,7 +106,7 @@ bitflags! {
   }
 }
 
-/// Discord Integration Types Config
+/// Discord Integration Types Config Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct ApplicationIntegrationTypesConfig {
   /// Configuration for [`GUILD_INSTALL`](IntegrationType::GUILD_INSTALL) integrations
@@ -117,7 +117,7 @@ pub struct ApplicationIntegrationTypesConfig {
   pub user_install: Option<ApplicationIntegrationTypesConfigValue>,
 }
 
-/// Discord Integration Types Config Value
+/// Discord Integration Types Config Value Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct ApplicationIntegrationTypesConfigValue {
   /// Install params for each installation context's default in-app authorization link
