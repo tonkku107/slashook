@@ -63,7 +63,7 @@ pub struct Command {
   /// [Type of command](ApplicationCommandType), defaults to `CHAT_INPUT`
   pub command_type: Option<ApplicationCommandType>,
   /// Description for `CHAT_INPUT` commands, 1-100 characters. Empty string for `USER` and `MESSAGE` commands
-  pub description: String,
+  pub description: OptionalString,
   /// Localization dictionary for `description` field. Values follow the same restrictions as `description`
   pub description_localizations: Option<HashMap<String, String>>,
   /// Parameters for the command, max of 25
@@ -112,6 +112,16 @@ pub struct Subcommand {
   pub options: Vec<ApplicationCommandOption>,
 }
 
+/// Wrapper struct for an `Option<String>` so extra traits can be implemented on it
+#[derive(Clone, Debug)]
+pub struct OptionalString(Option<String>);
+
+impl<T: Into<String>> From<T> for OptionalString {
+  fn from(value: T) -> Self {
+    Self(Some(value.into()))
+  }
+}
+
 async fn dummy (_: CommandInput, _: CommandResponder) -> CmdResult { Ok(()) }
 impl Default for Command {
   fn default() -> Self {
@@ -121,7 +131,7 @@ impl Default for Command {
       name: String::new(),
       name_localizations: None,
       command_type: None,
-      description: String::new(),
+      description: OptionalString(None),
       description_localizations: None,
       options: None,
       default_member_permissions: None,
@@ -180,7 +190,7 @@ impl TryFrom<Command> for ApplicationCommand {
       guild_id: None,
       name: value.name,
       name_localizations: value.name_localizations,
-      description: Some(value.description),
+      description: value.description.0,
       description_localizations: value.description_localizations,
       options,
       default_member_permissions: value.default_member_permissions,
