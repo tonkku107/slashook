@@ -393,7 +393,23 @@ impl TryFrom<u8> for ApplicationCommandType {
   }
 }
 
+impl TryFrom<u8> for IntegrationType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
 impl TryFrom<u8> for InteractionOptionType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
+impl TryFrom<u8> for InteractionContextType {
   type Error = serde_json::Error;
 
   fn try_from(value: u8) -> Result<Self, Self::Error> {
