@@ -32,9 +32,9 @@ pub struct Application {
   /// An array of rpc origin urls, if rpc is enabled
   pub rpc_origins: Option<Vec<String>>,
   /// When false only app owner can join the app's bot to guilds
-  pub bot_public: bool,
+  pub bot_public: Option<bool>,
   /// When true the app's bot will only join upon completion of the full oauth2 code grant flow
-  pub bot_require_code_grant: bool,
+  pub bot_require_code_grant: Option<bool>,
   /// Partial user object for the bot user associated with the app
   pub bot: Option<User>,
   /// The url of the app's terms of service
@@ -44,7 +44,7 @@ pub struct Application {
   /// Partial user object containing info on the owner of the application
   pub owner: Option<User>,
   /// The hex encoded key for verification in interactions and the GameSDK's [GetTicket](https://discord.com/developers/docs/game-sdk/applications#getticket)
-  pub verify_key: String,
+  pub verify_key: Option<String>,
   /// If the application belongs to a team, this will be the list of the members of that team
   pub team: Option<Team>,
   /// If this application is a game sold on Discord, this field will be the guild to which it has been linked
