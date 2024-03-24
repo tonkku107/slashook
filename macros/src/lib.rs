@@ -34,6 +34,8 @@ use syn::{self, ItemFn, ReturnType, parse_macro_input, parse_quote};
 /// #[command(
 ///   name = "command-name",
 ///   description = "A cool command",
+///   integration_types = [IntegrationType::GUILD_INSTALL, IntegrationType::USER_INSTALL],
+///   contexts = [InteractionContextType::GUILD, InteractionContextType::PRIVATE_CHANNEL, InteractionContextType::BOT_DM],
 ///   subcommand_groups = [{
 ///     name = "group-name",
 ///     subcommands = [{

@@ -20,7 +20,7 @@ use rocket::futures::future::BoxFuture;
 pub use responder::{MessageResponse, CommandResponder, Modal, InteractionResponseError};
 pub use handler::CommandInput;
 use crate::structs::{
-  interactions::{ApplicationCommand, ApplicationCommandType, ApplicationCommandOption, InteractionOptionType},
+  interactions::{ApplicationCommand, ApplicationCommandType, ApplicationCommandOption, InteractionOptionType, IntegrationType, InteractionContextType},
   Permissions
 };
 
@@ -63,17 +63,19 @@ pub struct Command {
   /// [Type of command](ApplicationCommandType), defaults to `CHAT_INPUT`
   pub command_type: Option<ApplicationCommandType>,
   /// Description for `CHAT_INPUT` commands, 1-100 characters. Empty string for `USER` and `MESSAGE` commands
-  pub description: String,
+  pub description: OptionalString,
   /// Localization dictionary for `description` field. Values follow the same restrictions as `description`
   pub description_localizations: Option<HashMap<String, String>>,
   /// Parameters for the command, max of 25
   pub options: Option<Vec<ApplicationCommandOption>>,
   /// Set of [permissions](Permissions) represented as a bit set
   pub default_member_permissions: Option<Permissions>,
-  /// Indicates whether the command is available in DMs with the app, only for globally-scoped commands. By default, commands are visible.
-  pub dm_permission: Option<bool>,
   /// Indicates whether the command is age-restricted, defaults to `false`
   pub nsfw: Option<bool>,
+  /// [Installation context(s)](https://discord.com/developers/docs/resources/application#installation-context) where the command is available, only for globally-scoped commands. Defaults to `GUILD_INSTALL` (`0`)
+  pub integration_types: Option<Vec<IntegrationType>>,
+  /// [Interaction context(s)](InteractionContextType) where the command can be used, only for globally-scoped commands. By default, all interaction context types included for new commands.
+  pub contexts: Option<Vec<InteractionContextType>>,
   /// Subcommand groups for the command
   pub subcommand_groups: Option<Vec<SubcommandGroup>>,
   /// Subcommands for the command
@@ -110,6 +112,16 @@ pub struct Subcommand {
   pub options: Vec<ApplicationCommandOption>,
 }
 
+/// Wrapper struct for an `Option<String>` so extra traits can be implemented on it
+#[derive(Clone, Debug)]
+pub struct OptionalString(Option<String>);
+
+impl<T: Into<String>> From<T> for OptionalString {
+  fn from(value: T) -> Self {
+    Self(Some(value.into()))
+  }
+}
+
 async fn dummy (_: CommandInput, _: CommandResponder) -> CmdResult { Ok(()) }
 impl Default for Command {
   fn default() -> Self {
@@ -119,12 +131,13 @@ impl Default for Command {
       name: String::new(),
       name_localizations: None,
       command_type: None,
-      description: String::new(),
+      description: OptionalString(None),
       description_localizations: None,
       options: None,
       default_member_permissions: None,
-      dm_permission: None,
       nsfw: None,
+      integration_types: None,
+      contexts: None,
       subcommand_groups: None,
       subcommands: None
     }
@@ -143,8 +156,9 @@ impl Clone for Command {
       description_localizations: self.description_localizations.clone(),
       options: self.options.clone(),
       default_member_permissions: self.default_member_permissions,
-      dm_permission: self.dm_permission,
       nsfw: self.nsfw,
+      integration_types: self.integration_types.clone(),
+      contexts: self.contexts.clone(),
       subcommand_groups: self.subcommand_groups.clone(),
       subcommands: self.subcommands.clone(),
     }
@@ -176,12 +190,13 @@ impl TryFrom<Command> for ApplicationCommand {
       guild_id: None,
       name: value.name,
       name_localizations: value.name_localizations,
-      description: value.description,
+      description: value.description.0,
       description_localizations: value.description_localizations,
       options,
       default_member_permissions: value.default_member_permissions,
-      dm_permission: value.dm_permission,
       nsfw: value.nsfw,
+      integration_types: value.integration_types,
+      contexts: value.contexts,
       version: None
     })
   }

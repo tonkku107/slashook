@@ -12,7 +12,9 @@ use serde_repr::Deserialize_repr;
 use super::{
   Snowflake,
   users::User,
-  Permissions
+  Permissions,
+  guilds::Guild,
+  interactions::IntegrationType,
 };
 use bitflags::bitflags;
 
@@ -30,9 +32,11 @@ pub struct Application {
   /// An array of rpc origin urls, if rpc is enabled
   pub rpc_origins: Option<Vec<String>>,
   /// When false only app owner can join the app's bot to guilds
-  pub bot_public: bool,
+  pub bot_public: Option<bool>,
   /// When true the app's bot will only join upon completion of the full oauth2 code grant flow
-  pub bot_require_code_grant: bool,
+  pub bot_require_code_grant: Option<bool>,
+  /// Partial user object for the bot user associated with the app
+  pub bot: Option<User>,
   /// The url of the app's terms of service
   pub terms_of_service_url: Option<String>,
   /// The url of the app's privacy policy
@@ -40,11 +44,13 @@ pub struct Application {
   /// Partial user object containing info on the owner of the application
   pub owner: Option<User>,
   /// The hex encoded key for verification in interactions and the GameSDK's [GetTicket](https://discord.com/developers/docs/game-sdk/applications#getticket)
-  pub verify_key: String,
+  pub verify_key: Option<String>,
   /// If the application belongs to a team, this will be the list of the members of that team
   pub team: Option<Team>,
   /// If this application is a game sold on Discord, this field will be the guild to which it has been linked
   pub guild_id: Option<Snowflake>,
+  /// Partial object of the associated guild
+  pub guild: Option<Guild>,
   /// If this application is a game sold on Discord, this field will be the id of the "Game SKU" that is created, if exists
   pub primary_sku_id: Option<Snowflake>,
   /// If this application is a game sold on Discord, this field will be the URL slug that links to the store page
@@ -53,18 +59,32 @@ pub struct Application {
   pub cover_image: Option<String>,
   /// The application's public [flags](ApplicationFlags)
   pub flags: Option<ApplicationFlags>,
+  /// Approximate count of guilds the app has been added to
+  pub approximate_guild_count: Option<i64>,
+  /// Array of redirect URIs for the app
+  pub redirect_uris: Option<Vec<String>>,
+  /// [Interactions endpoint URL](https://discord.com/developers/docs/interactions/receiving-and-responding#receiving-an-interaction) for the app
+  pub interactions_endpoint_url: Option<String>,
+  /// Role connection verification URL for the app
+  pub role_connections_verification_url: Option<String>,
+  /// List of tags describing the content and functionality of the app. Max of 5 tags.
+  pub tags: Option<Vec<String>>,
   /// Settings for the application's default in-app authorization link, if enabled
   pub install_params: Option<InstallParams>,
+  /// List of supported installation contexes
+  pub integration_types: Option<IntegrationType>,
+  /// Default scopes and permissions for each supported installation context. Value for each key is an [integration type configuration object](ApplicationIntegrationTypesConfigValue)
+  pub integration_types_config: Option<ApplicationIntegrationTypesConfig>,
   /// The application's default custom authorization link, if enabled
   pub custom_install_url: Option<String>,
-  /// The application's role connection verification entry point, which when configured will render the app as a verification method in the guild role verification configuration
-  pub role_connections_verification_url: Option<String>,
 }
 
 bitflags! {
   /// Bitflags for Discord Application Flags
   #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct ApplicationFlags: u32 {
+    /// Indicates if an app uses the [Auto Moderation API](https://discord.com/developers/docs/resources/auto-moderation)
+    const APPLICATION_AUTO_MODERATION_RULE_CREATE_BADGE = 1 << 6;
     /// Intent required for bots in **100 or more servers** to receive `presence_update` events
     const GATEWAY_PRESENCE = 1 << 12;
     /// Intent required for bots in under 100 servers to receive `presence_update` events, found in Bot Settings
@@ -84,6 +104,24 @@ bitflags! {
     /// Indicates if an app has registered global [application commands](super::interactions::ApplicationCommand)
     const APPLICATION_COMMAND_BADGE = 1 << 23;
   }
+}
+
+/// Discord Integration Types Config Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct ApplicationIntegrationTypesConfig {
+  /// Configuration for [`GUILD_INSTALL`](IntegrationType::GUILD_INSTALL) integrations
+  #[serde(rename = "0")]
+  pub guild_install: Option<ApplicationIntegrationTypesConfigValue>,
+  /// Configuration for [`USER_INSTALL`](IntegrationType::USER_INSTALL) integrations
+  #[serde(rename = "1")]
+  pub user_install: Option<ApplicationIntegrationTypesConfigValue>,
+}
+
+/// Discord Integration Types Config Value Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct ApplicationIntegrationTypesConfigValue {
+  /// Install params for each installation context's default in-app authorization link
+  pub oauth2_install_params: InstallParams,
 }
 
 /// Discord Install Params Object

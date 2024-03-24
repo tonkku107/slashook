@@ -16,8 +16,8 @@ use anyhow::{anyhow, bail, Context};
 
 use crate::structs::{
   interactions::{
-    ApplicationCommand,
-    Interaction, InteractionType, ApplicationCommandType, InteractionDataResolved, InteractionOption, InteractionOptionType,
+    ApplicationCommand, IntegrationOwners,
+    Interaction, InteractionType, ApplicationCommandType, InteractionDataResolved, InteractionOption, InteractionOptionType, InteractionContextType,
     InteractionCallback,
     OptionValue
   },
@@ -97,13 +97,17 @@ pub struct CommandInput {
   /// Only included in command autocomplete interactions
   pub focused: Option<String>,
   /// Permissions the app or bot has within the channel the interaction was sent from
-  pub app_permissions: Option<Permissions>,
+  pub app_permissions: Permissions,
   /// The selected [language](https://discord.com/developers/docs/reference#locales) of the user
   pub locale: String,
   /// The guild's preferred locale
   pub guild_locale: Option<String>,
   /// For [monetized apps](https://discord.com/developers/docs/monetization/overview), any entitlements for the invoking user, representing access to premium [SKUs](https://discord.com/developers/docs/monetization/skus)
   pub entitlements: Vec<Entitlement>,
+  /// Mapping of installation contexts that the interaction was authorized for to related user or guild IDs. See [Authorizing Integration Owners Object](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-authorizing-integration-owners-object) for details
+  pub authorizing_integration_owners: Option<IntegrationOwners>,
+  /// Context where the interaction was triggered from
+  pub context: Option<InteractionContextType>,
   /// Handler for Discord API calls
   pub rest: Rest,
 }
@@ -417,6 +421,8 @@ impl CommandHandler {
       locale: interaction.locale.context("Interaction didn't include a locale")?,
       guild_locale: interaction.guild_locale,
       entitlements: interaction.entitlements,
+      authorizing_integration_owners: interaction.authorizing_integration_owners,
+      context: interaction.context,
       rest: Rest::with_optional_token(bot_token)
     };
 
