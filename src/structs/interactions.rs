@@ -7,7 +7,7 @@
 
 //! Structs related to Discord interactions
 
-use serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize, de::{Deserializer, Error}};
 use serde_repr::{Serialize_repr, Deserialize_repr};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -163,11 +163,20 @@ pub enum IntegrationType {
 #[derive(Deserialize, Clone, Debug)]
 pub struct IntegrationOwners {
   /// ID of the authorizing guild. Value will be 0 if used in the bot's DM channel
-  #[serde(rename = "0")]
+  #[serde(rename = "0", deserialize_with = "snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason")]
   pub guild_id: Option<Snowflake>,
   /// ID of the authorizing user
   #[serde(rename = "1")]
   pub user_id: Option<Snowflake>,
+}
+
+fn snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Snowflake>, D::Error> {
+  match serde_json::Value::deserialize(d)? {
+    Value::String(s) => Ok(Some(s)),
+    Value::Number(i) => Ok(Some(i.to_string())),
+    Value::Null => Ok(None),
+    _ => Err(D::Error::custom("Expected string or number"))
+  }
 }
 
 #[doc(hidden)]
