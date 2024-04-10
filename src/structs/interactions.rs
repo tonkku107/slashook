@@ -163,7 +163,7 @@ pub enum IntegrationType {
 #[derive(Deserialize, Clone, Debug)]
 pub struct IntegrationOwners {
   /// ID of the authorizing guild. Value will be 0 if used in the bot's DM channel
-  #[serde(rename = "0", deserialize_with = "snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason")]
+  #[serde(rename = "0", default, deserialize_with = "snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason")]
   pub guild_id: Option<Snowflake>,
   /// ID of the authorizing user
   #[serde(rename = "1")]
