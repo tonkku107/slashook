@@ -18,7 +18,7 @@ use super::{
   embeds::Embed,
   emojis::Emoji,
   guilds::GuildMember,
-  interactions::{InteractionType, InteractionDataResolved, Attachments},
+  interactions::{IntegrationOwners, InteractionType, InteractionDataResolved, Attachments},
   invites::{Invite, CreateInviteOptions},
   permissions::Permissions,
   stickers::StickerItem,
@@ -343,8 +343,8 @@ pub struct Message {
   pub flags: Option<MessageFlags>,
   /// The message associated with the message_reference
   pub referenced_message: Option<Box<Message>>,
-  /// Sent if the message is a response to an [Interaction](https://discord.com/developers/docs/interactions/receiving-and-responding)
-  pub interaction: Option<MessageInteraction>,
+  /// Sent if the message is sent as a result of an interaction
+  pub interaction_metadata: Option<MessageInteractionMetadata>,
   /// The thread that was started from this message, includes [thread member](ThreadMember) object
   pub thread: Option<Channel>,
   /// Sent if the message contains components like buttons, action rows, or other interactive components
@@ -564,20 +564,24 @@ bitflags! {
   }
 }
 
-/// Discord Message Interaction Object
+/// Discord Message Interaction Metadata Object
 #[derive(Deserialize, Clone, Debug)]
-pub struct MessageInteraction {
+pub struct MessageInteractionMetadata {
   /// Id of the interaction
   pub id: Snowflake,
   /// The type of interaction
   #[serde(rename = "type")]
   pub interaction_type: Option<InteractionType>,
-  /// The name of the [application command](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-structure)
-  pub name: String,
-  /// The user who invoked the interaction
-  pub user: User,
-  /// The member who invoked the interaction in the guild
-  pub member: Option<GuildMember>
+  /// ID of the user who triggered the interaction
+  pub user_id: Snowflake,
+  /// IDs for installation context(s) related to an interaction. Details in [Authorizing Integration Owners Object](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-authorizing-integration-owners-object)
+  pub authorizing_integration_owners: IntegrationOwners,
+  /// ID of the original response message, present only on [follow-up messages](https://discord.com/developers/docs/interactions/receiving-and-responding)
+  pub original_response_message_id: Option<Snowflake>,
+  /// ID of the message that contained interactive component, present only on messages created from component interactions
+  pub interacted_message_id: Option<Snowflake>,
+  /// Metadata for the interaction that was used to open the modal, present only on modal submit interactions
+  pub triggering_interaction_metadata: Option<Box<MessageInteractionMetadata>>,
 }
 
 /// Discord Allowed Mentions Object

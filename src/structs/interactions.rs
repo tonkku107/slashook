@@ -7,7 +7,7 @@
 
 //! Structs related to Discord interactions
 
-use serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize, de::{Deserializer, Error}};
 use serde_repr::{Serialize_repr, Deserialize_repr};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -49,7 +49,8 @@ pub struct ApplicationCommand {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub name_localizations: Option<HashMap<String, String>>,
   /// Description for `CHAT_INPUT` commands, 1-100 characters. Empty string for `USER` and `MESSAGE` commands
-  pub description: String,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub description: Option<String>,
   /// Localization dictionary for `description` field. Values follow the same restrictions as `description`
   #[serde(skip_serializing_if = "Option::is_none")]
   pub description_localizations: Option<HashMap<String, String>>,
@@ -59,12 +60,15 @@ pub struct ApplicationCommand {
   /// Set of [permissions](Permissions) represented as a bit set
   #[serde(skip_serializing_if = "Option::is_none")]
   pub default_member_permissions: Option<Permissions>,
-  /// Indicates whether the command is available in DMs with the app, only for globally-scoped commands. By default, commands are visible.
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub dm_permission: Option<bool>,
   /// Indicates whether the command is age-restricted, defaults to `false`
   #[serde(skip_serializing_if = "Option::is_none")]
   pub nsfw: Option<bool>,
+  /// [Installation context(s)](https://discord.com/developers/docs/resources/application#installation-context) where the command is available, only for globally-scoped commands. Defaults to `GUILD_INSTALL` (`0`)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub integration_types: Option<Vec<IntegrationType>>,
+  /// [Interaction context(s)](InteractionContextType) where the command can be used, only for globally-scoped commands. By default, all interaction context types included for new commands.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub contexts: Option<Vec<InteractionContextType>>,
   /// Autoincrementing version identifier updated during substantial record changes
   #[serde(skip_serializing_if = "Option::is_none")]
   pub version: Option<Snowflake>,
@@ -142,6 +146,39 @@ pub struct ApplicationCommandOptionChoice {
   pub value: Value,
 }
 
+/// Discord Application Intgration Types
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum IntegrationType {
+  /// App is installable to servers
+  GUILD_INSTALL = 0,
+  /// App is installable to users
+  USER_INSTALL = 1,
+  /// Integration type that hasn't been implemented yet
+  UNKNOWN
+}
+
+/// Discord Integration Owners Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct IntegrationOwners {
+  /// ID of the authorizing guild. Value will be 0 if used in the bot's DM channel
+  #[serde(rename = "0", default, deserialize_with = "snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason")]
+  pub guild_id: Option<Snowflake>,
+  /// ID of the authorizing user
+  #[serde(rename = "1")]
+  pub user_id: Option<Snowflake>,
+}
+
+fn snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason<'de, D: Deserializer<'de>>(d: D) -> Result<Option<Snowflake>, D::Error> {
+  match serde_json::Value::deserialize(d)? {
+    Value::String(s) => Ok(Some(s)),
+    Value::Number(i) => Ok(Some(i.to_string())),
+    Value::Null => Ok(None),
+    _ => Err(D::Error::custom("Expected string or number"))
+  }
+}
+
 #[doc(hidden)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct Interaction {
@@ -158,10 +195,12 @@ pub struct Interaction {
   pub token: String,
   pub version: u8,
   pub message: Option<Message>,
-  pub app_permissions: Option<Permissions>,
+  pub app_permissions: Permissions,
   pub locale: Option<String>,
   pub guild_locale: Option<String>,
   pub entitlements: Vec<Entitlement>,
+  pub authorizing_integration_owners: Option<IntegrationOwners>,
+  pub context: Option<InteractionContextType>
 }
 
 /// Discord Interaction Types
@@ -283,6 +322,21 @@ pub enum OptionValue {
   Other(Value)
 }
 
+/// Discord Interaction Context Types
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum InteractionContextType {
+  /// Interaction can be used within servers
+  GUILD = 0,
+  /// Interaction can be used within DMs with the app's bot user
+  BOT_DM = 1,
+  /// Interaction can be used within Group DMs and DMs other than the app's bot user
+  PRIVATE_CHANNEL = 2,
+  /// Interaction Context Type that hasn't been implemented yet
+  UNKNOWN
+}
+
 #[doc(hidden)]
 #[derive(Serialize, Clone, Debug)]
 pub struct InteractionCallback {
@@ -348,7 +402,23 @@ impl TryFrom<u8> for ApplicationCommandType {
   }
 }
 
+impl TryFrom<u8> for IntegrationType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
 impl TryFrom<u8> for InteractionOptionType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
+impl TryFrom<u8> for InteractionContextType {
   type Error = serde_json::Error;
 
   fn try_from(value: u8) -> Result<Self, Self::Error> {
