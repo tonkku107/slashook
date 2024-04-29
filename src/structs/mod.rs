@@ -20,6 +20,7 @@ pub use emojis::Emoji;
 pub mod guilds;
 pub mod interactions;
 pub mod invites;
+pub mod messages;
 pub mod monetization;
 mod permissions;
 pub use permissions::Permissions;

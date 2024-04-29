@@ -8,7 +8,7 @@
 use crate::structs::{
   embeds::Embed,
   interactions::{InteractionCallbackData, ApplicationCommandOptionChoice, Attachments},
-  channels::{Message, AllowedMentions, Attachment, MessageFlags},
+  messages::{Message, AllowedMentions, Attachment, MessageFlags},
   components::{Component, Components},
   utils::File
 };
@@ -39,8 +39,8 @@ pub struct MessageResponse {
   #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
   /// Flags of the message.\
-  /// Valid flags are [EPHEMERAL](crate::structs::channels::MessageFlags::EPHEMERAL) for interactions to only show the response to the invoking user and
-  /// [SUPPRESS_EMBEDS](crate::structs::channels::MessageFlags::SUPPRESS_EMBEDS) to hide embeds from showing in the message.
+  /// Valid flags are [EPHEMERAL](crate::structs::messages::MessageFlags::EPHEMERAL) for interactions to only show the response to the invoking user and
+  /// [SUPPRESS_EMBEDS](crate::structs::messages::MessageFlags::SUPPRESS_EMBEDS) to hide embeds from showing in the message.
   pub flags: Option<MessageFlags>,
   /// Up to 10 embeds to send with the response
   #[serde(skip_serializing_if = "Option::is_none")]
@@ -87,7 +87,7 @@ impl MessageResponse {
   /// Set the ephemeralness of the message
   /// ```
   /// # use slashook::commands::MessageResponse;
-  /// # use slashook::structs::channels::MessageFlags;
+  /// # use slashook::structs::messages::MessageFlags;
   /// let response = MessageResponse::from("This is for your eyes only!")
   ///   .set_ephemeral(true);
   /// assert_eq!(response.flags.unwrap().contains(MessageFlags::EPHEMERAL), true);
@@ -102,7 +102,7 @@ impl MessageResponse {
   /// Set suppress embeds flag
   /// ```
   /// # use slashook::commands::MessageResponse;
-  /// # use slashook::structs::channels::MessageFlags;
+  /// # use slashook::structs::messages::MessageFlags;
   /// let response = MessageResponse::from("No embeds here")
   ///   .set_suppress_embeds(true);
   /// assert_eq!(response.flags.unwrap().contains(MessageFlags::SUPPRESS_EMBEDS), true);
@@ -117,7 +117,7 @@ impl MessageResponse {
   /// Set voice message flag
   /// ```no_run
   /// # use slashook::commands::{MessageResponse, CmdResult};
-  /// # use slashook::structs::{channels::MessageFlags, utils::File};
+  /// # use slashook::structs::{messages::MessageFlags, utils::File};
   /// # use slashook::tokio::fs::File as TokioFile;
   /// # #[slashook::main]
   /// # async fn main() -> CmdResult {
@@ -185,7 +185,7 @@ impl MessageResponse {
   /// Set the allowed mentions for the message
   /// ```
   /// # use slashook::commands::MessageResponse;
-  /// # use slashook::structs::channels::{AllowedMentions, AllowedMentionType};
+  /// # use slashook::structs::messages::{AllowedMentions, AllowedMentionType};
   /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::USERS);
   /// let response = MessageResponse::from("<@1234> Get pinged. Not @everyone or <@&1235> tho.")
   ///   .set_allowed_mentions(allowed_mentions);
