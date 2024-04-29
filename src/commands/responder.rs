@@ -6,11 +6,12 @@
 // copied, modified, or distributed except according to those terms.
 
 use crate::structs::{
-  embeds::Embed,
-  interactions::{InteractionCallbackData, ApplicationCommandOptionChoice, Attachments},
-  messages::{Message, AllowedMentions, Attachment, MessageFlags},
   components::{Component, Components},
-  utils::File
+  embeds::Embed,
+  interactions::{ApplicationCommandOptionChoice, Attachments, InteractionCallbackData},
+  messages::{AllowedMentions, Attachment, Message, MessageFlags},
+  polls::PollCreateRequest,
+  utils::File,
 };
 use serde::Serialize;
 use crate::tokio::sync::mpsc;
@@ -28,8 +29,8 @@ impl std::error::Error for InteractionResponseError { }
 
 /// Message that can be sent as a response to a command or other interaction
 ///
-/// This struct can be easily constructed from a `str`, `String`, [`Embed`](crate::structs::embeds::Embed), [`Components`](crate::structs::components::Components)
-/// or [`File`](crate::structs::utils::File)
+/// This struct can be easily constructed from a `str`, `String`, [`Embed`](crate::structs::embeds::Embed), [`Components`](crate::structs::components::Components),
+/// [`File`](crate::structs::utils::File) or [`PollCreateRequest`](crate::structs::polls::PollCreateRequest)
 /// with the `From` trait
 #[derive(Serialize, Clone, Debug)]
 pub struct MessageResponse {
@@ -56,7 +57,10 @@ pub struct MessageResponse {
   pub allowed_mentions: Option<AllowedMentions>,
   /// Up to 10 files to send with the response
   #[serde(skip_serializing)]
-  pub files: Option<Vec<File>>
+  pub files: Option<Vec<File>>,
+  /// A poll!
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub poll: Option<PollCreateRequest>,
 }
 
 impl MessageResponse {
@@ -257,6 +261,23 @@ impl MessageResponse {
   /// ```
   pub fn clear_attachments(mut self) -> Self {
     self.attachments = Some(Vec::new());
+    self
+  }
+
+  /// Add a poll to the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::{polls::{PollCreateRequest, PollAnswer}, Emoji};
+  /// let response = MessageResponse::from("This message will contain a poll!")
+  ///   .set_poll(PollCreateRequest::new("Is this a good poll?")
+  ///     .add_answer(PollAnswer::new().set_text("Yes").set_emoji(Emoji::new_standard_emoji("✅")))
+  ///     .add_answer(PollAnswer::from("No").set_emoji(Emoji::new_custom_emoji("567088349484023818", "redtick", false)))
+  ///     .add_answer("Maybe")
+  ///     .set_duration(1)
+  ///   );
+  /// ```
+  pub fn set_poll(mut self, poll: PollCreateRequest) -> Self {
+    self.poll = Some(poll);
     self
   }
 }
@@ -589,7 +610,8 @@ impl From<&str> for MessageResponse {
       components: None,
       attachments: None,
       allowed_mentions: None,
-      files: None
+      files: None,
+      poll: None,
     }
   }
 }
@@ -604,7 +626,8 @@ impl From<String> for MessageResponse {
       components: None,
       attachments: None,
       allowed_mentions: None,
-      files: None
+      files: None,
+      poll: None,
     }
   }
 }
@@ -619,7 +642,8 @@ impl From<Embed> for MessageResponse {
       components: None,
       attachments: None,
       allowed_mentions: None,
-      files: None
+      files: None,
+      poll: None,
     }
   }
 }
@@ -634,7 +658,8 @@ impl From<Vec<Embed>> for MessageResponse {
       components: None,
       attachments: None,
       allowed_mentions: None,
-      files: None
+      files: None,
+      poll: None,
     }
   }
 }
@@ -649,7 +674,8 @@ impl From<Components> for MessageResponse {
       components: Some(c.0),
       attachments: None,
       allowed_mentions: None,
-      files: None
+      files: None,
+      poll: None,
     }
   }
 }
@@ -664,7 +690,8 @@ impl From<File> for MessageResponse {
       components: None,
       attachments: None,
       allowed_mentions: None,
-      files: Some(vec![f])
+      files: Some(vec![f]),
+      poll: None,
     }
   }
 }
@@ -679,7 +706,24 @@ impl From<Vec<File>> for MessageResponse {
       components: None,
       attachments: None,
       allowed_mentions: None,
-      files: Some(f)
+      files: Some(f),
+      poll: None,
+    }
+  }
+}
+
+impl From<PollCreateRequest> for MessageResponse {
+  fn from(poll: PollCreateRequest) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      flags: None,
+      embeds: None,
+      components: None,
+      attachments: None,
+      allowed_mentions: None,
+      files: None,
+      poll: Some(poll),
     }
   }
 }

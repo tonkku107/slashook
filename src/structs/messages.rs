@@ -20,6 +20,7 @@ use super::{
   emojis::Emoji,
   guilds::GuildMember,
   interactions::{IntegrationOwners, InteractionType, InteractionDataResolved},
+  polls::{Poll, PollVoters},
   stickers::StickerItem,
   users::User,
   utils::File,
@@ -101,6 +102,8 @@ pub struct Message {
   pub role_subscription_data: Option<RoleSubscriptionData>,
   /// Data for users, members, channels, and roles in the message's [auto-populated select menus](crate::structs::components::SelectMenu)
   pub resolved: Option<InteractionDataResolved>,
+  /// A poll!
+  pub poll: Option<Poll>,
 }
 
 /// Discord Channel Mention Object
@@ -381,7 +384,7 @@ pub struct MessageFetchOptions {
   pub limit: Option<i64>,
 }
 
-/// Options for fetching reactions with [get_reactions](Message::get_reactions).
+/// Options for fetching reactions with [get_reactions](Message::get_reactions) or poll voters with [get_poll_voters](Message::get_poll_voters).
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct ReactionFetchOptions {
   /// Get users after this user ID
@@ -628,6 +631,38 @@ impl Message {
   /// ```
   pub async fn start_thread(&self, rest: &Rest, options: ThreadCreateOptions) -> Result<Channel, RestError> {
     rest.post(format!("channels/{}/messages/{}/threads", self.channel_id, self.id), options).await
+  }
+
+  /// Get a list of users that voted for this specific answer.
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::{messages::ReactionFetchOptions, interactions::ApplicationCommandType};
+  /// # #[command(name = "Example Message Context", command_type = ApplicationCommandType::MESSAGE)]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = input.target_message.unwrap();
+  /// let options = ReactionFetchOptions::new();
+  /// let voters = msg.get_poll_voters(&input.rest, 1, options).await?;
+  /// println!("{:?}", voters.users);
+  /// # }
+  /// ```
+  pub async fn get_poll_voters(&self, rest: &Rest, answer_id: i64, options: ReactionFetchOptions) -> Result<PollVoters, RestError> {
+    rest.get_query(format!("channels/{}/polls/{}/answers/{}", self.channel_id, self.id, answer_id), options).await
+  }
+
+  /// Immediately ends the poll. You cannot end polls from other users.
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::interactions::ApplicationCommandType;
+  /// # #[command(name = "Example Message Context", command_type = ApplicationCommandType::MESSAGE)]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let msg = input.target_message.unwrap();
+  /// msg.end_poll(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn end_poll(&self, rest: &Rest) -> Result<Message, RestError> {
+    rest.post(format!("channels/{}/polls/{}/expire", self.channel_id, self.id), Value::Null).await
   }
 }
 

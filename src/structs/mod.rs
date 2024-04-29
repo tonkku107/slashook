@@ -24,6 +24,7 @@ pub mod messages;
 pub mod monetization;
 mod permissions;
 pub use permissions::Permissions;
+pub mod polls;
 pub mod stickers;
 pub mod users;
 pub mod utils;
