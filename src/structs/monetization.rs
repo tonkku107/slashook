@@ -9,6 +9,7 @@
 
 use serde::{Deserialize, de::Deserializer, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
+use serde_json::Value;
 use chrono::{DateTime, Utc};
 use bitflags::bitflags;
 use super::Snowflake;
@@ -37,6 +38,10 @@ pub struct SKU {
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum SKUType {
+  /// Durable one-time purchase
+  DURABLE = 2,
+  /// Consumable one-time purchase
+  CONSUMABLE = 3,
   /// Represents a recurring subscription
   SUBSCRIPTION = 5,
   /// System-generated group for each SUBSCRIPTION SKU created
@@ -80,6 +85,8 @@ pub struct Entitlement {
   pub ends_at: Option<DateTime<Utc>>,
   /// ID of the guild that is granted access to the entitlement's sku
   pub guild_id: Option<Snowflake>,
+  /// For consumable items, whether or not the entitlement has been consumed
+  pub consumed: Option<bool>,
 }
 
 /// Discord Entitlement Types
@@ -87,6 +94,20 @@ pub struct Entitlement {
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum EntitlementType {
+  /// Entitlement was purchased by user
+  PURCHASE = 1,
+  /// Entitlement for Discord Nitro subscription
+  PREMIUM_SUBSCRIPTION = 2,
+  /// Entitlement was gifted by developer
+  DEVELOPER_GIFT = 3,
+  /// Entitlement was purchased by a dev in application test mode
+  TEST_MODE_PURCHASE = 4,
+  /// Entitlement was granted when the SKU was free
+  FREE_PURCHASE = 5,
+  /// Entitlement was gifted by another user
+  USER_GIFT = 6,
+  /// Entitlement was claimed by user for free as a Nitro Subscriber
+  PREMIUM_PURCHASE = 7,
   /// Entitlement was purchased as an app subscription
   APPLICATION_SUBSCRIPTION = 8,
   /// An entitlement type that hasn't been implemented yet
@@ -144,6 +165,11 @@ impl Entitlement {
   /// Lists all entitlements
   pub async fn list_entitlements<T: ToString>(rest: &Rest, application_id: T, options: ListEntitlementsOptions) -> Result<Vec<Entitlement>, RestError> {
     rest.get_query(format!("applications/{}/entitlements", application_id.to_string()), options).await
+  }
+
+  /// Consumes a consumable entitlement
+  pub async fn consume_entitlement<T: ToString>(&self, rest: &Rest, application_id: T) -> Result<(), RestError> {
+    rest.post(format!("applications/{}/entitlements/{}/consume", application_id.to_string(), self.id), Value::Null).await
   }
 
   /// Creates a test entitlement
