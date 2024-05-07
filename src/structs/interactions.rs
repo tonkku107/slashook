@@ -16,8 +16,9 @@ use super::{
   embeds::Embed,
   users::User,
   guilds::{GuildMember, Role},
-  channels::{Channel, Message, MessageFlags, AllowedMentions, Attachment, ChannelType},
+  channels::{Channel, ChannelType},
   components::{Component, ComponentType},
+  messages::{Message, MessageFlags, AllowedMentions, Attachment},
   monetization::Entitlement,
   utils::File,
   Permissions

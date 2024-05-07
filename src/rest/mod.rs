@@ -14,7 +14,7 @@ use std::any::TypeId;
 use serde::{Serialize, de::{DeserializeOwned, Error}};
 use serde_json::{Value, json};
 use crate::structs::{
-  channels::Attachment,
+  messages::Attachment,
   interactions::Attachments,
   utils::File
 };

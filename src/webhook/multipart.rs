@@ -7,7 +7,7 @@
 
 use std::io::Cursor;
 use crate::structs::{
-  channels::Attachment,
+  messages::Attachment,
   interactions::{InteractionCallback, Attachments}
 };
 use rocket::{

@@ -22,9 +22,10 @@ use crate::structs::{
     OptionValue
   },
   components::{Component, ComponentType},
-  channels::{Channel, Message},
+  channels::Channel,
   users::User,
   guilds::GuildMember,
+  messages::Message,
   monetization::Entitlement,
   Snowflake,
   Permissions
