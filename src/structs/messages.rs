@@ -354,7 +354,7 @@ pub enum AllowedMentionType {
   /// Allowed to mention users
   USERS,
   /// Allowed to mention @everyone and @here
-  CHANNELS
+  EVERYONE
 }
 
 /// Discord Role Subscription Data Object
