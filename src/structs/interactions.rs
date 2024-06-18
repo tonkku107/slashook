@@ -358,7 +358,6 @@ pub enum InteractionCallbackType {
   UPDATE_MESSAGE = 7,
   APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8,
   MODAL = 9,
-  PREMIUM_REQUIRED = 10,
 }
 
 #[doc(hidden)]
@@ -470,13 +469,6 @@ impl From<CommandResponse> for InteractionCallback {
         InteractionCallback {
           response_type: InteractionCallbackType::MODAL,
           data: Some(modal.into())
-        }
-      },
-
-      CommandResponse::PremiumRequired => {
-        InteractionCallback {
-          response_type: InteractionCallbackType::PREMIUM_REQUIRED,
-          data: None
         }
       },
 
