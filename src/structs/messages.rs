@@ -319,8 +319,8 @@ pub struct MessageInteractionMetadata {
   /// The type of interaction
   #[serde(rename = "type")]
   pub interaction_type: Option<InteractionType>,
-  /// ID of the user who triggered the interaction
-  pub user_id: Snowflake,
+  /// User who triggered the interaction
+  pub user: User,
   /// IDs for installation context(s) related to an interaction. Details in [Authorizing Integration Owners Object](https://discord.com/developers/docs/interactions/receiving-and-responding#interaction-object-authorizing-integration-owners-object)
   pub authorizing_integration_owners: IntegrationOwners,
   /// ID of the original response message, present only on [follow-up messages](https://discord.com/developers/docs/interactions/receiving-and-responding)

@@ -114,6 +114,10 @@ bitflags! {
     const USE_EXTERNAL_SOUNDS = 1 << 45;
     /// Allows sending voice messages
     const SEND_VOICE_MESSAGES = 1 << 46;
+    /// Allows sending polls
+    const SEND_POLLS = 1 << 49;
+    /// Allows user-installed apps to send public responses. When disabled, users will still be allowed to use their apps but the responses will be ephemeral. This only applies to apps not also installed to the server.
+    const USE_EXTERNAL_APPS = 1 << 50;
   }
 }
 
