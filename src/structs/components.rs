@@ -73,9 +73,9 @@ pub struct ActionRow {
 
 /// A Button component
 ///
-/// Non-link buttons must have a `custom_id` and cannot have a `url`.\
+/// Most buttons must have a `custom_id` and one of `label` or `emoji` and cannot have a `url` or `sku_id`.\
 /// Link buttons must have a `url` and cannot have a `custom_id`.\
-/// One of `label` or `emoji` is required.
+/// Premium buttons must have a `sku_id` and cannot have `custom_id`, `label`, `url`, or `emoji`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Button {
   #[serde(rename = "type")]
@@ -88,6 +88,8 @@ pub struct Button {
   pub emoji: Option<Emoji>,
   /// A developer-defined identifier for the button, max 100 characters
   pub custom_id: Option<String>,
+  /// Identifier for a purchasable [SKU](super::monetization::SKU), only available when using premium-style buttons
+  pub sku_id: Option<Snowflake>,
   /// A url for link-style buttons
   pub url: Option<String>,
   /// Whether the button is disabled (default `false`)
@@ -109,6 +111,8 @@ pub enum ButtonStyle {
   DANGER = 4,
   /// A grey button that navigates to a URL
   LINK = 5,
+  /// A blurple button that links to a SKU
+  PREMIUM = 6,
   /// A button style that hasn't been implemented yet
   UNKNOWN
 }
@@ -366,39 +370,14 @@ impl Button {
   pub fn new() -> Self {
     Self {
       component_type: ComponentType::BUTTON,
-      custom_id: None,
-      disabled: Some(false),
       style: ButtonStyle::PRIMARY,
       label: None,
       emoji: None,
-      url: None
+      custom_id: None,
+      sku_id: None,
+      url: None,
+      disabled: Some(false),
     }
-  }
-
-  /// Set the custom_id for a button.\
-  /// The command argument is used by the library to choose which command to run when the button is clicked.
-  /// The custom_id is formatted as `command/id`
-  /// ```
-  /// # use slashook::structs::components::Button;
-  /// let button = Button::new()
-  ///   .set_id("example_button", "cool-button");
-  /// assert_eq!(button.custom_id, Some(String::from("example_button/cool-button")));
-  /// ```
-  pub fn set_id<T: ToString, U: ToString>(mut self, command: T, id: U) -> Self {
-    self.custom_id = Some(format!("{}/{}", command.to_string(), id.to_string()));
-    self
-  }
-
-  /// Set the disabled state of the button
-  /// ```
-  /// # use slashook::structs::components::Button;
-  /// let button = Button::new()
-  ///   .set_disabled(true);
-  /// assert_eq!(button.disabled, Some(true));
-  /// ```
-  pub fn set_disabled(mut self, disabled: bool) -> Self {
-    self.disabled = Some(disabled);
-    self
   }
 
   /// Set the style of the button
@@ -438,6 +417,33 @@ impl Button {
     self
   }
 
+  /// Set the custom_id for a button.\
+  /// The command argument is used by the library to choose which command to run when the button is clicked.
+  /// The custom_id is formatted as `command/id`
+  /// ```
+  /// # use slashook::structs::components::Button;
+  /// let button = Button::new()
+  ///   .set_id("example_button", "cool-button");
+  /// assert_eq!(button.custom_id, Some(String::from("example_button/cool-button")));
+  /// ```
+  pub fn set_id<T: ToString, U: ToString>(mut self, command: T, id: U) -> Self {
+    self.custom_id = Some(format!("{}/{}", command.to_string(), id.to_string()));
+    self
+  }
+
+  /// Set the SKU for a premium-style button
+  /// ```
+  /// # use slashook::structs::components::{Button, ButtonStyle};
+  /// let button = Button::new()
+  ///   .set_style(ButtonStyle::PREMIUM)
+  ///   .set_sku_id("1180218955160375406");
+  /// assert_eq!(button.sku_id, Some(String::from("1180218955160375406")));
+  /// ```
+  pub fn set_sku_id<T: ToString>(mut self, sku_id: T) -> Self {
+    self.sku_id = Some(sku_id.to_string());
+    self
+  }
+
   /// Set the url for a link-style button
   /// ```
   /// # use slashook::structs::components::{Button, ButtonStyle};
@@ -448,6 +454,18 @@ impl Button {
   /// ```
   pub fn set_url<T: ToString>(mut self, url: T) -> Self {
     self.url = Some(url.to_string());
+    self
+  }
+
+  /// Set the disabled state of the button
+  /// ```
+  /// # use slashook::structs::components::Button;
+  /// let button = Button::new()
+  ///   .set_disabled(true);
+  /// assert_eq!(button.disabled, Some(true));
+  /// ```
+  pub fn set_disabled(mut self, disabled: bool) -> Self {
+    self.disabled = Some(disabled);
     self
   }
 }
