@@ -39,6 +39,7 @@ pub enum ComponentType {
   /// A select menu for channels
   CHANNEL_SELECT = 8,
   /// A component that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -114,6 +115,7 @@ pub enum ButtonStyle {
   /// A blurple button that links to a SKU
   PREMIUM = 6,
   /// A button style that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 

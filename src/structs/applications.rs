@@ -171,6 +171,7 @@ pub enum TeamMembershipState {
   /// Member has accepted invitation
   ACCEPTED = 2,
   /// Membership state that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 

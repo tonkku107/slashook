@@ -121,6 +121,7 @@ pub enum VerificationLevel {
   /// Must have a verified phone number
   VERY_HIGH = 4,
   /// Verification level that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -134,6 +135,7 @@ pub enum MessageNotificationsLevel {
   /// Members will receive notifications only for messages that @mention them by default
   ONLY_MENTIONS = 1,
   /// Message notifications level that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -149,6 +151,7 @@ pub enum ExplicitContentFilterLevel {
   /// Media content sent by all members will be scanned
   ALL_MEMBERS = 2,
   /// Explicit content filter level that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -162,6 +165,7 @@ pub enum MFALevel {
   /// Guild has a 2FA requirement for moderation actions
   ELEVATED = 1,
   /// MFA level that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -198,6 +202,7 @@ pub enum PremiumTier {
   /// Guild has unlocked Server Boost level 3 perks
   TIER_3 = 3,
   /// Premium tier that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -237,6 +242,7 @@ pub enum NSFWLevel {
   /// Age Restricted
   AGE_RESTRICTED = 3,
   /// NSFW level that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -376,6 +382,7 @@ pub enum PrivacyLevel {
   /// The scheduled event is only accessible to guild members
   GUILD_ONLY = 2,
   /// Privacy level that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -393,6 +400,7 @@ pub enum EventStatus {
   /// Canceled
   CANCELED = 4,
   /// Status that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -408,6 +416,7 @@ pub enum EntityType {
   /// External
   EXTERNAL = 3,
   /// Entity type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 

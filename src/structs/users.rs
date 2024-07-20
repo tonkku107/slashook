@@ -99,6 +99,7 @@ pub enum PremiumType {
   /// User has Nitro Basic
   NITRO_BASIC = 3,
   /// A premium type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 

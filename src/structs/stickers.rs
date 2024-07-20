@@ -52,6 +52,7 @@ pub enum StickerType {
   /// A sticker uploaded to a guild for the guild's members
   GUILD = 2,
   /// Sticker type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -78,5 +79,6 @@ pub enum StickerFormatType {
   /// Lottie .json format
   LOTTIE = 3,
   /// Sticker format type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
