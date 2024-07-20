@@ -135,6 +135,7 @@ pub enum ChannelType {
   /// Channel that can only contain threads
   GUILD_FORUM = 15,
   /// Channel type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -162,6 +163,7 @@ pub enum PermissionOverwriteType {
   /// Permission overwrite for a member
   MEMBER = 1,
   /// Permission overwrite type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -175,6 +177,7 @@ pub enum VideoQualityMode {
   /// 720p
   FULL = 2,
   /// Video quality mode that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -255,6 +258,7 @@ pub enum SortOrderType {
   /// Sort forum posts by creation time (from most recent to oldest)
   CREATION_DATE = 1,
   /// Sort order type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -270,6 +274,7 @@ pub enum ForumLayoutType {
   /// Display posts as a collection of tiles
   GALLERY_VIEW = 2,
   /// Forum layout type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 

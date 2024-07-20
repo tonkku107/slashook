@@ -87,6 +87,7 @@ pub enum ApplicationCommandType {
   /// A UI-based command that shows up when you right click or tap on a message
   MESSAGE = 3,
   /// An application command type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -157,6 +158,7 @@ pub enum IntegrationType {
   /// App is installable to users
   USER_INSTALL = 1,
   /// Integration type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -211,6 +213,7 @@ pub enum InteractionType {
   /// Modal submit interaction
   MODAL_SUBMIT = 5,
   /// Interaction type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -286,8 +289,9 @@ pub enum InteractionOptionType {
   NUMBER = 10,
   /// An attachment object
   ATTACHMENT = 11,
-  #[default]
   /// An unknown option type that hasn't been implemented yet
+  #[default]
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -326,6 +330,7 @@ pub enum InteractionContextType {
   /// Interaction can be used within Group DMs and DMs other than the app's bot user
   PRIVATE_CHANNEL = 2,
   /// Interaction Context Type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 

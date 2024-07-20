@@ -58,6 +58,7 @@ pub enum PollLayoutType {
   /// The, uhm, default layout type.
   DEFAULT = 1,
   /// Poll Layout Type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN,
 }
 

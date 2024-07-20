@@ -239,6 +239,7 @@ pub enum MessageType {
   /// Application premium subscription
   GUILD_APPLICATION_PREMIUM_SUBSCRIPTION = 32,
   /// A message type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -266,6 +267,7 @@ pub enum MessageActivityType {
   /// Invite to request to join
   JOIN_REQUEST = 5,
   /// Message activity type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 

@@ -66,6 +66,7 @@ pub enum TargetType {
   /// Embedded application target
   EMBEDDED_APPLICATION = 2,
   /// Target type that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
