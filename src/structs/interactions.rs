@@ -73,6 +73,8 @@ pub struct ApplicationCommand {
   /// Autoincrementing version identifier updated during substantial record changes
   #[serde(skip_serializing_if = "Option::is_none")]
   pub version: Option<Snowflake>,
+  /// Determines whether the interaction is handled by the app's interactions handler or by Discord
+  pub handler: Option<ApplicationCommandHandlerType>,
 }
 
 /// Discord Application Command Types
@@ -86,6 +88,8 @@ pub enum ApplicationCommandType {
   USER = 2,
   /// A UI-based command that shows up when you right click or tap on a message
   MESSAGE = 3,
+  /// A UI-based command that represents the primary way to invoke an app's [Activity](https://discord.com/developers/docs/activities/overview)
+  PRIMARY_ENTRY_POINT = 4,
   /// An application command type that hasn't been implemented yet
   #[serde(other)]
   UNKNOWN
@@ -334,6 +338,20 @@ pub enum InteractionContextType {
   UNKNOWN
 }
 
+/// Discord Entry Point Command Handler Types
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum ApplicationCommandHandlerType {
+  /// The app handles the interaction using an interaction token
+  APP_HANDLER = 1,
+  /// Discord handles the interaction by launching an Activity and sending a follow-up message without coordinating with the app
+  DISCORD_LAUNCH_ACTIVITY = 2,
+  /// Command Handler Type that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
+}
+
 #[doc(hidden)]
 #[derive(Serialize, Clone, Debug)]
 pub struct InteractionCallback {
@@ -354,6 +372,7 @@ pub enum InteractionCallbackType {
   UPDATE_MESSAGE = 7,
   APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8,
   MODAL = 9,
+  LAUNCH_ACTIVITY = 12,
 }
 
 #[doc(hidden)]
@@ -429,42 +448,49 @@ impl From<CommandResponse> for InteractionCallback {
       CommandResponse::DeferMessage(flags) => {
         InteractionCallback {
           response_type: InteractionCallbackType::DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
-          data: Some(flags.into())
+          data: Some(flags.into()),
         }
       },
 
       CommandResponse::DeferUpdate => {
         InteractionCallback {
           response_type: InteractionCallbackType::DEFERRED_UPDATE_MESSAGE,
-          data: None
+          data: None,
         }
       }
 
       CommandResponse::SendMessage(msg) => {
         InteractionCallback {
           response_type: InteractionCallbackType::CHANNEL_MESSAGE_WITH_SOURCE,
-          data: Some(msg.into())
+          data: Some(msg.into()),
         }
       },
 
       CommandResponse::UpdateMessage(msg) => {
         InteractionCallback {
           response_type: InteractionCallbackType::UPDATE_MESSAGE,
-          data: Some(msg.into())
+          data: Some(msg.into()),
         }
       },
 
       CommandResponse::AutocompleteResult(results) => {
         InteractionCallback {
           response_type: InteractionCallbackType::APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
-          data: Some(results.into())
+          data: Some(results.into()),
         }
       },
 
       CommandResponse::Modal(modal) => {
         InteractionCallback {
           response_type: InteractionCallbackType::MODAL,
-          data: Some(modal.into())
+          data: Some(modal.into()),
+        }
+      },
+
+      CommandResponse::LaunchActivity => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::LAUNCH_ACTIVITY,
+          data: None,
         }
       },
 

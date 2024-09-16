@@ -334,6 +334,7 @@ pub enum CommandResponse {
   UpdateMessage(MessageResponse),
   AutocompleteResult(Vec<ApplicationCommandOptionChoice>),
   Modal(Modal),
+  LaunchActivity,
 }
 
 /// Struct with methods for responding to interactions
@@ -483,6 +484,26 @@ impl CommandResponder {
   /// ```
   pub async fn open_modal(&self, modal: Modal) -> Result<(), InteractionResponseError> {
     self.tx.send(CommandResponse::Modal(modal)).map_err(|_| InteractionResponseError)?;
+    self.tx.closed().await;
+    Ok(())
+  }
+
+  /// Respond to an interaction by launching the activity associated with the app.
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::interactions::{ApplicationCommandType, ApplicationCommandHandlerType};
+  /// ##[command(
+  ///   name = "launch",
+  ///   command_type = ApplicationCommandType::PRIMARY_ENTRY_POINT,
+  ///   handler = ApplicationCommandHandlerType::APP_HANDLER
+  /// )]
+  /// fn launch(input: CommandInput, res: CommandResponder) {
+  ///   return res.launch_activity().await?;
+  /// }
+  /// ```
+  pub async fn launch_activity(&self) -> Result<(), InteractionResponseError> {
+    self.tx.send(CommandResponse::LaunchActivity).map_err(|_| InteractionResponseError)?;
     self.tx.closed().await;
     Ok(())
   }
