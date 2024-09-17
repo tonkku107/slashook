@@ -20,7 +20,7 @@ use rocket::futures::future::BoxFuture;
 pub use responder::{MessageResponse, CommandResponder, Modal, InteractionResponseError};
 pub use handler::CommandInput;
 use crate::structs::{
-  interactions::{ApplicationCommand, ApplicationCommandType, ApplicationCommandOption, InteractionOptionType, IntegrationType, InteractionContextType},
+  interactions::{ApplicationCommand, ApplicationCommandHandlerType, ApplicationCommandOption, ApplicationCommandType, IntegrationType, InteractionContextType, InteractionOptionType},
   Permissions
 };
 
@@ -76,6 +76,8 @@ pub struct Command {
   pub integration_types: Option<Vec<IntegrationType>>,
   /// [Interaction context(s)](InteractionContextType) where the command can be used, only for globally-scoped commands. By default, all interaction context types included for new commands.
   pub contexts: Option<Vec<InteractionContextType>>,
+  /// Determines whether the interaction is handled by the app's interactions handler or by Discord
+  pub handler: Option<ApplicationCommandHandlerType>,
   /// Subcommand groups for the command
   pub subcommand_groups: Option<Vec<SubcommandGroup>>,
   /// Subcommands for the command
@@ -138,6 +140,7 @@ impl Default for Command {
       nsfw: None,
       integration_types: None,
       contexts: None,
+      handler: None,
       subcommand_groups: None,
       subcommands: None
     }
@@ -159,6 +162,7 @@ impl Clone for Command {
       nsfw: self.nsfw,
       integration_types: self.integration_types.clone(),
       contexts: self.contexts.clone(),
+      handler: self.handler.clone(),
       subcommand_groups: self.subcommand_groups.clone(),
       subcommands: self.subcommands.clone(),
     }
@@ -197,7 +201,8 @@ impl TryFrom<Command> for ApplicationCommand {
       nsfw: value.nsfw,
       integration_types: value.integration_types,
       contexts: value.contexts,
-      version: None
+      version: None,
+      handler: value.handler,
     })
   }
 }
