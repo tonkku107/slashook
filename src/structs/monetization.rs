@@ -156,6 +156,58 @@ pub enum EntitlementOwnerType {
   User = 2,
 }
 
+/// Discord Subscription Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct Subscription {
+  /// ID of the subscription
+  pub id: Snowflake,
+  /// ID of the user who is subscribed
+  pub user_id: Snowflake,
+  /// List of SKUs subscribed to
+  pub sku_ids: Vec<Snowflake>,
+  /// List of entitlements granted for this subscription
+  pub entitlement_ids: Vec<Snowflake>,
+  /// Start of the current subscription period
+  pub current_period_start: DateTime<Utc>,
+  /// End of the current subscription period
+  pub current_period_end: DateTime<Utc>,
+  /// Current status of the subscription
+  pub status: SubscriptionStatus,
+  /// When the subscription was canceled
+  pub canceled_at: Option<DateTime<Utc>>,
+  /// ISO3166-1 alpha-2 country code of the payment source used to purchase the subscription. Missing unless queried with a private OAuth scope.
+  pub country: Option<String>,
+}
+
+/// Discord Subscription Statuses
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum SubscriptionStatus {
+  /// Subscription is active and scheduled to renew.
+  ACTIVE = 0,
+  /// Subscription is active but will not renew.
+  ENDING = 1,
+  /// Subscription is inactive and not being charged.
+  INACTIVE = 2,
+  /// A subscription status that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN
+}
+
+/// Options for fetching subscriptions
+#[derive(Serialize, Clone, Debug, Default)]
+pub struct ListSubscriptionOptions {
+  /// List subscriptions before this ID
+  pub before: Option<Snowflake>,
+  /// List subscriptions after this ID
+  pub after: Option<Snowflake>,
+  /// Number of results to return (1-100)
+  pub limit: Option<i64>,
+  /// User ID for which to return subscriptions. Required except for OAuth queries.
+  pub user_id: Option<Snowflake>,
+}
+
 impl SKU {
   /// Lists all SKUs
   pub async fn list_skus<T: ToString>(rest: &Rest, application_id: T) -> Result<Vec<SKU>, RestError> {
@@ -182,6 +234,18 @@ impl Entitlement {
   /// Deletes a test entitlement
   pub async fn delete_test_entitlement<T: ToString>(&self, rest: &Rest, application_id: T) -> Result<(), RestError> {
     rest.delete(format!("applications/{}/entitlements/{}", application_id.to_string(), self.id)).await
+  }
+}
+
+impl Subscription {
+  /// List all subscriptions containing the SKU
+  pub async fn list_sku_subscriptions<T: ToString>(rest: &Rest, sku_id: T, options: ListSubscriptionOptions) -> Result<Vec<Subscription>, RestError> {
+    rest.get_query(format!("skus/{}/subscriptions", sku_id.to_string()), options).await
+  }
+
+  /// Get a subscription by its ID
+  pub async fn get_sku_subscription<T: ToString, U: ToString>(rest: &Rest, sku_id: T, subscription_id: U) -> Result<Subscription, RestError> {
+    rest.get(format!("skus/{}/subscriptions/{}", sku_id.to_string(), subscription_id.to_string())).await
   }
 }
 
