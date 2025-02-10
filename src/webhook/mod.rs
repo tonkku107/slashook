@@ -8,7 +8,7 @@
 mod signature_headers;
 mod multipart;
 
-use super::{Config, commands::handler::RocketCommand};
+use super::{Config, commands::handler::RocketCommand, events::handler::RocketEvent};
 use super::structs::{
   interactions::{Interaction, InteractionType, InteractionCallback, InteractionCallbackType},
   events::{EventPayload, EventWebhookType}
@@ -126,7 +126,7 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
 }
 
 #[post("/events", data = "<body>")]
-async fn events(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config>) -> Res {
+async fn events(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config>, event_sender: &State<mpsc::UnboundedSender::<RocketEvent>>) -> Res {
   if !verify_signature(body, headers, &config.public_key) {
     return Res::Raw{ status: Status::Unauthorized, json: json!({ "error": "Bad signature" })}
   }
@@ -151,8 +151,18 @@ async fn events(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Confi
       Res::Raw{ status: Status::NotFound, json: json!({ "error": "Unknown event webhook type" }) }
     },
     EventWebhookType::EVENT => {
-      println!("Received event but handling them hasn't been implemented yet");
-      Res::EventSuccess
+      let (handler_send, handler_respond) = oneshot::channel::<anyhow::Result<()>>();
+      let event_body = event.event.expect("No event body on event");
+      event_sender.send(RocketEvent(event_body, config.bot_token.clone(), handler_send)).expect("Cannot execute handler");
+      let response = handler_respond.await.unwrap();
+
+      match response {
+        Err(err) => {
+          eprintln!("Error when processing event: {:?}", err);
+          Res::Raw{ status: Status::InternalServerError, json: json!({ "error": "Handler failed" }) }
+        },
+        Ok(_) => Res::EventSuccess,
+      }
     }
   }
 }
@@ -167,7 +177,7 @@ fn default_error() -> Res {
   Res::Raw{ status: Status::InternalServerError, json: json!({ "error": "Unexpected error" }) }
 }
 
-pub(crate) async fn start(config: Config, sender: mpsc::UnboundedSender::<RocketCommand>) {
+pub(crate) async fn start(config: Config, command_sender: mpsc::UnboundedSender::<RocketCommand>, event_sender: mpsc::UnboundedSender<RocketEvent>) {
   let figment = rocket::Config::figment()
     .merge(("address", config.ip))
     .merge(("port", config.port))
@@ -178,7 +188,8 @@ pub(crate) async fn start(config: Config, sender: mpsc::UnboundedSender::<Rocket
     .mount("/", routes![index, events])
     .register("/", catchers![not_found, default_error])
     .manage(config)
-    .manage(sender)
+    .manage(command_sender)
+    .manage(event_sender)
     .launch()
     .await;
 

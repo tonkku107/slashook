@@ -63,7 +63,7 @@ pub struct EventBody {
 }
 
 /// Discord Event Types
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Eq, Hash, PartialEq, Debug, Clone)]
 #[allow(non_camel_case_types)]
 pub enum EventType {
   /// Sent when an app was authorized by a user to a server or their account

@@ -52,6 +52,7 @@ pub(crate) const USER_AGENT: &str = concat!("slashook/", env!("CARGO_PKG_VERSION
 mod webhook;
 pub mod structs;
 pub mod commands;
+pub mod events;
 pub mod rest;
 
 // Macros
@@ -68,6 +69,7 @@ use std::{
 use tokio::{sync::mpsc, spawn};
 
 use commands::{Command, handler::{CommandHandler, RocketCommand}};
+use events::{EventHandler, handler::{EventHandlers, RocketEvent}};
 use structs::interactions::ApplicationCommand;
 use rest::Rest;
 
@@ -104,7 +106,8 @@ impl Default for Config {
 /// The entry point of the library
 pub struct Client {
   config: Config,
-  command_handler: CommandHandler
+  command_handler: CommandHandler,
+  event_handlers: EventHandlers,
 }
 
 impl Client {
@@ -112,7 +115,8 @@ impl Client {
   pub fn new(config: Config) -> Self {
     Self {
       config,
-      command_handler: CommandHandler::new()
+      command_handler: CommandHandler::new(),
+      event_handlers: EventHandlers::new(),
     }
   }
 
@@ -154,6 +158,18 @@ impl Client {
   pub fn register_commands(&mut self, commands: Vec<Command>) -> &mut Self {
     for command in commands.into_iter() {
       self.command_handler.add(command);
+    }
+    self
+  }
+
+  pub fn register_event_handler(&mut self, event_handler: EventHandler) -> &mut Self {
+    self.event_handlers.add(event_handler);
+    self
+  }
+
+  pub fn register_event_handlers(&mut self, event_handlers: Vec<EventHandler>) -> &mut Self {
+    for event_handler in event_handlers.into_iter() {
+      self.event_handlers.add(event_handler);
     }
     self
   }
@@ -235,12 +251,18 @@ impl Client {
 
   /// Starts the webhook listener, setting everything into motion
   pub async fn start(self) {
-    let (sender, receiver) = mpsc::unbounded_channel::<RocketCommand>();
-    let rocket = webhook::start(self.config, sender);
+    let (command_sender, command_receiver) = mpsc::unbounded_channel::<RocketCommand>();
+    let (event_sender, event_receiver) = mpsc::unbounded_channel::<RocketEvent>();
+    let rocket = webhook::start(self.config, command_sender, event_sender);
 
     let command_handler = Arc::new(self.command_handler);
     spawn(async move {
-      command_handler.rocket_bridge(receiver).await;
+      command_handler.rocket_bridge(command_receiver).await;
+    });
+
+    let event_handlers = Arc::new(self.event_handlers);
+    spawn(async move {
+      event_handlers.rocket_bridge(event_receiver).await;
     });
 
     rocket.await;
