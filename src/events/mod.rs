@@ -14,33 +14,34 @@ use std::future::Future;
 use crate::commands::CmdResult;
 use rocket::futures::future::BoxFuture;
 
-use crate::structs::events::{EventType, EventData};
-pub use handler::Event;
+pub use crate::structs::events::EventType;
+pub use handler::EventInput;
 pub use responder::EventResponseError;
+use crate::structs::events::EventData;
 
-/// A trait for Event handler functions
+/// A trait for Event functions
 ///
-/// A trait that allows requiring an `async fn(Event, EventData) -> CmdResult` in the [EventHandler] struct.\
+/// A trait that allows requiring an `async fn(Event, EventData) -> CmdResult` in the [Event] struct.\
 /// The function must also be `Send` as they can be transferred between threads
 pub trait AsyncEvntFn: Send {
   /// A method that calls the function
-  fn call(&self, event: Event, data: EventData) -> BoxFuture<'static, CmdResult>;
+  fn call(&self, event: EventInput, data: EventData) -> BoxFuture<'static, CmdResult>;
 }
 impl<T, F> AsyncEvntFn for T
 where
-  T: Fn(Event, EventData) -> F + Send,
+  T: Fn(EventInput, EventData) -> F + Send,
   F: Future<Output = CmdResult> + Send + 'static,
 {
-  fn call(&self, event: Event, data: EventData) -> BoxFuture<'static, CmdResult> {
+  fn call(&self, event: EventInput, data: EventData) -> BoxFuture<'static, CmdResult> {
     Box::pin(self(event, data))
   }
 }
 
-/// A struct representing an event handler that can be executed
+/// A struct representing an event that can be executed
 ///
 /// **NOTE: This struct is usually constructed with the help of the [event attribute macro](macro@crate::event)**
-pub struct EventHandler {
-  /// A handler function for the command
+pub struct Event {
+  /// A handler function for the event
   pub func: Box<dyn AsyncEvntFn>,
   /// [Type of event](EventType)
   pub event_type: EventType,

@@ -15,13 +15,13 @@ use crate::tokio::{spawn, sync::{mpsc, oneshot}};
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 
-use super::{EventHandler, responder::{EventResponder, EventResponseError}};
+use super::{Event, responder::{EventResponder, EventResponseError}};
 use crate::structs::events::{EventType, EventBody, EventData};
 use crate::rest::Rest;
 
-/// Metadata values passed as inputs for your event handler and methods for responding to the event.
+/// Metadata values passed as inputs for your event function and methods for responding to the event.
 /// The actual event data is included as the second argument.
-pub struct Event {
+pub struct EventInput {
   /// [Event type](EventType)
   pub event_type: EventType,
   /// Timestamp of when the event occurred in [ISO8601 format](https://discord.com/developers/docs/reference#iso8601-datetime)
@@ -31,7 +31,7 @@ pub struct Event {
   responder: Option<EventResponder>,
 }
 
-impl Event {
+impl EventInput {
   /// Acknowledge an event.\
   /// If you do not acknowledge within 3 seconds (perhaps due to an error), Discord will keep repeating the event
   /// with exponential backoff for up to 10 minutes.
@@ -41,42 +41,42 @@ impl Event {
   }
 }
 
-pub(crate) struct EventHandlers {
-  pub(crate) events: HashMap<EventType, Arc<Mutex<EventHandler>>>
+pub(crate) struct EventHandler {
+  pub(crate) events: HashMap<EventType, Arc<Mutex<Event>>>
 }
 
-impl EventHandlers {
+impl EventHandler {
   pub fn new() -> Self {
     Self {
       events: HashMap::new(),
     }
   }
 
-  pub fn add(&mut self, event_handler: EventHandler) {
-    self.events.insert(event_handler.event_type.clone(), Arc::new(Mutex::new(event_handler)));
+  pub fn add(&mut self, event: Event) {
+    self.events.insert(event.event_type.clone(), Arc::new(Mutex::new(event)));
   }
 
   pub async fn rocket_bridge(self: &Arc<Self>, mut receiver: mpsc::UnboundedReceiver::<RocketEvent>) {
     while let Some(event) = receiver.recv().await {
-      let event_handlers = self.clone();
+      let event_handler = self.clone();
       spawn(async move {
         let RocketEvent(event_body, bot_token, handler_send) = event;
 
-        let value = event_handlers.handle_event(event_body, bot_token).await;
+        let value = event_handler.handle_event(event_body, bot_token).await;
         handler_send.send(value).unwrap();
       });
     }
   }
 
-  async fn spawn_event_handler(&self, event_handler: Arc<Mutex<EventHandler>>, mut event: Event, data: EventData) -> anyhow::Result<()> {
+  async fn spawn_event_handler(&self, event: Arc<Mutex<Event>>, mut event_input: EventInput, data: EventData) -> anyhow::Result<()> {
     let (tx, mut rx) = mpsc::unbounded_channel::<()>();
     let responder = EventResponder {
       tx,
     };
-    event.responder = Some(responder);
+    event_input.responder = Some(responder);
 
     spawn(async move {
-      let fut = event_handler.lock().unwrap().func.call(event, data);
+      let fut = event.lock().unwrap().func.call(event_input, data);
       if let Err(err) = fut.await {
         eprintln!("Error returned from event handler: {:?}", err);
       }
@@ -89,10 +89,10 @@ impl EventHandlers {
   }
 
   pub async fn handle_event(&self, event_body: EventBody, bot_token: Option<String>) -> anyhow::Result<()> {
-    let event_handler = self.events.get(&event_body.event_type).with_context(|| format!("Received event ({:?}) has no registered event handler", event_body.event_type))?;
-    let task_event_handler = event_handler.clone();
+    let event = self.events.get(&event_body.event_type).with_context(|| format!("Received event ({:?}) has no registered event handler", event_body.event_type))?;
+    let task_event = event.clone();
 
-    let event = Event {
+    let event_input = EventInput {
       event_type: event_body.event_type,
       timestamp: event_body.timestamp,
       rest: Rest::with_optional_token(bot_token),
@@ -101,7 +101,7 @@ impl EventHandlers {
 
     let data = event_body.data.context("Event has no data")?;
 
-    self.spawn_event_handler(task_event_handler, event, data).await?;
+    self.spawn_event_handler(task_event, event_input, data).await?;
     Ok(())
   }
 }

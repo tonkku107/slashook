@@ -131,8 +131,6 @@ async fn events(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Confi
     return Res::Raw{ status: Status::Unauthorized, json: json!({ "error": "Bad signature" })}
   }
 
-  // println!("{:?}", std::str::from_utf8(body).unwrap());
-
   let event: EventPayload = match serde_json::from_slice(body) {
     Ok(e) => e,
     Err(err) => {
@@ -140,8 +138,6 @@ async fn events(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Confi
       return Res::Raw{ status: Status::BadRequest, json: json!({ "error": "Bad body" })}
     }
   };
-
-  println!("{:#?}", event);
 
   match event.webhook_type {
     EventWebhookType::PING => {

@@ -51,7 +51,7 @@ use syn::{self, parse_macro_input, parse_quote_spanned, FnArg, ItemFn, Path, Stm
 ///   }]
 /// )]
 /// fn command(input: CommandInput, res: CommandResponder) {
-///   res.send_message("Command executed")?;
+///   res.send_message("Command executed").await?;
 /// }
 /// ```
 /// ## Conversion
@@ -62,7 +62,7 @@ use syn::{self, parse_macro_input, parse_quote_spanned, FnArg, ItemFn, Path, Stm
 /// For example, the example above would be converted to:
 /// ```ignore
 /// async fn command(input: CommandInput, res: CommandResponder) -> CmdResult {
-///   res.send_message("Command executed")?;
+///   res.send_message("Command executed").await?;
 ///   Ok(())
 /// }
 /// ```
@@ -84,6 +84,29 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
   output.into()
 }
 
+/// A macro that turns a function to an `Event`
+///
+/// An `EventType` is required as an argument.
+/// ## Example
+/// ```ignore
+/// #[event(EventType::APPLICATION_AUTHORIZED)]
+/// fn authorized(event: EventInput, data: ApplicationAuthorizedEventData) {
+///   event.ack().await?;
+/// }
+/// ```
+/// ## Conversion
+/// The event handler expects functions to be `async fn(EventInput, EventData) -> CmdResult`.
+/// However, this macro will convert simple `fn(EventInput, <specific event data struct>) -> ()` functions into ones suitable for the event handler.\
+/// This conversion provides great convenience for the simplest of events, but it is still recommended to make sure you have the correct return type from an async function so your code looks syntatically correct.
+///
+/// For example, the example above would be converted to:
+/// ```ignore
+/// async fn authorized(event: EventInput, data: EventData) -> CmdResult {
+///   let data: ApplicationAuthorizedEventData = match data {...}
+///   event.ack().await?;
+///   Ok(())
+/// }
+/// ```
 #[proc_macro_attribute]
 pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
   let path = parse_macro_input!(attr as Path);
@@ -113,7 +136,7 @@ pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
 
   let output = quote! {
     #function
-    let #func_ident = slashook::events::EventHandler {
+    let #func_ident = slashook::events::Event {
       event_type: #path,
       func: Box::new(#func_ident),
     };
