@@ -1,4 +1,4 @@
-// Copyright 2024 slashook Developers
+// Copyright 2025 slashook Developers
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -11,14 +11,14 @@ extern crate proc_macro;
 mod converter;
 mod attr_parser;
 
-use converter::convert_block;
+use converter::convert_function;
 use attr_parser::Attributes;
 
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
 use proc_macro2::Span;
 use devise::{Spanned, ext::SpanDiagnosticExt};
-use syn::{self, ItemFn, ReturnType, parse_macro_input, parse_quote};
+use syn::{self, parse_macro_input, parse_quote_spanned, FnArg, ItemFn, Path, Stmt};
 
 /// A macro that turns a function to a `Command`
 ///
@@ -69,28 +69,8 @@ use syn::{self, ItemFn, ReturnType, parse_macro_input, parse_quote};
 #[proc_macro_attribute]
 pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
   let attrs = parse_macro_input!(attr as Attributes);
-  let mut function = parse_macro_input!(item as ItemFn);
+  let function = convert_function(parse_macro_input!(item as ItemFn));
   let func_ident = function.sig.ident.clone();
-
-  // Force function to be async
-  if function.sig.asyncness.is_none() {
-    function.sig.asyncness = parse_quote!(async);
-  }
-
-  // Convert functions that return () to ones that return a Result
-  if let ReturnType::Default = function.sig.output {
-    function.sig.output = parse_quote!(-> slashook::commands::CmdResult);
-    let converted_block = convert_block(*function.block);
-    let statements = converted_block.stmts;
-    let new_block = parse_quote!{
-      {
-        #(#statements)*;
-        #[allow(unreachable_code)]
-        Ok(())
-      }
-    };
-    function.block = Box::new(new_block);
-  }
 
   let output = quote! {
     #function
@@ -100,6 +80,45 @@ pub fn command(attr: TokenStream, item: TokenStream) -> TokenStream {
       ..Default::default()
     };
   };
+
+  output.into()
+}
+
+#[proc_macro_attribute]
+pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
+  let path = parse_macro_input!(attr as Path);
+  let mut function = convert_function(parse_macro_input!(item as ItemFn));
+  let func_ident = function.sig.ident.clone();
+
+  let Some(FnArg::Typed(data_var)) = function.sig.inputs.get_mut(1) else {
+    return syn::Error::new(function.sig.inputs.span(), "Second argument to event handler is invalid").into_compile_error().into()
+  };
+
+  let event_type = path.segments.last().unwrap().ident.to_string();
+  let matcher = match event_type.as_str() {
+    "APPLICATION_AUTHORIZED" => quote_spanned! {data_var.ty.span()=> slashook::structs::events::EventData::ApplicationAuthorized(d) => d},
+    "ENTITLEMENT_CREATE" => quote_spanned! {data_var.ty.span()=>slashook::structs::events::EventData::EntitlementCreate(d) => d},
+    "QUEST_USER_ENROLLMENT" => quote_spanned! {data_var.ty.span()=>slashook::structs::events::EventData::QuestUserEnrollment(d) => d},
+    _ => return syn::Error::new(path.span(), "Unknown event type").into_compile_error().into(),
+  };
+
+  let data_var_name = data_var.pat.clone();
+  let stmt: Stmt = parse_quote_spanned! {data_var.span()=> let #data_var = match #data_var_name {
+    #matcher,
+    _ => panic!("Unexpected event type to data type mismatch"),
+  };};
+
+  function.block.stmts.insert(0, stmt);
+  data_var.ty = parse_quote_spanned! {data_var.ty.span()=> slashook::structs::events::EventData};
+
+  let output = quote! {
+    #function
+    let #func_ident = slashook::events::EventHandler {
+      event_type: #path,
+      func: Box::new(#func_ident),
+    };
+  };
+
   output.into()
 }
 
