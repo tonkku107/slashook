@@ -16,7 +16,7 @@ use anyhow::Context;
 use chrono::{DateTime, Utc};
 
 use super::{Event, responder::{EventResponder, EventResponseError}};
-use crate::structs::events::{EventType, EventBody, EventData};
+use crate::structs::{Snowflake, events::{EventType, EventBody, EventData}};
 use crate::rest::Rest;
 
 /// Metadata values passed as inputs for your event function and methods for responding to the event.
@@ -26,6 +26,8 @@ pub struct EventInput {
   pub event_type: EventType,
   /// Timestamp of when the event occurred in [ISO8601 format](https://discord.com/developers/docs/reference#iso8601-datetime)
   pub timestamp: DateTime<Utc>,
+  /// ID of your app
+  pub application_id: Snowflake,
   /// Handler for Discord API calls
   pub rest: Rest,
   responder: Option<EventResponder>,
@@ -60,9 +62,9 @@ impl EventHandler {
     while let Some(event) = receiver.recv().await {
       let event_handler = self.clone();
       spawn(async move {
-        let RocketEvent(event_body, bot_token, handler_send) = event;
+        let RocketEvent(event_body, application_id, bot_token, handler_send) = event;
 
-        let value = event_handler.handle_event(event_body, bot_token).await;
+        let value = event_handler.handle_event(event_body, application_id, bot_token).await;
         handler_send.send(value).unwrap();
       });
     }
@@ -88,13 +90,14 @@ impl EventHandler {
     Ok(())
   }
 
-  pub async fn handle_event(&self, event_body: EventBody, bot_token: Option<String>) -> anyhow::Result<()> {
+  pub async fn handle_event(&self, event_body: EventBody, application_id: Snowflake, bot_token: Option<String>) -> anyhow::Result<()> {
     let event = self.events.get(&event_body.event_type).with_context(|| format!("Received event ({:?}) has no registered event handler", event_body.event_type))?;
     let task_event = event.clone();
 
     let event_input = EventInput {
       event_type: event_body.event_type,
       timestamp: event_body.timestamp,
+      application_id,
       rest: Rest::with_optional_token(bot_token),
       responder: None,
     };
@@ -107,4 +110,4 @@ impl EventHandler {
 }
 
 #[derive(Debug)]
-pub(crate) struct RocketEvent(pub EventBody, pub Option<String>, pub oneshot::Sender::<anyhow::Result<()>>);
+pub(crate) struct RocketEvent(pub EventBody, pub Snowflake, pub Option<String>, pub oneshot::Sender::<anyhow::Result<()>>);

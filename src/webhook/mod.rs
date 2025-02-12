@@ -149,7 +149,7 @@ async fn events(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Confi
     EventWebhookType::EVENT => {
       let (handler_send, handler_respond) = oneshot::channel::<anyhow::Result<()>>();
       let event_body = event.event.expect("No event body on event");
-      event_sender.send(RocketEvent(event_body, config.bot_token.clone(), handler_send)).expect("Cannot execute handler");
+      event_sender.send(RocketEvent(event_body, event.application_id, config.bot_token.clone(), handler_send)).expect("Cannot execute handler");
       let response = handler_respond.await.unwrap();
 
       match response {
