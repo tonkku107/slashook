@@ -1,17 +1,18 @@
-// Copyright 2022 slashook Developers
+// Copyright 2025 slashook Developers
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-extern crate ring;
-extern crate hex;
 mod signature_headers;
 mod multipart;
 
-use super::{Config, commands::handler::RocketCommand};
-use super::structs::interactions::{Interaction, InteractionType, InteractionCallback, InteractionCallbackType};
+use super::{Config, commands::handler::RocketCommand, events::handler::RocketEvent};
+use super::structs::{
+  interactions::{Interaction, InteractionType, InteractionCallback, InteractionCallbackType},
+  events::{EventPayload, EventWebhookType}
+};
 use signature_headers::SignatureHeaders;
 use rocket::{
   http::Status,
@@ -31,7 +32,8 @@ enum Res {
   Response {
     status: Status,
     data: Box<InteractionCallback>
-  }
+  },
+  EventSuccess
 }
 
 impl<'r> Responder<'r, 'static> for Res {
@@ -53,6 +55,10 @@ impl<'r> Responder<'r, 'static> for Res {
           response.merge(content::RawJson(json).respond_to(req)?);
         }
         response.status(status);
+      },
+
+      Self::EventSuccess => {
+        response.status(Status::NoContent);
       }
     }
 
@@ -78,7 +84,6 @@ fn verify_signature(body: &[u8], headers: SignatureHeaders, public_key: &str) ->
 
 #[post("/", data = "<body>")]
 async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config>, cmd_sender: &State<mpsc::UnboundedSender::<RocketCommand>>) -> Res {
-
   if !verify_signature(body, headers, &config.public_key) {
     return Res::Raw{ status: Status::Unauthorized, json: json!({ "error": "Bad signature" })}
   }
@@ -120,6 +125,44 @@ async fn index(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config
   }
 }
 
+#[post("/events", data = "<body>")]
+async fn events(body: &[u8], headers: SignatureHeaders<'_>, config: &State<Config>, event_sender: &State<mpsc::UnboundedSender::<RocketEvent>>) -> Res {
+  if !verify_signature(body, headers, &config.public_key) {
+    return Res::Raw{ status: Status::Unauthorized, json: json!({ "error": "Bad signature" })}
+  }
+
+  let event: EventPayload = match serde_json::from_slice(body) {
+    Ok(e) => e,
+    Err(err) => {
+      eprintln!("Received bad request body from Discord. Error: {}", err);
+      return Res::Raw{ status: Status::BadRequest, json: json!({ "error": "Bad body" })}
+    }
+  };
+
+  match event.webhook_type {
+    EventWebhookType::PING => {
+      Res::EventSuccess
+    },
+    EventWebhookType::UNKNOWN => {
+      Res::Raw{ status: Status::NotFound, json: json!({ "error": "Unknown event webhook type" }) }
+    },
+    EventWebhookType::EVENT => {
+      let (handler_send, handler_respond) = oneshot::channel::<anyhow::Result<()>>();
+      let event_body = event.event.expect("No event body on event");
+      event_sender.send(RocketEvent(event_body, event.application_id, config.bot_token.clone(), handler_send)).expect("Cannot execute handler");
+      let response = handler_respond.await.unwrap();
+
+      match response {
+        Err(err) => {
+          eprintln!("Error when processing event: {:?}", err);
+          Res::Raw{ status: Status::InternalServerError, json: json!({ "error": "Handler failed" }) }
+        },
+        Ok(_) => Res::EventSuccess,
+      }
+    }
+  }
+}
+
 #[catch(404)]
 fn not_found() -> Res {
   Res::Raw{ status: Status::NotFound, json: json!({ "error": "Not found" }) }
@@ -130,7 +173,7 @@ fn default_error() -> Res {
   Res::Raw{ status: Status::InternalServerError, json: json!({ "error": "Unexpected error" }) }
 }
 
-pub(crate) async fn start(config: Config, sender: mpsc::UnboundedSender::<RocketCommand>) {
+pub(crate) async fn start(config: Config, command_sender: mpsc::UnboundedSender::<RocketCommand>, event_sender: mpsc::UnboundedSender<RocketEvent>) {
   let figment = rocket::Config::figment()
     .merge(("address", config.ip))
     .merge(("port", config.port))
@@ -138,10 +181,11 @@ pub(crate) async fn start(config: Config, sender: mpsc::UnboundedSender::<Rocket
     .merge(("log_level", rocket::config::LogLevel::Off));
 
   let result = rocket::custom(figment)
-    .mount("/", routes![index])
+    .mount("/", routes![index, events])
     .register("/", catchers![not_found, default_error])
     .manage(config)
-    .manage(sender)
+    .manage(command_sender)
+    .manage(event_sender)
     .launch()
     .await;
 

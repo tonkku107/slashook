@@ -100,7 +100,7 @@ pub struct Guild {
   /// [Guild NSFW level](NSFWLevel)
   pub nsfw_level: NSFWLevel,
   /// Custom guild stickers
-  pub stickers: Option<Sticker>,
+  pub stickers: Option<Vec<Sticker>>,
   /// Whether the guild has the boost progress bar enabled
   pub premium_progress_bar_enabled: Option<bool>,
 }

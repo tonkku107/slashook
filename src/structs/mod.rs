@@ -1,4 +1,4 @@
-// Copyright 2024 slashook Developers
+// Copyright 2025 slashook Developers
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -17,6 +17,7 @@ pub mod components;
 pub mod embeds;
 mod emojis;
 pub use emojis::Emoji;
+pub mod events;
 pub mod guilds;
 pub mod interactions;
 pub mod invites;

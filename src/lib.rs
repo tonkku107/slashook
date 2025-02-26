@@ -1,4 +1,4 @@
-// Copyright 2024 slashook Developers
+// Copyright 2025 slashook Developers
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -10,7 +10,7 @@
 
 //! A webhook-based Discord slash command library
 //!
-//! This library focuses on the use of a web server to receive command events with the interaction system instead of the traditional gateway websocket.
+//! This library focuses on the use of a web server to receive commands and events with the interaction system instead of the traditional gateway websocket.
 //! Scaling can be performed using any load balancing solution and no guild count based sharding is required.
 //!
 //! ## Usage
@@ -20,6 +20,8 @@
 //! #[macro_use] extern crate slashook;
 //! use slashook::{ Client, Config };
 //! use slashook::commands::{ CommandInput, CommandResponder };
+//! use slashook::events::{ EventInput, EventType };
+//! use slashook::structs::events::ApplicationAuthorizedEventData;
 //!
 //! #[slashook::main]
 //! async fn main() {
@@ -35,16 +37,25 @@
 //!     res.send_message("Pong!").await?;
 //!   }
 //!
+//!   #[event(EventType::APPLICATION_AUTHORIZED)]
+//!   fn authorized(event: EventInput, data: ApplicationAuthorizedEventData) {
+//!     event.ack().await?;
+//!     println!("Authorized by {} at {}", data.user.username, event.timestamp);
+//!   }
+//!
 //!   let mut client = Client::new(config);
 //!   client.register_command(ping);
+//!   client.register_event(authorized);
 //!   client.sync_commands().await;
 //!   client.start().await;
 //! }
 //! ```
 //! Your bot will now be listening on `http://0.0.0.0:3000/`. See [Config] for IP and port options.\
-//! You may now route it through a reverse proxy and set your interaction url on the Developer Portal.
+//! You may now route it through a reverse proxy and set your interaction url with route `/` and event url with route `/events` on the Developer Portal.
 //!
-//! Take a look at [CommandInput](commands::CommandInput) and [CommandResponder](commands::CommandResponder) for the values and functions you have at your disposal in your functions.
+//! Take a look at [CommandInput](commands::CommandInput) and [CommandResponder](commands::CommandResponder) for the values and functions you have at your disposal in your command functions.
+//! Check out [EventInput](events::EventInput) for data available in every event as well as how to acknowledge them and
+//! [EventData](structs::events::EventData) for the available data types for different [EventType](events::EventType)s.
 
 pub(crate) const USER_AGENT: &str = concat!("slashook/", env!("CARGO_PKG_VERSION"));
 
@@ -52,6 +63,7 @@ pub(crate) const USER_AGENT: &str = concat!("slashook/", env!("CARGO_PKG_VERSION
 mod webhook;
 pub mod structs;
 pub mod commands;
+pub mod events;
 pub mod rest;
 
 // Macros
@@ -68,6 +80,7 @@ use std::{
 use tokio::{sync::mpsc, spawn};
 
 use commands::{Command, handler::{CommandHandler, RocketCommand}};
+use events::{Event, handler::{EventHandler, RocketEvent}};
 use structs::interactions::ApplicationCommand;
 use rest::Rest;
 
@@ -104,7 +117,8 @@ impl Default for Config {
 /// The entry point of the library
 pub struct Client {
   config: Config,
-  command_handler: CommandHandler
+  command_handler: CommandHandler,
+  event_handler: EventHandler,
 }
 
 impl Client {
@@ -112,7 +126,8 @@ impl Client {
   pub fn new(config: Config) -> Self {
     Self {
       config,
-      command_handler: CommandHandler::new()
+      command_handler: CommandHandler::new(),
+      event_handler: EventHandler::new(),
     }
   }
 
@@ -154,6 +169,48 @@ impl Client {
   pub fn register_commands(&mut self, commands: Vec<Command>) -> &mut Self {
     for command in commands.into_iter() {
       self.command_handler.add(command);
+    }
+    self
+  }
+
+  /// Registers an event to the event handler
+  ///
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::{Client, Config, events::{EventType, EventInput}, structs::events::ApplicationAuthorizedEventData};
+  /// # let config = Config::default();
+  /// # let mut client = Client::new(config);
+  /// ##[event(EventType::APPLICATION_AUTHORIZED)]
+  /// fn event(event: EventInput, data: ApplicationAuthorizedEventData) {
+  ///   event.ack().await?;
+  /// }
+  /// client.register_event(event);
+  /// ```
+  pub fn register_event(&mut self, event: Event) -> &mut Self {
+    self.event_handler.add(event);
+    self
+  }
+
+  /// Registers multiple events at once to the event handler
+  ///
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::{Client, Config, events::{EventType, EventInput}, structs::{events::ApplicationAuthorizedEventData, monetization::Entitlement}};
+  /// # let config = Config::default();
+  /// # let mut client = Client::new(config);
+  /// ##[event(EventType::APPLICATION_AUTHORIZED)]
+  /// fn event1(event: EventInput, data: ApplicationAuthorizedEventData) {
+  ///   event.ack().await?;
+  /// }
+  /// ##[event(EventType::ENTITLEMENT_CREATE)]
+  /// fn event2(event: EventInput, data: Entitlement) {
+  ///   event.ack().await?;
+  /// }
+  /// client.register_events(vec![event1, event2]);
+  /// ```
+  pub fn register_events(&mut self, events: Vec<Event>) -> &mut Self {
+    for event in events.into_iter() {
+      self.event_handler.add(event);
     }
     self
   }
@@ -235,12 +292,18 @@ impl Client {
 
   /// Starts the webhook listener, setting everything into motion
   pub async fn start(self) {
-    let (sender, receiver) = mpsc::unbounded_channel::<RocketCommand>();
-    let rocket = webhook::start(self.config, sender);
+    let (command_sender, command_receiver) = mpsc::unbounded_channel::<RocketCommand>();
+    let (event_sender, event_receiver) = mpsc::unbounded_channel::<RocketEvent>();
+    let rocket = webhook::start(self.config, command_sender, event_sender);
 
     let command_handler = Arc::new(self.command_handler);
     spawn(async move {
-      command_handler.rocket_bridge(receiver).await;
+      command_handler.rocket_bridge(command_receiver).await;
+    });
+
+    let event_handler = Arc::new(self.event_handler);
+    spawn(async move {
+      event_handler.rocket_bridge(event_receiver).await;
     });
 
     rocket.await;

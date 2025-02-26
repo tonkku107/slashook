@@ -1,11 +1,35 @@
-// Copyright 2024 slashook Developers
+// Copyright 2025 slashook Developers
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-use syn::{self, Block, Stmt, Expr, parse_quote};
+use syn::{self, parse_quote, Block, Expr, ItemFn, ReturnType, Stmt};
+
+pub(crate) fn convert_function(mut function: ItemFn) -> ItemFn {
+  // Force function to be async
+  if function.sig.asyncness.is_none() {
+    function.sig.asyncness = parse_quote!(async);
+  }
+
+  // Convert functions that return () to ones that return a Result
+  if let ReturnType::Default = function.sig.output {
+    function.sig.output = parse_quote!(-> slashook::commands::CmdResult);
+    let converted_block = convert_block(*function.block);
+    let statements = converted_block.stmts;
+    let new_block = parse_quote!{
+      {
+        #(#statements)*;
+        #[allow(unreachable_code)]
+        Ok(())
+      }
+    };
+    function.block = Box::new(new_block);
+  }
+
+  function
+}
 
 pub(crate) fn convert_block(block: Block) -> Block {
   let existing_statements = block.stmts;
