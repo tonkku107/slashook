@@ -65,6 +65,7 @@ pub mod structs;
 pub mod commands;
 pub mod events;
 pub mod rest;
+pub(crate) mod internal_utils;
 
 // Macros
 pub use slashook_macros::*;
