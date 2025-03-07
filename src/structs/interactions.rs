@@ -26,6 +26,7 @@ use super::{
 use crate::{
   rest::{Rest, RestError},
   commands::{MessageResponse, Modal, responder::CommandResponse},
+  internal_utils::in_case_of_discord_fuckups::snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason
 };
 
 /// Discord ApplicationCommand Object
@@ -224,6 +225,7 @@ pub enum InteractionType {
 #[doc(hidden)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct InteractionData {
+  #[serde(deserialize_with="snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason")]
   pub id: Option<Snowflake>,
   pub name: Option<String>,
   #[serde(rename = "type")]
