@@ -225,7 +225,7 @@ pub enum InteractionType {
 #[doc(hidden)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct InteractionData {
-  #[serde(deserialize_with="snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason")]
+  #[serde(deserialize_with="snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason", default)]
   pub id: Option<Snowflake>,
   pub name: Option<String>,
   #[serde(rename = "type")]
