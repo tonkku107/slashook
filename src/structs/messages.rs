@@ -60,7 +60,7 @@ pub struct Message {
   /// Users specifically mentioned in the message
   pub mentions: Vec<User>,
   /// Roles specifically mentioned in this message
-  pub mention_roles: Vec<Snowflake>,
+  pub mention_roles: Option<Vec<Snowflake>>,
   /// Channels specifically mentioned in this message
   pub mention_channels: Option<Vec<ChannelMention>>,
   /// Any attached files
