@@ -44,7 +44,10 @@ pub enum RestError {
     status: StatusCode,
     /// Body of the request
     body: String
-  }
+  },
+  /// The struct used to make a request is invalid
+  #[error("Method cannot be used on this struct: {0}")]
+  InvalidStruct(&'static str),
 }
 
 /// Handler for Discord API calls
