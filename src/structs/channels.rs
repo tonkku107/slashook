@@ -630,7 +630,7 @@ impl Channel {
   /// let channel = input.channel.unwrap();
   /// // In a regular channel
   /// let options = ThreadCreateOptions::new("A thread")
-  ///   .set_thread_type(ChannelType::GUILD_PUBLIC_THREAD);
+  ///   .set_thread_type(ChannelType::PUBLIC_THREAD);
   /// channel.start_thread(&input.rest, options).await?;
   /// // In a forum or media channel
   /// let options2 = ThreadCreateOptions::new("A post")

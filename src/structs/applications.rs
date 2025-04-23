@@ -131,10 +131,10 @@ pub enum ApplicationEventWebhookStatus {
 /// Discord Integration Types Config Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct ApplicationIntegrationTypesConfig {
-  /// Configuration for [`GUILD_INSTALL`](IntegrationType::GUILD_INSTALL) integrations
+  /// Configuration for [`GUILD_INSTALL`](super::interactions::IntegrationType::GUILD_INSTALL) integrations
   #[serde(rename = "0")]
   pub guild_install: Option<ApplicationIntegrationTypesConfigValue>,
-  /// Configuration for [`USER_INSTALL`](IntegrationType::USER_INSTALL) integrations
+  /// Configuration for [`USER_INSTALL`](super::interactions::IntegrationType::USER_INSTALL) integrations
   #[serde(rename = "1")]
   pub user_install: Option<ApplicationIntegrationTypesConfigValue>,
 }
