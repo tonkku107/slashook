@@ -15,7 +15,7 @@ use super::{
   channels::{Channel, ChannelType},
   components::{Component, ComponentType},
   embeds::Embed,
-  guilds::{Guild, GuildMember, Role},
+  guilds::{GuildMember, Role},
   messages::{Message, MessageFlags, AllowedMentions, Attachment},
   monetization::Entitlement,
   polls::PollCreateRequest,
@@ -187,7 +187,8 @@ pub struct Interaction {
   #[serde(rename = "type")]
   pub interaction_type: InteractionType,
   pub data: Option<InteractionData>,
-  pub guild: Option<Guild>,
+  // Commented out because it's practically empty, doesn't even contain the name
+  // pub guild: Option<Guild>,
   pub guild_id: Option<Snowflake>,
   pub channel: Option<Channel>,
   pub channel_id: Option<Snowflake>,

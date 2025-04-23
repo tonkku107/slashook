@@ -24,7 +24,7 @@ use crate::structs::{
   components::{Component, ComponentType},
   channels::Channel,
   users::User,
-  guilds::{Guild, GuildMember},
+  guilds::GuildMember,
   messages::Message,
   monetization::Entitlement,
   Snowflake,
@@ -63,8 +63,8 @@ pub struct CommandInput {
   pub application_id: Snowflake,
   /// The ID of the guild the command was sent from
   pub guild_id: Option<Snowflake>,
-  /// Guild that the interaction was sent from
-  pub guild: Option<Guild>,
+  // /// Guild that the interaction was sent from
+  // pub guild: Option<Guild>,
   /// The ID of the channel the command was sent from
   pub channel_id: Option<Snowflake>,
   /// The channel the command was sent from
@@ -410,7 +410,7 @@ impl CommandHandler {
       resolved: None,
       application_id: interaction.application_id.clone(),
       guild_id: interaction.guild_id,
-      guild: interaction.guild,
+      // guild: interaction.guild,
       channel_id: interaction.channel_id,
       channel: interaction.channel,
       user: self.parse_user(interaction.user, &interaction.member)?,
