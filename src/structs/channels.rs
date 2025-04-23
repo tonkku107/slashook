@@ -578,7 +578,7 @@ impl Channel {
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let channel = input.channel.unwrap();
   /// let pinned_messages = channel.get_pinned_messages(&input.rest).await?;
-  /// let ids = pinned_messages.into_iter().map(|m| m.id).collect::<Vec<String>>().join(", ");
+  /// let ids = pinned_messages.into_iter().map(|m| m.id.unwrap()).collect::<Vec<String>>().join(", ");
   /// res.send_message(ids).await?;
   /// # }
   /// ```

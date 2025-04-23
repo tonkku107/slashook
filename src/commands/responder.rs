@@ -9,9 +9,9 @@ use crate::structs::{
   components::{Component, Components},
   embeds::Embed,
   interactions::{ApplicationCommandOptionChoice, Attachments, InteractionCallbackData},
-  messages::{AllowedMentions, Attachment, Message, MessageFlags},
+  messages::{AllowedMentions, Attachment, Message, MessageFlags, MessageReference},
   polls::PollCreateRequest,
-  utils::File,
+  utils::File, Snowflake,
 };
 use serde::Serialize;
 use crate::tokio::sync::mpsc;
@@ -34,33 +34,40 @@ impl std::error::Error for InteractionResponseError { }
 /// with the `From` trait
 #[derive(Serialize, Clone, Debug)]
 pub struct MessageResponse {
-  /// Should the response is TTS or not
+  /// Whether the response is TTS
   pub tts: Option<bool>,
-  /// Content of the message
+  /// Message content (up to 2000 characters)
   #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
-  /// Flags of the message.\
-  /// Valid flags are [EPHEMERAL](crate::structs::messages::MessageFlags::EPHEMERAL) for interactions to only show the response to the invoking user and
-  /// [SUPPRESS_EMBEDS](crate::structs::messages::MessageFlags::SUPPRESS_EMBEDS) to hide embeds from showing in the message.
-  pub flags: Option<MessageFlags>,
-  /// Up to 10 embeds to send with the response
+  /// Up to 10 embeds (up to 6000 characters)
   #[serde(skip_serializing_if = "Option::is_none")]
   pub embeds: Option<Vec<Embed>>,
-  /// Components to send with the response
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub components: Option<Vec<Component>>,
-  /// Partial attachment objects indicating which to keep when editing.
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub attachments: Option<Vec<Attachment>>,
-  /// Which mentions should be parsed
+  /// [Allowed mentions](AllowedMentions) object
   #[serde(skip_serializing_if = "Option::is_none")]
   pub allowed_mentions: Option<AllowedMentions>,
+  /// [Message flags](MessageFlags) combined as a bitfield
+  /// (only [SUPPRESS_EMBEDS](MessageFlags::SUPPRESS_EMBEDS), [EPHEMERAL](MessageFlags::EPHEMERAL), and [SUPPRESS_NOTIFICATIONS](MessageFlags::SUPPRESS_NOTIFICATIONS) can be set for interaction responses)
+  pub flags: Option<MessageFlags>,
+  /// Message components
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub components: Option<Vec<Component>>,
+  /// Attachment objects with filename and description.\
+  /// Use `files` if you want to upload an attachment.\
+  /// This is for partial attachment objects indicating which to keep when editing.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub attachments: Option<Vec<Attachment>>,
+  /// Details about the poll
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub poll: Option<PollCreateRequest>,
+  /// Include to make your message a reply or a forward (not available for interaction responses)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub message_reference: Option<MessageReference>,
+  /// IDs of up to 3 stickers in the server to send in the message
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub sticker_ids: Option<Vec<Snowflake>>,
   /// Up to 10 files to send with the response
   #[serde(skip_serializing)]
   pub files: Option<Vec<File>>,
-  /// A poll!
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub poll: Option<PollCreateRequest>,
 }
 
 impl MessageResponse {
@@ -85,6 +92,47 @@ impl MessageResponse {
   /// ```
   pub fn set_content<T: ToString>(mut self, content: T) -> Self {
     self.content = Some(content.to_string());
+    self
+  }
+
+  /// Add an embed to the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::embeds::Embed;
+  /// let embed = Embed::new().set_description("This is an embed");
+  /// let response = MessageResponse::from("Look at my embed:")
+  ///   .add_embed(embed);
+  /// assert_eq!(response.embeds.unwrap()[0].description, Some(String::from("This is an embed")));
+  /// ```
+  pub fn add_embed(mut self, embed: Embed) -> Self {
+    let mut embeds = self.embeds.unwrap_or_default();
+    embeds.push(embed);
+    self.embeds = Some(embeds);
+    self
+  }
+
+  /// Clear embeds from the message. Sets embeds to an empty Vec which also clears embeds when editing.
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// let response = MessageResponse::from("Embeds cleared")
+  ///   .clear_embeds();
+  /// assert_eq!(response.embeds.unwrap().len(), 0);
+  /// ```
+  pub fn clear_embeds(mut self) -> Self {
+    self.embeds = Some(Vec::new());
+    self
+  }
+
+  /// Set the allowed mentions for the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::messages::{AllowedMentions, AllowedMentionType};
+  /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::USERS);
+  /// let response = MessageResponse::from("<@1234> Get pinged. Not @everyone or <@&1235> tho.")
+  ///   .set_allowed_mentions(allowed_mentions);
+  /// ```
+  pub fn set_allowed_mentions(mut self, allowed_mentions: AllowedMentions) -> Self {
+    self.allowed_mentions = Some(allowed_mentions);
     self
   }
 
@@ -118,6 +166,21 @@ impl MessageResponse {
     self
   }
 
+  /// Set suppress notifications flag
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::messages::MessageFlags;
+  /// let response = MessageResponse::from("No notifications @here")
+  ///   .set_suppress_notifications(true);
+  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::SUPPRESS_NOTIFICATIONS), true);
+  /// ```
+  pub fn set_suppress_notifications(mut self, suppress: bool) -> Self {
+    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
+    flags.set(MessageFlags::SUPPRESS_NOTIFICATIONS, suppress);
+    self.flags = Some(flags);
+    self
+  }
+
   /// Set voice message flag
   /// ```no_run
   /// # use slashook::commands::{MessageResponse, CmdResult};
@@ -141,34 +204,6 @@ impl MessageResponse {
     self
   }
 
-  /// Add an embed to the message
-  /// ```
-  /// # use slashook::commands::MessageResponse;
-  /// # use slashook::structs::embeds::Embed;
-  /// let embed = Embed::new().set_description("This is an embed");
-  /// let response = MessageResponse::from("Look at my embed:")
-  ///   .add_embed(embed);
-  /// assert_eq!(response.embeds.unwrap()[0].description, Some(String::from("This is an embed")));
-  /// ```
-  pub fn add_embed(mut self, embed: Embed) -> Self {
-    let mut embeds = self.embeds.unwrap_or_default();
-    embeds.push(embed);
-    self.embeds = Some(embeds);
-    self
-  }
-
-  /// Clear embeds from the message. Sets embeds to an empty Vec which also clears embeds when editing.
-  /// ```
-  /// # use slashook::commands::MessageResponse;
-  /// let response = MessageResponse::from("Embeds cleared")
-  ///   .clear_embeds();
-  /// assert_eq!(response.embeds.unwrap().len(), 0);
-  /// ```
-  pub fn clear_embeds(mut self) -> Self {
-    self.embeds = Some(Vec::new());
-    self
-  }
-
   /// Set the components on the message
   /// ```
   /// # use slashook::commands::MessageResponse;
@@ -183,19 +218,6 @@ impl MessageResponse {
   /// ```
   pub fn set_components(mut self, components: Components) -> Self {
     self.components = Some(components.0);
-    self
-  }
-
-  /// Set the allowed mentions for the message
-  /// ```
-  /// # use slashook::commands::MessageResponse;
-  /// # use slashook::structs::messages::{AllowedMentions, AllowedMentionType};
-  /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::USERS);
-  /// let response = MessageResponse::from("<@1234> Get pinged. Not @everyone or <@&1235> tho.")
-  ///   .set_allowed_mentions(allowed_mentions);
-  /// ```
-  pub fn set_allowed_mentions(mut self, allowed_mentions: AllowedMentions) -> Self {
-    self.allowed_mentions = Some(allowed_mentions);
     self
   }
 
@@ -278,6 +300,33 @@ impl MessageResponse {
   /// ```
   pub fn set_poll(mut self, poll: PollCreateRequest) -> Self {
     self.poll = Some(poll);
+    self
+  }
+
+  /// Set a reply or forward
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::messages::MessageReference;
+  /// let response = MessageResponse::from("This is a reply")
+  ///   .set_message_reference(MessageReference::new_reply("916413462467465246"));
+  /// assert_eq!(response.message_reference.unwrap().message_id, Some(String::from("916413462467465246")));
+  /// ```
+  pub fn set_message_reference(mut self, message_reference: MessageReference) -> Self {
+    self.message_reference = Some(message_reference);
+    self
+  }
+
+  /// Add a sticker to the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// let response = MessageResponse::from(":)")
+  ///   .add_sticker("749044136589393960");
+  /// assert_eq!(response.sticker_ids.unwrap().remove(0), String::from("749044136589393960"));
+  /// ```
+  pub fn add_sticker<T: ToString>(mut self, sticker_id: T) -> Self {
+    let mut sticker_ids = self.sticker_ids.unwrap_or_default();
+    sticker_ids.push(sticker_id.to_string());
+    self.sticker_ids = Some(sticker_ids);
     self
   }
 }
@@ -538,7 +587,7 @@ impl CommandResponder {
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("First message!").await?;
   ///   let msg = res.send_followup_message("Second message!").await?;
-  ///   res.edit_followup_message(msg.id, "Second message but edited!").await?;
+  ///   res.edit_followup_message(msg.id.unwrap(), "Second message but edited!").await?;
   /// }
   /// ```
   pub async fn edit_followup_message<T: Into<MessageResponse>>(&self, id: String, response: T) -> Result<Message, RestError> {
@@ -588,7 +637,7 @@ impl CommandResponder {
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   res.send_message("First message!").await?;
   ///   let msg = res.send_followup_message("If you see me say hi").await?;
-  ///   res.delete_followup_message(msg.id).await?;
+  ///   res.delete_followup_message(msg.id.unwrap()).await?;
   /// }
   /// ```
   pub async fn delete_followup_message(&self, id: String) -> Result<(), RestError> {
@@ -607,13 +656,15 @@ impl From<&str> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: Some(String::from(s)),
-      flags: None,
       embeds: None,
+      allowed_mentions: None,
+      flags: None,
       components: None,
       attachments: None,
-      allowed_mentions: None,
-      files: None,
       poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
     }
   }
 }
@@ -623,13 +674,15 @@ impl From<String> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: Some(s),
-      flags: None,
       embeds: None,
+      allowed_mentions: None,
+      flags: None,
       components: None,
       attachments: None,
-      allowed_mentions: None,
-      files: None,
       poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
     }
   }
 }
@@ -639,13 +692,15 @@ impl From<Embed> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      flags: None,
       embeds: Some(vec![e]),
+      allowed_mentions: None,
+      flags: None,
       components: None,
       attachments: None,
-      allowed_mentions: None,
-      files: None,
       poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
     }
   }
 }
@@ -655,13 +710,15 @@ impl From<Vec<Embed>> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      flags: None,
       embeds: Some(e),
+      allowed_mentions: None,
+      flags: None,
       components: None,
       attachments: None,
-      allowed_mentions: None,
-      files: None,
       poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
     }
   }
 }
@@ -671,13 +728,15 @@ impl From<Components> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      flags: None,
       embeds: None,
+      allowed_mentions: None,
+      flags: None,
       components: Some(c.0),
       attachments: None,
-      allowed_mentions: None,
-      files: None,
       poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
     }
   }
 }
@@ -687,13 +746,15 @@ impl From<File> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      flags: None,
       embeds: None,
+      allowed_mentions: None,
+      flags: None,
       components: None,
       attachments: None,
-      allowed_mentions: None,
-      files: Some(vec![f]),
       poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: Some(vec![f]),
     }
   }
 }
@@ -703,13 +764,15 @@ impl From<Vec<File>> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      flags: None,
       embeds: None,
+      allowed_mentions: None,
+      flags: None,
       components: None,
       attachments: None,
-      allowed_mentions: None,
-      files: Some(f),
       poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: Some(f),
     }
   }
 }
@@ -719,13 +782,33 @@ impl From<PollCreateRequest> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      flags: None,
       embeds: None,
+      allowed_mentions: None,
+      flags: None,
       components: None,
       attachments: None,
-      allowed_mentions: None,
-      files: None,
       poll: Some(poll),
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
+    }
+  }
+}
+
+impl From<MessageReference> for MessageResponse {
+  fn from(reference: MessageReference) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      embeds: None,
+      allowed_mentions: None,
+      flags: None,
+      components: None,
+      attachments: None,
+      poll: None,
+      message_reference: Some(reference),
+      sticker_ids: None,
+      files: None,
     }
   }
 }
