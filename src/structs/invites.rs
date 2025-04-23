@@ -21,6 +21,9 @@ use super::{
 /// Discord Invite Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct Invite {
+  /// The [type of invite](InviteType)
+  #[serde(rename = "type")]
+  pub invite_type: InviteType,
   /// The invite code (unique ID)
   pub code: String,
   /// The guild this invite is for
@@ -44,6 +47,8 @@ pub struct Invite {
   /// Guild scheduled event data, only included if `guild_scheduled_event_id` contains a valid guild scheduled event id
   pub guild_scheduled_event: Option<GuildScheduledEvent>,
 
+  // Invite Metadata Extension:
+
   /// Number of times this invite has been used
   pub uses: Option<i64>,
   /// Max number of times this invite can be used
@@ -54,6 +59,22 @@ pub struct Invite {
   pub temporary: Option<bool>,
   /// When this invite was created
   pub created_at: Option<DateTime<Utc>>,
+}
+
+/// Discord Invite Types
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum InviteType {
+  /// Guild
+  GUILD = 0,
+  /// Group DM
+  GROUP_DM = 1,
+  /// Friend
+  FRIEND = 2,
+  /// Invite type that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
 }
 
 /// Discord Invite Target Types
@@ -67,7 +88,7 @@ pub enum TargetType {
   EMBEDDED_APPLICATION = 2,
   /// Target type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Parameters for creating an invite with [create_invite](super::channels::Channel::create_invite)

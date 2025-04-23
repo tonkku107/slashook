@@ -53,7 +53,7 @@ pub enum StickerType {
   GUILD = 2,
   /// Sticker type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Sticker Item Object
@@ -64,7 +64,7 @@ pub struct StickerItem {
   /// Name of the sticker
   pub name: String,
   /// [Type of sticker format](StickerFormatType)
-  pub format_type: StickerFormatType
+  pub format_type: StickerFormatType,
 }
 
 /// Discord Sticker Format Types
@@ -78,7 +78,9 @@ pub enum StickerFormatType {
   APNG = 2,
   /// Lottie .json format
   LOTTIE = 3,
+  /// .gif format
+  GIF = 4,
   /// Sticker format type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }

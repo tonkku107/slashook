@@ -10,11 +10,11 @@
 use serde::{Deserialize, de::Deserializer};
 use serde_repr::Deserialize_repr;
 use super::{
-  Snowflake,
+  events::EventType,
+  guilds::Guild,
   users::User,
   Permissions,
-  guilds::Guild,
-  interactions::IntegrationType,
+  Snowflake,
 };
 use bitflags::bitflags;
 
@@ -61,18 +61,24 @@ pub struct Application {
   pub flags: Option<ApplicationFlags>,
   /// Approximate count of guilds the app has been added to
   pub approximate_guild_count: Option<i64>,
+  /// Approximate count of users that have installed the app
+  pub approximate_user_install_count: Option<i64>,
   /// Array of redirect URIs for the app
   pub redirect_uris: Option<Vec<String>>,
   /// [Interactions endpoint URL](https://discord.com/developers/docs/interactions/receiving-and-responding#receiving-an-interaction) for the app
   pub interactions_endpoint_url: Option<String>,
   /// Role connection verification URL for the app
   pub role_connections_verification_url: Option<String>,
+  /// [Event webhooks URL](https://discord.com/developers/docs/events/webhook-events#preparing-for-events) for the app to receive webhook events
+  pub event_webhooks_url: Option<String>,
+  /// If [webhook events](https://discord.com/developers/docs/events/webhook-events) are enabled for the app.
+  pub event_webhooks_status: Option<ApplicationEventWebhookStatus>,
+  /// List of [Webhook event types](EventType) the app subscribes to
+  pub event_webhooks_types: Option<Vec<EventType>>,
   /// List of tags describing the content and functionality of the app. Max of 5 tags.
   pub tags: Option<Vec<String>>,
   /// Settings for the application's default in-app authorization link, if enabled
   pub install_params: Option<InstallParams>,
-  /// List of supported installation contexes
-  pub integration_types: Option<IntegrationType>,
   /// Default scopes and permissions for each supported installation context. Value for each key is an [integration type configuration object](ApplicationIntegrationTypesConfigValue)
   pub integration_types_config: Option<ApplicationIntegrationTypesConfig>,
   /// The application's default custom authorization link, if enabled
@@ -106,6 +112,22 @@ bitflags! {
   }
 }
 
+/// Discord Application Event Webhook Status Enum
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum ApplicationEventWebhookStatus {
+  /// Webhook events are disabled by developer
+  DISABLED = 1,
+  /// Webhook events are enabled by developer
+  ENABLED = 2,
+  /// Webhook events are disabled by Discord, usually due to inactivity
+  DISABLED_BY_DISCORD = 3,
+  /// Application Event Webhook Status that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
+}
+
 /// Discord Integration Types Config Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct ApplicationIntegrationTypesConfig {
@@ -130,7 +152,7 @@ pub struct InstallParams {
   /// The [scopes](https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes) to add the application to the server with
   pub scopes: Vec<String>,
   /// The [permissions](Permissions) to request for the bot role
-  pub permissions: Permissions
+  pub permissions: Permissions,
 }
 
 /// Discord Team Object
@@ -145,7 +167,7 @@ pub struct Team {
   /// The name of the team
   pub name: String,
   /// The user id of the current team owner
-  pub owner_user_id: Snowflake
+  pub owner_user_id: Snowflake,
 }
 
 /// Discord Team Members Object
@@ -153,12 +175,12 @@ pub struct Team {
 pub struct TeamMember {
   /// The user's [membership state](TeamMembershipState) on the team
   pub membership_state: TeamMembershipState,
-  /// Will always be `["*"]`
-  pub permissions: Vec<String>,
   /// The id of the parent team of which they are a member
   pub team_id: Snowflake,
   /// The avatar, discriminator, id and username of the user
-  pub user: User
+  pub user: User,
+  /// [Role](TeamMemberRole) of the team member
+  pub role: TeamMemberRole,
 }
 
 /// Discord Team Membership State Enum
@@ -172,7 +194,23 @@ pub enum TeamMembershipState {
   ACCEPTED = 2,
   /// Membership state that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
+}
+
+/// Discord Team Member Role Types
+#[derive(Deserialize, Eq, Hash, PartialEq, Debug, Clone)]
+#[allow(non_camel_case_types)]
+#[serde(rename_all = "snake_case")]
+pub enum TeamMemberRole {
+  /// Admins have similar access as owners, except they cannot take destructive actions on the team or team-owned apps.
+  ADMIN,
+  /// Developers can access information about team-owned apps, like the client secret or public key. They can also take limited actions on team-owned apps, like configuring interaction endpoints or resetting the bot token. Members with the Developer role cannot manage the team or its members, or take destructive actions on team-owned apps.
+  DEVELOPER,
+  /// Read-only members can access information about a team and any team-owned apps. Some examples include getting the IDs of applications and exporting payout records. Members can also invite bots associated with team-owned apps that are marked private.
+  READ_ONLY,
+  /// A team member role that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
 }
 
 impl<'de> Deserialize<'de> for ApplicationFlags {

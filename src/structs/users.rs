@@ -22,6 +22,8 @@ pub struct User {
   pub username: String,
   /// The user's 4-digit discord-tag
   pub discriminator: String,
+  /// The user's display name, if it is set. For bots, this is the application name
+  pub global_name: Option<String>,
   /// The user's [avatar hash](https://discord.com/developers/docs/reference#image-formatting)
   pub avatar: Option<String>,
   /// Whether the user belongs to an OAuth2 application
@@ -46,6 +48,8 @@ pub struct User {
   pub premium_type: Option<PremiumType>,
   /// The public flags on a user's account
   pub public_flags: Option<UserFlags>,
+  /// Data for the user's avatar decoration
+  pub avatar_decoration_data: Option<AvatarDecorationData>,
 }
 
 bitflags! {
@@ -100,7 +104,16 @@ pub enum PremiumType {
   NITRO_BASIC = 3,
   /// A premium type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
+}
+
+/// Discord Avatar Decoration Data Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct AvatarDecorationData {
+  /// The [avatar decoration hash](https://discord.com/developers/docs/reference#image-formatting)
+  pub asset: String,
+  /// ID of the avatar decoration's SKU
+  pub sku_id: Snowflake,
 }
 
 impl User {

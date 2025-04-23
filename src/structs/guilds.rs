@@ -10,12 +10,12 @@
 use serde::{Deserialize, de::Deserializer};
 use serde_repr::Deserialize_repr;
 use super::{
-  Snowflake,
+  stickers::Sticker,
+  users::{User, AvatarDecorationData},
+  utils::Color,
   Emoji,
   Permissions,
-  stickers::Sticker,
-  users::User,
-  utils::Color
+  Snowflake,
 };
 use chrono::{DateTime, Utc};
 use bitflags::bitflags;
@@ -91,6 +91,8 @@ pub struct Guild {
   pub public_updates_channel_id: Option<Snowflake>,
   /// The maximum amount of users in a video channel
   pub max_video_channel_users: Option<i64>,
+  /// The maximum amount of users in a stage video channel
+  pub max_stage_video_channel_users: Option<i64>,
   /// Approximate number of members in this guild, returned from the `GET /guilds/<id>` endpoint when `with_counts` is `true`
   pub approximate_member_count: Option<i64>,
   /// Approximate number of non-offline members in this guild, returned from the `GET /guilds/<id>` endpoint when `with_counts` is `true`
@@ -103,6 +105,10 @@ pub struct Guild {
   pub stickers: Option<Vec<Sticker>>,
   /// Whether the guild has the boost progress bar enabled
   pub premium_progress_bar_enabled: Option<bool>,
+  /// The id of the channel where admins and moderators of Community guilds receive safety alerts from Discord
+  pub safety_alerts_channel_id: Option<Snowflake>,
+  /// The incidents data for this guild
+  pub incidents_data: Option<GuildIncidentsData>,
 }
 
 /// Discord Verification Levels
@@ -122,7 +128,7 @@ pub enum VerificationLevel {
   VERY_HIGH = 4,
   /// Verification level that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Message Notifications Level
@@ -136,7 +142,7 @@ pub enum MessageNotificationsLevel {
   ONLY_MENTIONS = 1,
   /// Message notifications level that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Explicit Content Filter Level
@@ -152,7 +158,7 @@ pub enum ExplicitContentFilterLevel {
   ALL_MEMBERS = 2,
   /// Explicit content filter level that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord MFA Level
@@ -166,7 +172,7 @@ pub enum MFALevel {
   ELEVATED = 1,
   /// MFA level that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 bitflags! {
@@ -203,7 +209,7 @@ pub enum PremiumTier {
   TIER_3 = 3,
   /// Premium tier that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Welcome Screen Object
@@ -246,6 +252,19 @@ pub enum NSFWLevel {
   UNKNOWN
 }
 
+/// Discord Incidents Data Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildIncidentsData {
+  /// When invites get enabled again
+  pub invites_disabled_until: Option<DateTime<Utc>>,
+  /// When direct messages get enabled again
+  pub dms_disabled_until: Option<DateTime<Utc>>,
+  /// When the dm spam was detected
+  pub dm_spam_detected_at: Option<DateTime<Utc>>,
+  /// When the raid was detected
+  pub raid_detected_at: Option<DateTime<Utc>>,
+}
+
 /// Discord Guild Member Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct GuildMember {
@@ -255,6 +274,8 @@ pub struct GuildMember {
   pub nick: Option<String>,
   /// The member's [guild avatar hash](https://discord.com/developers/docs/reference#image-formatting)
   pub avatar: Option<String>,
+  /// The member's [guild banner hash](https://discord.com/developers/docs/reference#image-formatting)
+  pub banner: Option<String>,
   /// Array of [role](Role) object ids
   pub roles: Vec<Snowflake>,
   /// When the user joined the guild
@@ -272,7 +293,9 @@ pub struct GuildMember {
   /// Total permissions of the member in the channel, including overwrites, returned when in the interaction object
   pub permissions: Option<Permissions>,
   /// When the user's [timeout](https://support.discord.com/hc/en-us/articles/4413305239191-Time-Out-FAQ) will expire and the user will be able to communicate in the guild again, None or a time in the past if the user is not timed out
-  pub communication_disabled_until: Option<DateTime<Utc>>
+  pub communication_disabled_until: Option<DateTime<Utc>>,
+  /// Data for the member's guild avatar decoration
+  pub avatar_decoration_data: Option<AvatarDecorationData>,
 }
 
 bitflags! {
@@ -287,6 +310,16 @@ bitflags! {
     const BYPASSES_VERIFICATION = 1 << 2;
     /// Member has started onboarding
     const STARTED_ONBOARDING = 1 << 3;
+    /// Member is a guest and can only access the voice channel they were invited to
+    const IS_GUEST = 1 << 4;
+    /// Member has started Server Guide new member actions
+    const STARTED_HOME_ACTIONS = 1 << 5;
+    /// Member has completed Server Guide new member actions
+    const COMPLETED_HOME_ACTIONS = 1 << 6;
+    /// Member's username, display name, or nickname is blocked by AutoMod
+    const AUTOMOD_QUARANTINED_USERNAME = 1 << 7;
+    /// Member has dismissed the DM settings upsell
+    const DM_SETTINGS_UPSELL_ACKNOWLEDGED = 1 << 8;
   }
 }
 
@@ -314,7 +347,9 @@ pub struct Role {
   /// Whether this role is mentionable
   pub mentionable: bool,
   /// The tags this role has
-  pub tags: Option<RoleTags>
+  pub tags: Option<RoleTags>,
+  /// [Role flags](RoleFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
+  pub flags: RoleFlags,
 }
 
 /// Discord Role Tags Object
@@ -335,6 +370,15 @@ pub struct RoleTags {
   /// Whether this role is a guild's linked role
   #[serde(default, deserialize_with = "exists")]
   pub guild_connections: bool,
+}
+
+bitflags! {
+  /// Discord Role Flags
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
+  pub struct RoleFlags: u32 {
+    /// Role can be selected by members in an [onboarding](https://discord.com/developers/docs/resources/guild#guild-onboarding-object) prompt
+    const IN_PROMPT = 1 << 0;
+  }
 }
 
 /// Discord Guild Scheduled Event Object
@@ -372,6 +416,8 @@ pub struct GuildScheduledEvent {
   pub user_count: Option<i64>,
   /// The [cover image hash](https://discord.com/developers/docs/reference#image-formatting) of the scheduled event
   pub image: Option<String>,
+  /// The definition for how often this event should recur
+  pub recurrence_rule: Option<EventRecurrenceRule>,
 }
 
 /// Discord Guild Scheduled Event Privacy Level
@@ -427,6 +473,116 @@ pub struct EntityMetadata {
   pub location: Option<String>,
 }
 
+/// Discord Guild Scheduled Event Recurrence Rule Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct EventRecurrenceRule {
+  /// Starting time of the recurrence interval
+  pub start: DateTime<Utc>,
+  /// Ending time of the recurrence interval
+  pub end: Option<DateTime<Utc>>,
+  /// How often the event occurs
+  pub frequency: EventRecurrenceRuleFrequency,
+  /// The spacing between the events, defined by `frequency`. For example, `frequency` of `WEEKLY` and an `interval` of `2` would be "every-other week"
+  pub interval: i64,
+  /// Set of specific days within a week for the event to recur on
+  pub by_weekday: Option<Vec<EventRecurrenceRuleWeekday>>,
+  /// List of specific days within a specific week (1-5) to recur on
+  pub by_n_weekday: Option<Vec<EventRecurrenceRuleNWeekday>>,
+  /// Set of specific months to recur on
+  pub by_month: Option<Vec<EventRecurrenceRuleMonth>>,
+  /// Set of specific dates within a month to recur on
+  pub by_month_day: Option<Vec<i64>>,
+  /// Set of days within a year to recur on (1-364)
+  pub by_year_day: Option<Vec<i64>>,
+  /// The total amount of times that the event is allowed to recur before stopping
+  pub count: Option<i64>,
+}
+
+/// Discord Guild Scheduled Event Recurrence Rule - Frequency
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum EventRecurrenceRuleFrequency {
+  /// Yearly
+  YEARLY = 0,
+  /// Monthly
+  MONTHLY = 1,
+  /// Weekly
+  WEEKLY = 2,
+  /// Daily
+  DAILY = 3,
+  /// Frequency not implemented yet
+  #[serde(other)]
+  UNKNOWN,
+}
+
+/// Discord Guild Scheduled Event Recurrence Rule - Weekday
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum EventRecurrenceRuleWeekday {
+  /// Monday
+  MONDAY = 0,
+  /// Tuesday
+  TUESDAY = 1,
+  /// Wednesday
+  WEDNESDAY = 2,
+  /// Thursday
+  THURSDAY = 3,
+  /// Friday
+  FRIDAY = 4,
+  /// Saturday
+  SATURDAY = 5,
+  /// Sunday
+  SUNDAY = 6,
+  /// If for some reason humanity decides to create a new weekday
+  #[serde(other)]
+  UNKNOWN,
+}
+
+/// Discord Guild Scheduled Event Recurrence Rule - N_Weekday
+#[derive(Deserialize, Clone, Debug)]
+pub struct EventRecurrenceRuleNWeekday {
+  /// The week to reoccur on. 1 - 5
+  pub n: i64,
+  /// The day within the week to reoccur on
+  pub day: EventRecurrenceRuleWeekday,
+}
+
+/// Discord Guild Scheduled Event Recurrence Rule - Month
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum EventRecurrenceRuleMonth {
+  /// January
+  JANUARY = 1,
+  /// February
+  FEBRUARY = 2,
+  /// March
+  MARCH = 3,
+  /// April
+  APRIL = 4,
+  /// May
+  MAY = 5,
+  /// June
+  JUNE = 6,
+  /// July
+  JULY = 7,
+  /// August
+  AUGUST = 8,
+  /// September
+  SEPTEMBER = 9,
+  /// October
+  OCTOBER = 10,
+  /// November
+  NOVEMBER = 11,
+  /// December
+  DECEMBER = 12,
+  /// If for some reason humanity decides to create a new month
+  #[serde(other)]
+  UNKNOWN,
+}
+
 fn exists<'de, D: Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
   serde_json::Value::deserialize(d)?;
   Ok(true)
@@ -440,6 +596,13 @@ impl<'de> Deserialize<'de> for SystemChannelFlags {
 }
 
 impl<'de> Deserialize<'de> for GuildMemberFlags {
+  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    let bits = u32::deserialize(d)?;
+    Ok(Self::from_bits_retain(bits))
+  }
+}
+
+impl<'de> Deserialize<'de> for RoleFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
     Ok(Self::from_bits_retain(bits))

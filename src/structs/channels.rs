@@ -125,18 +125,20 @@ pub enum ChannelType {
   /// A temporary sub-channel within a GUILD_ANNOUNCEMENT channel
   ANNOUNCEMENT_THREAD = 10,
   /// A temporary sub-channel within a GUILD_TEXT or GUILD_FORUM channel
-  GUILD_PUBLIC_THREAD = 11,
+  PUBLIC_THREAD = 11,
   /// A temporary sub-channel within a GUILD_TEXT channel that is only viewable by those invited and those with the MANAGE_THREADS permission
-  GUILD_PRIVATE_THREAD = 12,
+  PRIVATE_THREAD = 12,
   /// A voice channel for [hosting events with an audience](https://support.discord.com/hc/en-us/articles/1500005513722)
   GUILD_STAGE_VOICE = 13,
   /// The channel in a [hub](https://support.discord.com/hc/en-us/articles/4406046651927-Discord-Student-Hubs-FAQ) containing the listed servers
   GUILD_DIRECTORY = 14,
   /// Channel that can only contain threads
   GUILD_FORUM = 15,
+  /// Channel that can only contain threads, similar to `GUILD_FORUM` channels
+  GUILD_MEDIA = 16,
   /// Channel type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Permission Overwrite Object
@@ -150,7 +152,7 @@ pub struct PermissionOverwrite {
   /// Permission bit set
   pub allow: Permissions,
   /// Permission bit set
-  pub deny: Permissions
+  pub deny: Permissions,
 }
 
 /// Discord Permission Overwrite Types
@@ -164,7 +166,7 @@ pub enum PermissionOverwriteType {
   MEMBER = 1,
   /// Permission overwrite type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Video Quality Modes
@@ -178,7 +180,7 @@ pub enum VideoQualityMode {
   FULL = 2,
   /// Video quality mode that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Thread Metadata Object
@@ -195,7 +197,7 @@ pub struct ThreadMetadata {
   /// Whether non-moderators can add other non-moderators to a thread; only available on private threads
   pub invitable: Option<bool>,
   /// Timestamp when the thread was created; only populated for threads created after 2022-01-09
-  pub create_timestamp: Option<DateTime<Utc>>
+  pub create_timestamp: Option<DateTime<Utc>>,
 }
 
 /// Discord Thread Member Object
@@ -221,6 +223,8 @@ bitflags! {
     const PINNED = 1 << 1;
     /// Whether a tag is required to be specified when creating a thread in a `GUILD_FORUM` channel. Tags are specified in the `applied_tags` field.
     const REQUIRE_TAG = 1 << 4;
+    /// When set hides the embedded media download options. Available only for media channels
+    const HIDE_MEDIA_DOWNLOAD_OPTIONS = 1 << 15;
   }
 }
 
@@ -259,7 +263,7 @@ pub enum SortOrderType {
   CREATION_DATE = 1,
   /// Sort order type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Sort Order Types
@@ -275,7 +279,7 @@ pub enum ForumLayoutType {
   GALLERY_VIEW = 2,
   /// Forum layout type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Followed Channel Object
@@ -302,7 +306,7 @@ pub struct ChannelModifyOptions {
   /// The position of the channel in the left-hand listing
   #[serde(skip_serializing_if = "Option::is_none")]
   pub position: Option<i64>,
-  /// 0-1024 character channel topic (0-4096 characters for `GUILD_FORUM` channels)
+  /// 0-1024 character channel topic (0-4096 characters for `GUILD_FORUM` and `GUILD_MEDIA` channels)
   #[serde(skip_serializing_if = "Option::is_none")]
   pub topic: Option<String>,
   /// Whether the channel is nsfw
@@ -332,10 +336,10 @@ pub struct ChannelModifyOptions {
   /// The default duration that the clients use (not the API) for newly created threads in the channel, in minutes, to automatically archive the thread after recent activity
   #[serde(skip_serializing_if = "Option::is_none")]
   pub default_auto_archive_duration: Option<i64>,
-  /// [Channel flags](ChannelFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field). Currently only `REQUIRE_TAG` is supported in forum channels and `PINNED` can only be set for threads in forum channels.
+  /// [Channel flags](ChannelFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field). Currently only `REQUIRE_TAG` and is supported by `GUILD_FORUM` and `GUILD_MEDIA` channels and `PINNED` in threads of those channels. `HIDE_MEDIA_DOWNLOAD_OPTIONS` is supported only by `GUILD_MEDIA` channels
   #[serde(skip_serializing_if = "Option::is_none")]
   pub flags: Option<ChannelFlags>,
-  /// The set of tags that can be used in a `GUILD_FORUM` channel
+  /// The set of tags that can be used in a `GUILD_FORUM` or a `GUILD_MEDIA` channel; limited to 20
   #[serde(skip_serializing_if = "Option::is_none")]
   pub available_tags: Option<Vec<ForumTag>>,
   /// The emoji to show in the add reaction button on a thread in a `GUILD_FORUM` channel
@@ -344,7 +348,7 @@ pub struct ChannelModifyOptions {
   /// The initial `rate_limit_per_user` to set on newly created threads in a channel. This field is copied to the thread at creation time and does not live update.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub default_thread_rate_limit_per_user: Option<i64>,
-  /// The [default sort order type](SortOrderType) used to order posts in `GUILD_FORUM` channels
+  /// The [default sort order type](SortOrderType) used to order posts in `GUILD_FORUM` and `GUILD_MEDIA` channels
   #[serde(skip_serializing_if = "Option::is_none")]
   pub default_sort_order: Option<SortOrderType>,
   /// The [default forum layout type](ForumLayoutType) used to display posts in `GUILD_FORUM` channels
@@ -362,7 +366,7 @@ pub struct ChannelModifyOptions {
   /// Whether non-moderators can add other non-moderators to a thread; only available on private threads
   #[serde(skip_serializing_if = "Option::is_none")]
   pub invitable: Option<bool>,
-  /// The IDs of the set of tags that have been applied to a thread in a `GUILD_FORUM` channel
+  /// The IDs of the set of tags that have been applied to a thread in a `GUILD_FORUM` or a `GUILD_MEDIA` channel
   #[serde(skip_serializing_if = "Option::is_none")]
   pub applied_tags: Option<Vec<Snowflake>>,
 }
@@ -415,7 +419,7 @@ pub struct ThreadListResponse {
   /// A thread member object for each returned thread the current user has joined
   pub members: Vec<ThreadMember>,
   /// Whether there are potentially additional threads that could be returned on a subsequent call
-  pub has_more: bool
+  pub has_more: bool,
 }
 
 impl Channel {
