@@ -16,7 +16,7 @@ use bitflags::bitflags;
 use crate::rest::{Rest, RestError};
 use super::{
   channels::Channel,
-  guilds::Guild,
+  guilds::{Guild, GuildMember},
   Snowflake,
 };
 
@@ -151,14 +151,44 @@ pub struct GetUserGuildsOptions {
 }
 
 impl User {
-  /// Get an avatar url for the user. None if the user has no custom avatar
+  /// Get user's custom avatar url. `None` if the user has no custom avatar
   pub fn avatar_url<T: ToString, U: ToString>(&self, format: T, size: U) -> Option<String> {
     self.avatar.as_ref().map(|a| format!("https://cdn.discordapp.com/avatars/{}/{}.{}?size={}", self.id, a, format.to_string(), size.to_string()))
   }
 
-  /// Get a banner url for the user. None if the user has no banner
+  /// Get the url for the user's default avatar
+  pub fn default_avatar_url(&self) -> String {
+    let index = if self.discriminator == "0" {
+      let id = self.id.parse::<u64>().unwrap_or_default();
+      ((id >> 22) % 6) as u8
+    } else {
+      let discrim = self.discriminator.parse::<u16>().unwrap_or_default();
+      (discrim % 5) as u8
+    };
+
+    format!("https://cdn.discordapp.com/embed/avatars/{}.png", index)
+  }
+
+  /// Get the url for the user avatar that would be displayed in app, falling back to the default avatar if the user doesn't have one
+  pub fn display_avatar_url<T: ToString, U: ToString>(&self, format: T, size: U) -> String {
+    self.avatar_url(format, size).unwrap_or_else(|| self.default_avatar_url())
+  }
+
+  /// Get the url for the user avatar that would be displayed in app, taking into account the per-server profile. Workaround for [`GuildMember`] that don't have `user` set.
+  pub fn display_avatar_url_with_member<T: ToString, U: ToString, V: ToString>(&self, format: T, size: U, guild_id: V, member: GuildMember) -> String {
+    member.avatar_url(guild_id, &self.id, format.to_string(), size.to_string())
+      .unwrap_or_else(|| self.display_avatar_url(format, size))
+  }
+
+  /// Get user's banner url. `None` if the user has no banner
   pub fn banner_url<T: ToString, U: ToString>(&self, format: T, size: U) -> Option<String> {
     self.banner.as_ref().map(|b| format!("https://cdn.discordapp.com/banners/{}/{}.{}?size={}", self.id, b, format.to_string(), size.to_string()))
+  }
+
+  /// Get the url for the user banner that would be displayed in app, taking into account the per-server profile. `None` if the user has no banner. Workaround for [`GuildMember`] that don't have `user` set.
+  pub fn display_banner_url_with_member<T: ToString, U: ToString, V: ToString>(&self, format: T, size: U, guild_id: V, member: GuildMember) -> Option<String> {
+    member.banner_url(guild_id, &self.id, format.to_string(), size.to_string())
+      .or_else(|| self.banner_url(format, size))
   }
 
   /// Returns a string representing a user mention

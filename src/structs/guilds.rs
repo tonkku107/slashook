@@ -588,6 +588,40 @@ fn exists<'de, D: Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
   Ok(true)
 }
 
+impl GuildMember {
+  /// Get the url for the per-server member avatar. `None` if the member has no server-specific avatar
+  pub fn avatar_url<T: ToString, U: ToString, V: ToString, W: ToString>(&self, guild_id: T, user_id: U, format: V, size: W) -> Option<String> {
+    self.avatar.as_ref().map(|a| format!("https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size={}", guild_id.to_string(), user_id.to_string(), a, format.to_string(), size.to_string()))
+  }
+
+  /// Get the url for the per-server member banner. `None` if the member has no server-specific banner
+  pub fn banner_url<T: ToString, U: ToString, V: ToString, W: ToString>(&self, guild_id: T, user_id: U, format: V, size: W) -> Option<String> {
+    self.banner.as_ref().map(|b| format!("https://cdn.discordapp.com/guilds/{}/users/{}/banners/{}.{}?size={}", guild_id.to_string(), user_id.to_string(), b, format.to_string(), size.to_string()))
+  }
+
+  /// Get the url for the member avatar that would be displayed in app.\
+  /// **NOTE:** Will return `None` if `user` in the `GuildMember` is `None`. Use [`User::display_avatar_url_with_member`] if you want to make sure you get the correct avatar.
+  pub fn display_avatar_url<T: ToString, U: ToString, V: ToString>(&self, guild_id: T, format: U, size: V) -> Option<String> {
+    let Some(user) = &self.user else {
+      return None;
+    };
+
+    self.avatar_url(guild_id, &user.id, format.to_string(), size.to_string())
+      .or_else(|| Some(user.display_avatar_url(format, size)))
+  }
+
+  /// Get the url for the member banner that would be displayed in app. `None` if no banner is set.\
+  /// **NOTE:** Will return `None` if `user` in the `GuildMember` is `None`. Use [`User::display_banner_url_with_member`] if you want to make sure you get the correct banner.
+  pub fn display_banner_url<T: ToString, U: ToString, V: ToString>(&self, guild_id: T, format: U, size: V) -> Option<String> {
+    let Some(user) = &self.user else {
+      return None;
+    };
+
+    self.banner_url(guild_id, &user.id, format.to_string(), size.to_string())
+      .or_else(|| user.banner_url(format, size))
+  }
+}
+
 impl<'de> Deserialize<'de> for SystemChannelFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
