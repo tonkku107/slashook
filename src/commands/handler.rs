@@ -63,6 +63,8 @@ pub struct CommandInput {
   pub application_id: Snowflake,
   /// The ID of the guild the command was sent from
   pub guild_id: Option<Snowflake>,
+  // /// Guild that the interaction was sent from
+  // pub guild: Option<Guild>,
   /// The ID of the channel the command was sent from
   pub channel_id: Option<Snowflake>,
   /// The channel the command was sent from
@@ -109,6 +111,8 @@ pub struct CommandInput {
   pub authorizing_integration_owners: Option<IntegrationOwners>,
   /// Context where the interaction was triggered from
   pub context: Option<InteractionContextType>,
+  /// Attachment size limit in bytes
+  pub attachment_size_limit: i64,
   /// Handler for Discord API calls
   pub rest: Rest,
 }
@@ -406,6 +410,7 @@ impl CommandHandler {
       resolved: None,
       application_id: interaction.application_id.clone(),
       guild_id: interaction.guild_id,
+      // guild: interaction.guild,
       channel_id: interaction.channel_id,
       channel: interaction.channel,
       user: self.parse_user(interaction.user, &interaction.member)?,
@@ -424,6 +429,7 @@ impl CommandHandler {
       entitlements: interaction.entitlements,
       authorizing_integration_owners: interaction.authorizing_integration_owners,
       context: interaction.context,
+      attachment_size_limit: interaction.attachment_size_limit,
       rest: Rest::with_optional_token(bot_token)
     };
 

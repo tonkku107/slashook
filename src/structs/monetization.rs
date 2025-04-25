@@ -167,6 +167,8 @@ pub struct Subscription {
   pub sku_ids: Vec<Snowflake>,
   /// List of entitlements granted for this subscription
   pub entitlement_ids: Vec<Snowflake>,
+  /// List of SKUs that this user will be subscribed to at renewal
+  pub renewal_sku_ids: Option<Vec<Snowflake>>,
   /// Start of the current subscription period
   pub current_period_start: DateTime<Utc>,
   /// End of the current subscription period

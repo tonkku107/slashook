@@ -12,16 +12,17 @@ use serde_repr::{Serialize_repr, Deserialize_repr};
 use serde_json::Value;
 use std::collections::HashMap;
 use super::{
-  Snowflake,
-  embeds::Embed,
-  users::User,
-  guilds::{GuildMember, Role},
   channels::{Channel, ChannelType},
   components::{Component, ComponentType},
+  embeds::Embed,
+  guilds::{GuildMember, Role},
   messages::{Message, MessageFlags, AllowedMentions, Attachment},
   monetization::Entitlement,
+  polls::PollCreateRequest,
+  users::User,
   utils::File,
-  Permissions
+  Permissions,
+  Snowflake,
 };
 use crate::{
   rest::{Rest, RestError},
@@ -93,7 +94,7 @@ pub enum ApplicationCommandType {
   PRIMARY_ENTRY_POINT = 4,
   /// An application command type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Application Command Option Object
@@ -164,7 +165,7 @@ pub enum IntegrationType {
   USER_INSTALL = 1,
   /// Integration type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Integration Owners Object
@@ -186,6 +187,8 @@ pub struct Interaction {
   #[serde(rename = "type")]
   pub interaction_type: InteractionType,
   pub data: Option<InteractionData>,
+  // Commented out because it's practically empty, doesn't even contain the name
+  // pub guild: Option<Guild>,
   pub guild_id: Option<Snowflake>,
   pub channel: Option<Channel>,
   pub channel_id: Option<Snowflake>,
@@ -199,7 +202,8 @@ pub struct Interaction {
   pub guild_locale: Option<String>,
   pub entitlements: Vec<Entitlement>,
   pub authorizing_integration_owners: Option<IntegrationOwners>,
-  pub context: Option<InteractionContextType>
+  pub context: Option<InteractionContextType>,
+  pub attachment_size_limit: i64,
 }
 
 /// Discord Interaction Types
@@ -219,7 +223,7 @@ pub enum InteractionType {
   MODAL_SUBMIT = 5,
   /// Interaction type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 #[doc(hidden)]
@@ -237,7 +241,7 @@ pub struct InteractionData {
   pub custom_id: Option<String>,
   pub component_type: Option<ComponentType>,
   pub values: Option<Vec<String>>,
-  pub components: Option<Vec<Component>>
+  pub components: Option<Vec<Component>>,
 }
 
 /// Discord Interaction Data Resolved Object
@@ -254,7 +258,7 @@ pub struct InteractionDataResolved {
   /// The ids and partial Message objects
   pub messages: Option<HashMap<Snowflake, Message>>,
   /// The ids and attachment objects
-  pub attachments: Option<HashMap<Snowflake, Attachment>>
+  pub attachments: Option<HashMap<Snowflake, Attachment>>,
 }
 
 #[doc(hidden)]
@@ -265,7 +269,7 @@ pub struct InteractionOption {
   pub option_type: InteractionOptionType,
   pub value: Option<Value>,
   pub options: Option<Vec<InteractionOption>>,
-  pub focused: Option<bool>
+  pub focused: Option<bool>,
 }
 
 /// Discord Application Command Option Type
@@ -298,7 +302,7 @@ pub enum InteractionOptionType {
   /// An unknown option type that hasn't been implemented yet
   #[default]
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Represents the possible values from command arguments
@@ -321,7 +325,7 @@ pub enum OptionValue {
   /// Represents an attachment value
   Attachment(Attachment),
   /// Represents any unknown value
-  Other(Value)
+  Other(Value),
 }
 
 /// Discord Interaction Context Types
@@ -337,7 +341,7 @@ pub enum InteractionContextType {
   PRIVATE_CHANNEL = 2,
   /// Interaction Context Type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Entry Point Command Handler Types
@@ -359,7 +363,7 @@ pub enum ApplicationCommandHandlerType {
 pub struct InteractionCallback {
   #[serde(rename = "type")]
   pub response_type: InteractionCallbackType,
-  pub data: Option<InteractionCallbackData>
+  pub data: Option<InteractionCallbackData>,
 }
 
 #[doc(hidden)]
@@ -392,11 +396,16 @@ pub struct InteractionCallbackData {
   pub components: Option<Vec<Component>>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub attachments: Option<Vec<Attachment>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub poll: Option<PollCreateRequest>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub choices: Option<Vec<ApplicationCommandOptionChoice>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub custom_id: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub title: Option<String>,
   #[serde(skip_serializing)]
-  pub files: Option<Vec<File>>
+  pub files: Option<Vec<File>>,
 }
 
 impl ApplicationCommand {
@@ -510,6 +519,7 @@ impl From<MessageResponse> for InteractionCallbackData {
       embeds: msg.embeds,
       components: msg.components,
       attachments: msg.attachments,
+      poll: msg.poll,
       allowed_mentions: msg.allowed_mentions,
       choices: None,
       custom_id: None,
@@ -529,6 +539,7 @@ impl From<MessageFlags> for InteractionCallbackData {
       embeds: None,
       components: None,
       attachments: None,
+      poll: None,
       allowed_mentions: None,
       choices: None,
       custom_id: None,
@@ -548,6 +559,7 @@ impl From<Vec<ApplicationCommandOptionChoice>> for InteractionCallbackData {
       embeds: None,
       components: None,
       attachments: None,
+      poll: None,
       allowed_mentions: None,
       choices: Some(results),
       custom_id: None,
@@ -567,6 +579,7 @@ impl From<Modal> for InteractionCallbackData {
       embeds: None,
       components: Some(modal.components),
       attachments: None,
+      poll: None,
       allowed_mentions: None,
       choices: None,
       custom_id: Some(modal.custom_id),

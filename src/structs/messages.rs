@@ -85,12 +85,12 @@ pub struct Message {
   pub application: Option<Application>,
   /// If the message is a response to an [Interaction](https://discord.com/developers/docs/interactions/receiving-and-responding), this is the id of the interaction's application
   pub application_id: Option<Snowflake>,
+  /// [Message flags](MessageFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
+  pub flags: Option<MessageFlags>,
   /// Data showing the source of a crosspost, channel follow add, pin, or reply message
   pub message_reference: Option<MessageReference>,
   /// The message associated with the `message_reference`. This is a minimal subset of fields in a message (e.g. `author` is excluded.)
   pub message_snapshots: Option<Vec<MessageSnapshot>>,
-  /// [Message flags](MessageFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
-  pub flags: Option<MessageFlags>,
   /// The message associated with the message_reference
   pub referenced_message: Option<Box<Message>>,
   /// Sent if the message is sent as a result of an interaction
@@ -109,6 +109,8 @@ pub struct Message {
   pub resolved: Option<InteractionDataResolved>,
   /// A poll!
   pub poll: Option<Poll>,
+  /// The call associated with the message
+  pub call: Option<MessageCall>,
 }
 
 /// Discord Channel Mention Object
@@ -122,7 +124,7 @@ pub struct ChannelMention {
   #[serde(rename = "type")]
   pub channel_type: ChannelType,
   /// The name of the channel
-  pub name: String
+  pub name: String,
 }
 
 /// Discord Attachment Object
@@ -132,6 +134,8 @@ pub struct Attachment {
   pub id: Snowflake,
   /// Name of file attached
   pub filename: String,
+  /// The title of the file
+  pub title: Option<String>,
   /// Description for the file
   pub description: Option<String>,
   /// The attachment's [media type](https://en.wikipedia.org/wiki/Media_type)
@@ -153,7 +157,7 @@ pub struct Attachment {
   /// Base64 encoded bytearray representing a sampled waveform (currently for voice messages)
   pub waveform: Option<String>,
   /// [Attachment flags](AttachmentFlags) combined as a bitfield
-  pub flags: Option<AttachmentFlags>
+  pub flags: Option<AttachmentFlags>,
 }
 
 bitflags! {
@@ -170,10 +174,25 @@ bitflags! {
 pub struct Reaction {
   /// Times this emoji has been used to react
   pub count: i64,
+  /// [Reaction count details object](ReactionCountDetails)
+  pub count_details: ReactionCountDetails,
   /// Whether the current user reacted using this emoji
   pub me: bool,
+  /// Whether the current user super-reacted using this emoji
+  pub me_burst: bool,
   /// Emoji information
-  pub emoji: Emoji
+  pub emoji: Emoji,
+  /// HEX colors used for super reaction
+  pub burst_colors: Vec<String>,
+}
+
+/// Discord Reaction Count Details Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct ReactionCountDetails {
+  /// Count of super reactions
+  pub burst: i64,
+  /// Count of normal reactions
+  pub normal: i64,
 }
 
 /// Discord Message Types
@@ -257,7 +276,7 @@ pub enum MessageType {
   POLL_RESULT = 46,
   /// A message type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Message Activity Object
@@ -267,7 +286,7 @@ pub struct MessageActivity {
   #[serde(rename = "type")]
   pub activity_type: MessageActivityType,
   /// party_id from a [Rich Presence event](https://discord.com/developers/docs/rich-presence/how-to#updating-presence-update-presence-payload-fields)
-  pub party_id: Option<String>
+  pub party_id: Option<String>,
 }
 
 /// Discord Message Activity Types
@@ -285,44 +304,7 @@ pub enum MessageActivityType {
   JOIN_REQUEST = 5,
   /// Message activity type that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
-}
-
-/// Discord Message Reference Object
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct MessageReference {
-  /// [Type of reference](MessageReferenceType)
-  #[serde(rename = "type")]
-  pub reference_type: MessageReferenceType,
-  /// Id of the originating message
-  pub message_id: Option<Snowflake>,
-  /// Id of the originating message's channel
-  pub channel_id: Option<Snowflake>,
-  /// Id of the originating message's guild
-  pub guild_id: Option<Snowflake>,
-  /// When sending, whether to error if the referenced message doesn't exist instead of sending as a normal (non-reply) message, default true
-  pub fail_if_not_exists: Option<bool>
-}
-
-/// Discord Message Reference Types
-#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
-#[repr(u8)]
-#[allow(non_camel_case_types)]
-pub enum MessageReferenceType {
-  /// A standard reference used by replies.
-  DEFAULT = 0,
-  /// Reference used to point to a message at a point in time.
-  FORWARD = 1,
-  /// Message reference type that hasn't been implemented yet
-  #[serde(other)]
-  UNKNOWN
-}
-
-/// Discord Message Snapshot Object
-#[derive(Deserialize, Clone, Debug)]
-pub struct MessageSnapshot {
-  /// Minimal subset of fields in the forwarded message
-  pub message: Message,
+  UNKNOWN,
 }
 
 bitflags! {
@@ -356,6 +338,43 @@ bitflags! {
   }
 }
 
+/// Discord Message Reference Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MessageReference {
+  /// [Type of reference](MessageReferenceType)
+  #[serde(rename = "type")]
+  pub reference_type: MessageReferenceType,
+  /// Id of the originating message
+  pub message_id: Option<Snowflake>,
+  /// Id of the originating message's channel
+  pub channel_id: Option<Snowflake>,
+  /// Id of the originating message's guild
+  pub guild_id: Option<Snowflake>,
+  /// When sending, whether to error if the referenced message doesn't exist instead of sending as a normal (non-reply) message, default true
+  pub fail_if_not_exists: Option<bool>,
+}
+
+/// Discord Message Reference Types
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum MessageReferenceType {
+  /// A standard reference used by replies.
+  DEFAULT = 0,
+  /// Reference used to point to a message at a point in time.
+  FORWARD = 1,
+  /// Message reference type that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
+}
+
+/// Discord Message Snapshot Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct MessageSnapshot {
+  /// Minimal subset of fields in the forwarded message
+  pub message: Message,
+}
+
 /// Discord Message Interaction Metadata Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct MessageInteractionMetadata {
@@ -370,6 +389,10 @@ pub struct MessageInteractionMetadata {
   pub authorizing_integration_owners: IntegrationOwners,
   /// ID of the original response message, present only on [follow-up messages](https://discord.com/developers/docs/interactions/receiving-and-responding)
   pub original_response_message_id: Option<Snowflake>,
+  /// The user the command was run on, present only on [user command](https://discord.com/developers/docs/interactions/application-commands#user-commands) interactions
+  pub target_user: Option<User>,
+  /// The ID of the message the command was run on, present only on message command interactions. The original response message will also have `message_reference` and `referenced_message` pointing to this message.
+  pub target_message_id: Option<Snowflake>,
   /// ID of the message that contained interactive component, present only on messages created from component interactions
   pub interacted_message_id: Option<Snowflake>,
   /// Metadata for the interaction that was used to open the modal, present only on modal submit interactions
@@ -413,6 +436,15 @@ pub struct RoleSubscriptionData {
   pub total_months_subscribed: i64,
   /// Whether this notification is for a renewal rather than a new purchase
   pub is_renewal: bool,
+}
+
+/// Discord Message Call Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct MessageCall {
+  /// Array of [user](User) object ids that participated in the call
+  pub participants: Vec<Snowflake>,
+  /// Time when call ended
+  pub ended_timestamp: Option<DateTime<Utc>>,
 }
 
 /// Options for fetching multiple messages with [fetch_many](Message::fetch_many).
@@ -864,6 +896,7 @@ impl Attachment {
     Self {
       id: id.to_string(),
       filename: String::from(""),
+      title: None,
       description: None,
       content_type: None,
       size: 0,
@@ -882,6 +915,7 @@ impl Attachment {
     Self {
       id,
       filename: String::from(""),
+      title: None,
       description: file.description.clone(),
       content_type: None,
       size: 0,
