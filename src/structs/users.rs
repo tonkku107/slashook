@@ -9,9 +9,16 @@
 
 use serde::{Deserialize, de::Deserializer};
 use serde::{Serialize, ser::Serializer};
+use serde_json::json;
 use serde_repr::{Serialize_repr, Deserialize_repr};
-use super::Snowflake;
 use bitflags::bitflags;
+
+use crate::rest::{Rest, RestError};
+use super::{
+  channels::Channel,
+  guilds::Guild,
+  Snowflake,
+};
 
 /// Discord User Object
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -116,6 +123,33 @@ pub struct AvatarDecorationData {
   pub sku_id: Snowflake,
 }
 
+/// Options for modifying the user with [`modify_current_user`](User::modify_current_user)
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct ModifyUserOptions {
+  /// User's username
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub username: Option<String>,
+  /// If passed, modifies the user's avatar. Contains [base64 image data URL](https://discord.com/developers/docs/reference#image-data)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub avatar: Option<Option<String>>,
+  /// If passed, modifies the user's banner. Contains [base64 image data URL](https://discord.com/developers/docs/reference#image-data)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub banner: Option<Option<String>>,
+}
+
+/// Options for listing user guilds with [`get_current_user_guilds`](User::get_current_user_guilds)
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct GetUserGuildsOptions {
+  /// Get guilds before this guild ID
+  pub before: Option<Snowflake>,
+  /// Get guilds after this guild ID
+  pub after: Option<Snowflake>,
+  /// Max number of guilds to return (1-200). Default 200
+  pub limit: Option<i64>,
+  /// Include approximate member and presence counts in response
+  pub with_counts: Option<bool>,
+}
+
 impl User {
   /// Get an avatar url for the user. None if the user has no custom avatar
   pub fn avatar_url<T: ToString, U: ToString>(&self, format: T, size: U) -> Option<String> {
@@ -130,6 +164,181 @@ impl User {
   /// Returns a string representing a user mention
   pub fn mention(&self) -> String {
     format!("<@{}>", self.id)
+  }
+
+  /// Fetch a user with a user ID
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::users::User;
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let user = User::fetch(&input.rest, input.user.id).await?;
+  /// # }
+  /// ```
+  pub async fn fetch<T: ToString>(rest: &Rest, user_id: T) -> Result<Self, RestError> {
+    rest.get(format!("users/{}", user_id.to_string())).await
+  }
+
+  /// Gets the User object of the bot
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::users::User;
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let user = User::get_current_user(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn get_current_user(rest: &Rest) -> Result<Self, RestError> {
+    Self::fetch(rest, "@me").await
+  }
+
+  /// Modifies the bot's user
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::structs::utils::File;
+  /// # use slashook::tokio::fs::File as TokioFile;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::users::{User, ModifyUserOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let tokio_file = TokioFile::open("cat.png").await?;
+  /// let file = File::from_file("cat.png", tokio_file).await?;
+  /// let options = ModifyUserOptions::new()
+  ///   .set_username("Catbot")
+  ///   .set_avatar(file);
+  /// let user = User::modify_current_user(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn modify_current_user(rest: &Rest, options: ModifyUserOptions) -> Result<Self, RestError> {
+    rest.patch(String::from("users/@me"), options).await
+  }
+
+  /// Gets the guilds the bot user is in
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::users::{User, GetUserGuildsOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let options = GetUserGuildsOptions::new().set_with_counts(true);
+  /// let guilds = User::get_current_user_guilds(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn get_current_user_guilds(rest: &Rest, options: GetUserGuildsOptions) -> Result<Vec<Guild>, RestError> {
+    rest.get_query(String::from("users/@me/guilds"), options).await
+  }
+
+  /// Leaves a guild with the bot user
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::users::User;
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// User::leave_guild(&input.rest, input.guild_id.unwrap()).await?;
+  /// # }
+  /// ```
+  pub async fn leave_guild<T: ToString>(rest: &Rest, guild_id: T) -> Result<(), RestError> {
+    rest.delete(format!("users/@me/guilds/{}", guild_id.to_string())).await
+  }
+
+  /// Creates a DM with the user
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let dm = input.user.create_dm(&input.rest).await?;
+  /// dm.create_message(&input.rest, "Hello!").await?;
+  /// # }
+  /// ```
+  pub async fn create_dm(&self, rest: &Rest) -> Result<Channel, RestError> {
+    rest.post(String::from("users/@me/channels"), json!({ "recipient_id": self.id })).await
+  }
+}
+
+impl ModifyUserOptions {
+  /// Creates a new empty `ModifyUserOptions`
+  pub fn new() -> Self {
+    Self {
+      username: None,
+      avatar: None,
+      banner: None,
+    }
+  }
+
+  /// Sets the username
+  pub fn set_username<T: ToString>(mut self, username: T) -> Self {
+    self.username = Some(username.to_string());
+    self
+  }
+
+  /// Sets the avatar\
+  /// The `avatar_data` can be a [`File`](super::utils::File)
+  pub fn set_avatar<T: ToString>(mut self, avatar_data: T) -> Self {
+    self.avatar = Some(Some(avatar_data.to_string()));
+    self
+  }
+
+  /// Unsets the avatar
+  pub fn unset_avatar(mut self) -> Self {
+    self.avatar = Some(None);
+    self
+  }
+
+  /// Sets the banner
+  /// The `banner_data` can be a [`File`](super::utils::File)
+  pub fn set_banner<T: ToString>(mut self, banner_data: T) -> Self {
+    self.banner = Some(Some(banner_data.to_string()));
+    self
+  }
+
+  /// Unsets the banner
+  pub fn unset_banner(mut self) -> Self {
+    self.banner = Some(None);
+    self
+  }
+}
+
+impl GetUserGuildsOptions {
+  /// Creates a new empty `GetUserGuildsOptions`
+  pub fn new() -> Self {
+    Self {
+      before: None,
+      after: None,
+      limit: None,
+      with_counts: None,
+    }
+  }
+
+  /// Sets the guild ID to search before.
+  /// Also removes `after` if set.
+  pub fn set_before<T: ToString>(mut self, before: T) -> Self {
+    self.before = Some(before.to_string());
+    self.after = None;
+    self
+  }
+
+  /// Sets the guild ID to search after.
+  /// Also removes `before` if set.
+  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
+    self.after = Some(after.to_string());
+    self.before = None;
+    self
+  }
+
+  /// Sets the limit for the amount of guilds to fetch
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+
+  /// Sets whether approximate user and presence counts should be included
+  pub fn set_with_counts(mut self, with_counts: bool) -> Self {
+    self.with_counts = Some(with_counts);
+    self
   }
 }
 
