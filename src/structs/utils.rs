@@ -7,6 +7,7 @@
 
 //! Misc utility structs
 
+use base64::Engine;
 use serde::{Serialize, Deserialize};
 use crate::tokio::{fs, io::AsyncReadExt};
 use std::convert::TryFrom;
@@ -146,5 +147,15 @@ impl File {
   pub fn set_waveform<T: ToString>(mut self, waveform: T) -> Self {
     self.waveform = Some(waveform.to_string());
     self
+  }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for File {
+  /// Returns the file as a base64 data URL
+  fn to_string(&self) -> String {
+      let mime = infer::get(&self.data).map(|t| t.mime_type()).unwrap_or("application/octet-stream");
+      let b64 = base64::prelude::BASE64_STANDARD.encode(&self.data);
+      format!("data:{mime};base64,{b64}")
   }
 }
