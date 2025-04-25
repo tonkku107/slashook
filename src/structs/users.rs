@@ -122,6 +122,11 @@ impl User {
     self.avatar.as_ref().map(|a| format!("https://cdn.discordapp.com/avatars/{}/{}.{}?size={}", self.id, a, format.to_string(), size.to_string()))
   }
 
+  /// Get a banner url for the user. None if the user has no banner
+  pub fn banner_url<T: ToString, U: ToString>(&self, format: T, size: U) -> Option<String> {
+    self.banner.as_ref().map(|b| format!("https://cdn.discordapp.com/banners/{}/{}.{}?size={}", self.id, b, format.to_string(), size.to_string()))
+  }
+
   /// Returns a string representing a user mention
   pub fn mention(&self) -> String {
     format!("<@{}>", self.id)
