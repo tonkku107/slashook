@@ -50,7 +50,7 @@ pub struct Guild {
   /// The channel id that the widget will generate an invite to, or None if set to no invite
   pub widget_channel_id: Option<Snowflake>,
   /// [Verification level](VerificationLevel) required for the guild
-  pub verification_level: VerificationLevel,
+  pub verification_level: Option<VerificationLevel>,
   /// Default [message notifications level](MessageNotificationsLevel)
   pub default_message_notifications: Option<MessageNotificationsLevel>,
   /// [Explicit content filter level](ExplicitContentFilterLevel)
@@ -100,7 +100,7 @@ pub struct Guild {
   /// The welcome screen of a Community guild, shown to new members, returned in an [Invite](super::invites::Invite)'s guild object
   pub welcome_screen: Option<WelcomeScreen>,
   /// [Guild NSFW level](NSFWLevel)
-  pub nsfw_level: NSFWLevel,
+  pub nsfw_level: Option<NSFWLevel>,
   /// Custom guild stickers
   pub stickers: Option<Vec<Sticker>>,
   /// Whether the guild has the boost progress bar enabled
