@@ -9,6 +9,9 @@
 
 use serde::{Deserialize, de::Deserializer};
 use serde_repr::Deserialize_repr;
+use chrono::{DateTime, Utc};
+use bitflags::bitflags;
+
 use super::{
   stickers::Sticker,
   users::{User, AvatarDecorationData},
@@ -17,8 +20,7 @@ use super::{
   Permissions,
   Snowflake,
 };
-use chrono::{DateTime, Utc};
-use bitflags::bitflags;
+use crate::internal_utils::cdn::pick_format;
 
 /// Discord Guild Object
 #[derive(Deserialize, Clone, Debug)]
@@ -590,35 +592,41 @@ fn exists<'de, D: Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
 
 impl GuildMember {
   /// Get the url for the per-server member avatar. `None` if the member has no server-specific avatar
-  pub fn avatar_url<T: ToString, U: ToString, V: ToString, W: ToString>(&self, guild_id: T, user_id: U, format: V, size: W) -> Option<String> {
-    self.avatar.as_ref().map(|a| format!("https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size={}", guild_id.to_string(), user_id.to_string(), a, format.to_string(), size.to_string()))
+  pub fn avatar_url<T: ToString, U: ToString, V: ToString, W: ToString, X: ToString>(&self, guild_id: T, user_id: U, static_format: V, animated_format: Option<W>, size: X) -> Option<String> {
+    self.avatar.as_deref().map(|a| {
+      let (format, animated) = pick_format(a, static_format.to_string(), animated_format.map(|f| f.to_string()));
+      format!("https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size={}&animated={}", guild_id.to_string(), user_id.to_string(), a, format, size.to_string(), animated)
+    })
   }
 
   /// Get the url for the per-server member banner. `None` if the member has no server-specific banner
-  pub fn banner_url<T: ToString, U: ToString, V: ToString, W: ToString>(&self, guild_id: T, user_id: U, format: V, size: W) -> Option<String> {
-    self.banner.as_ref().map(|b| format!("https://cdn.discordapp.com/guilds/{}/users/{}/banners/{}.{}?size={}", guild_id.to_string(), user_id.to_string(), b, format.to_string(), size.to_string()))
+  pub fn banner_url<T: ToString, U: ToString, V: ToString, W: ToString, X: ToString>(&self, guild_id: T, user_id: U, static_format: V, animated_format: Option<W>, size: X) -> Option<String> {
+    self.banner.as_deref().map(|b| {
+      let (format, animated) = pick_format(b, static_format.to_string(), animated_format.map(|f| f.to_string()));
+      format!("https://cdn.discordapp.com/guilds/{}/users/{}/banners/{}.{}?size={}&animated={}", guild_id.to_string(), user_id.to_string(), b, format, size.to_string(), animated)
+    })
   }
 
   /// Get the url for the member avatar that would be displayed in app.\
   /// **NOTE:** Will return `None` if `user` in the `GuildMember` is `None`. Use [`User::display_avatar_url_with_member`] if you want to make sure you get the correct avatar.
-  pub fn display_avatar_url<T: ToString, U: ToString, V: ToString>(&self, guild_id: T, format: U, size: V) -> Option<String> {
+  pub fn display_avatar_url<T: ToString, U: ToString, V: ToString, W: ToString>(&self, guild_id: T, static_format: U, animated_format: Option<V>, size: W) -> Option<String> {
     let Some(user) = &self.user else {
       return None;
     };
 
-    self.avatar_url(guild_id, &user.id, format.to_string(), size.to_string())
-      .or_else(|| Some(user.display_avatar_url(format, size)))
+    self.avatar_url(guild_id, &user.id, static_format.to_string(), animated_format.as_ref().map(|f| f.to_string()), size.to_string())
+      .or_else(|| Some(user.display_avatar_url(static_format, animated_format, size)))
   }
 
   /// Get the url for the member banner that would be displayed in app. `None` if no banner is set.\
   /// **NOTE:** Will return `None` if `user` in the `GuildMember` is `None`. Use [`User::display_banner_url_with_member`] if you want to make sure you get the correct banner.
-  pub fn display_banner_url<T: ToString, U: ToString, V: ToString>(&self, guild_id: T, format: U, size: V) -> Option<String> {
+  pub fn display_banner_url<T: ToString, U: ToString, V: ToString, W: ToString>(&self, guild_id: T, static_format: U, animated_format: Option<V>, size: W) -> Option<String> {
     let Some(user) = &self.user else {
       return None;
     };
 
-    self.banner_url(guild_id, &user.id, format.to_string(), size.to_string())
-      .or_else(|| user.banner_url(format, size))
+    self.banner_url(guild_id, &user.id, static_format.to_string(), animated_format.as_ref().map(|f| f.to_string()), size.to_string())
+      .or_else(|| user.banner_url(static_format, animated_format, size))
   }
 }
 

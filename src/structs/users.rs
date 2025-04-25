@@ -13,6 +13,7 @@ use serde_json::json;
 use serde_repr::{Serialize_repr, Deserialize_repr};
 use bitflags::bitflags;
 
+use crate::internal_utils::cdn::pick_format;
 use crate::rest::{Rest, RestError};
 use super::{
   channels::Channel,
@@ -152,8 +153,11 @@ pub struct GetUserGuildsOptions {
 
 impl User {
   /// Get user's custom avatar url. `None` if the user has no custom avatar
-  pub fn avatar_url<T: ToString, U: ToString>(&self, format: T, size: U) -> Option<String> {
-    self.avatar.as_ref().map(|a| format!("https://cdn.discordapp.com/avatars/{}/{}.{}?size={}", self.id, a, format.to_string(), size.to_string()))
+  pub fn avatar_url<T: ToString, U: ToString, V: ToString>(&self, static_format: T, animated_format: Option<U>, size: V) -> Option<String> {
+    self.avatar.as_deref().map(|a| {
+      let (format, animated) = pick_format(a, static_format.to_string(), animated_format.map(|f| f.to_string()));
+      format!("https://cdn.discordapp.com/avatars/{}/{}.{}?size={}&animated={}", self.id, a, format, size.to_string(), animated)
+    })
   }
 
   /// Get the url for the user's default avatar
@@ -170,25 +174,28 @@ impl User {
   }
 
   /// Get the url for the user avatar that would be displayed in app, falling back to the default avatar if the user doesn't have one
-  pub fn display_avatar_url<T: ToString, U: ToString>(&self, format: T, size: U) -> String {
-    self.avatar_url(format, size).unwrap_or_else(|| self.default_avatar_url())
+  pub fn display_avatar_url<T: ToString, U: ToString, V: ToString>(&self, static_format: T, animated_format: Option<U>, size: V) -> String {
+    self.avatar_url(static_format, animated_format, size).unwrap_or_else(|| self.default_avatar_url())
   }
 
   /// Get the url for the user avatar that would be displayed in app, taking into account the per-server profile. Workaround for [`GuildMember`] that don't have `user` set.
-  pub fn display_avatar_url_with_member<T: ToString, U: ToString, V: ToString>(&self, format: T, size: U, guild_id: V, member: GuildMember) -> String {
-    member.avatar_url(guild_id, &self.id, format.to_string(), size.to_string())
-      .unwrap_or_else(|| self.display_avatar_url(format, size))
+  pub fn display_avatar_url_with_member<T: ToString, U: ToString, V: ToString, W: ToString>(&self, static_format: T, animated_format: Option<U>, size: V, guild_id: W, member: GuildMember) -> String {
+    member.avatar_url(guild_id, &self.id, static_format.to_string(), animated_format.as_ref().map(|f| f.to_string()), size.to_string())
+      .unwrap_or_else(|| self.display_avatar_url(static_format, animated_format, size))
   }
 
   /// Get user's banner url. `None` if the user has no banner
-  pub fn banner_url<T: ToString, U: ToString>(&self, format: T, size: U) -> Option<String> {
-    self.banner.as_ref().map(|b| format!("https://cdn.discordapp.com/banners/{}/{}.{}?size={}", self.id, b, format.to_string(), size.to_string()))
+  pub fn banner_url<T: ToString, U: ToString, V: ToString>(&self, static_format: T, animated_format: Option<U>, size: V) -> Option<String> {
+    self.banner.as_deref().map(|b| {
+      let (format, animated) = pick_format(b, static_format.to_string(), animated_format.map(|f| f.to_string()));
+      format!("https://cdn.discordapp.com/banners/{}/{}.{}?size={}&animated={}", self.id, b, format, size.to_string(), animated)
+    })
   }
 
   /// Get the url for the user banner that would be displayed in app, taking into account the per-server profile. `None` if the user has no banner. Workaround for [`GuildMember`] that don't have `user` set.
-  pub fn display_banner_url_with_member<T: ToString, U: ToString, V: ToString>(&self, format: T, size: U, guild_id: V, member: GuildMember) -> Option<String> {
-    member.banner_url(guild_id, &self.id, format.to_string(), size.to_string())
-      .or_else(|| self.banner_url(format, size))
+  pub fn display_banner_url_with_member<T: ToString, U: ToString, V: ToString, W: ToString>(&self, static_format: T, animated_format: Option<U>, size: V, guild_id: W, member: GuildMember) -> Option<String> {
+    member.banner_url(guild_id, &self.id, static_format.to_string(), animated_format.as_ref().map(|f| f.to_string()), size.to_string())
+      .or_else(|| self.banner_url(static_format, animated_format, size))
   }
 
   /// Returns a string representing a user mention
