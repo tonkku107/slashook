@@ -5,5 +5,14 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
-pub mod cdn;
-pub mod in_case_of_discord_fuckups;
+pub fn pick_format(hash: &str, static_format: String, animated_format: Option<String>) -> (String, bool) {
+  let Some(animated_format) = animated_format else {
+    return (static_format, false);
+  };
+
+  if hash.starts_with("a_") {
+    return (animated_format, true)
+  }
+
+  (static_format, false)
+}
