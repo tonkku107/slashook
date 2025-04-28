@@ -293,11 +293,11 @@ impl CommandHandler {
     Ok(())
   }
 
-  fn parse_component_values(&self, components: Vec<Component>, input: &mut CommandInput) {
+  fn parse_component_values(components: Vec<Component>, input: &mut CommandInput) {
     for component in components.into_iter() {
       match component {
         Component::ActionRow(action_row) => {
-          self.parse_component_values(action_row.components, input);
+          Self::parse_component_values(action_row.components, input);
         },
         Component::TextInput(text_input) => {
           let value = OptionValue::String(text_input.value.unwrap_or_default());
@@ -438,7 +438,7 @@ impl CommandHandler {
     }
 
     if let Some(components) = data.components {
-      self.parse_component_values(components, &mut input);
+      Self::parse_component_values(components, &mut input);
     }
 
     if let Some(values) = data.values {
@@ -462,17 +462,17 @@ impl CommandInput {
 
   /// Returns true if the interaction is for a chat input command
   pub fn is_chat_input(&self) -> bool {
-    self.command_type.as_ref().map_or(false, |t| matches!(t, ApplicationCommandType::CHAT_INPUT))
+    self.command_type.as_ref().is_some_and(|t| matches!(t, ApplicationCommandType::CHAT_INPUT))
   }
 
   /// Returns true if the interaction is for a user context menu
   pub fn is_user_context(&self) -> bool {
-    self.command_type.as_ref().map_or(false, |t| matches!(t, ApplicationCommandType::USER))
+    self.command_type.as_ref().is_some_and(|t| matches!(t, ApplicationCommandType::USER))
   }
 
   /// Returns true if the interaction is for a message context menu
   pub fn is_message_context(&self) -> bool {
-    self.command_type.as_ref().map_or(false, |t| matches!(t, ApplicationCommandType::MESSAGE))
+    self.command_type.as_ref().is_some_and(|t| matches!(t, ApplicationCommandType::MESSAGE))
   }
 
   /// Returns true if the interaction is for a message component
@@ -482,32 +482,32 @@ impl CommandInput {
 
   /// Returns true if the interaction is for a clicked button
   pub fn is_button(&self) -> bool {
-    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::BUTTON))
+    self.component_type.as_ref().is_some_and(|t| matches!(t, ComponentType::BUTTON))
   }
 
   /// Returns true if the interaction is for a string select menu
   pub fn is_string_select(&self) -> bool {
-    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::STRING_SELECT))
+    self.component_type.as_ref().is_some_and(|t| matches!(t, ComponentType::STRING_SELECT))
   }
 
   /// Returns true if the interaction is for a user select menu
   pub fn is_user_select(&self) -> bool {
-    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::USER_SELECT))
+    self.component_type.as_ref().is_some_and(|t| matches!(t, ComponentType::USER_SELECT))
   }
 
   /// Returns true if the interaction is for a role select menu
   pub fn is_role_select(&self) -> bool {
-    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::ROLE_SELECT))
+    self.component_type.as_ref().is_some_and(|t| matches!(t, ComponentType::ROLE_SELECT))
   }
 
   /// Returns true if the interaction is for a mentionable select menu
   pub fn is_mentionable_select(&self) -> bool {
-    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::MENTIONABLE_SELECT))
+    self.component_type.as_ref().is_some_and(|t| matches!(t, ComponentType::MENTIONABLE_SELECT))
   }
 
   /// Returns true if the interaction is for a channel select menu
   pub fn is_channel_select(&self) -> bool {
-    self.component_type.as_ref().map_or(false, |t| matches!(t, ComponentType::CHANNEL_SELECT))
+    self.component_type.as_ref().is_some_and(|t| matches!(t, ComponentType::CHANNEL_SELECT))
   }
 
   /// Returns true if the interaction is for autocompletion
