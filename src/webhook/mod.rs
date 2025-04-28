@@ -48,7 +48,7 @@ impl<'r> Responder<'r, 'static> for Res {
       },
 
       Self::Response{ status, data } => {
-        if data.data.as_ref().map_or(false, |d| d.files.is_some()) {
+        if data.data.as_ref().is_some_and(|d| d.files.is_some()) {
           response.merge(multipart::handle_multipart(*data)?);
         } else {
           let json = serde_json::to_string(&data).map_err(|_| Status::InternalServerError)?;
