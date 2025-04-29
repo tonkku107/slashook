@@ -2,7 +2,7 @@
 name = "slashook-macros"
 description = "Macros for slashook"
 categories = ["development-tools"]
-version = "0.4.0"
+version = "0.5.0"
 edition = "2024"
 authors = ["Tonkku"]
 repository = "https://github.com/tonkku107/slashook"
