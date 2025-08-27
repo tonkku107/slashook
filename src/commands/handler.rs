@@ -310,15 +310,13 @@ impl CommandHandler {
 
   fn parse_mentionable(&self, resolved: &InteractionDataResolved, option_value: &str) -> anyhow::Result<OptionValue> {
     let mut found_value = None;
-    if let Some(users) = &resolved.users {
-      if let Some(user) = users.get(option_value) {
+    if let Some(users) = &resolved.users
+      && let Some(user) = users.get(option_value) {
         found_value = Some(OptionValue::User(user.clone()))
-      }
     }
-    if let Some(roles) = &resolved.roles {
-      if let Some(role) = roles.get(option_value) {
+    if let Some(roles) = &resolved.roles
+      && let Some(role) = roles.get(option_value) {
         found_value = Some(OptionValue::Role(role.clone()))
-      }
     }
     if let Some(value) = found_value {
       Ok(value)
