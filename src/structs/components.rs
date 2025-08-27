@@ -893,33 +893,33 @@ impl Label {
   }
 }
 
-impl Into<Component> for ActionRow {
-  fn into(self) -> Component {
-    Component::ActionRow(self)
+impl From<ActionRow> for Component {
+  fn from(value: ActionRow) -> Self {
+    Self::ActionRow(value)
   }
 }
 
-impl Into<Component> for Button {
-  fn into(self) -> Component {
-    Component::Button(Box::new(self))
+impl From<Button> for Component {
+  fn from(value: Button) -> Self {
+    Self::Button(Box::new(value))
   }
 }
 
-impl Into<Component> for SelectMenu {
-  fn into(self) -> Component {
-    Component::SelectMenu(Box::new(self))
+impl From<SelectMenu> for Component {
+  fn from(value: SelectMenu) -> Self {
+    Self::SelectMenu(Box::new(value))
   }
 }
 
-impl Into<Component> for TextInput {
-  fn into(self) -> Component {
-    Component::TextInput(self)
+impl From<TextInput> for Component {
+  fn from(value: TextInput) -> Self {
+    Self::TextInput(value)
   }
 }
 
-impl Into<Component> for Label {
-  fn into(self) -> Component {
-    Component::Label(self)
+impl From<Label> for Component {
+  fn from(value: Label) -> Self {
+    Self::Label(value)
   }
 }
 
