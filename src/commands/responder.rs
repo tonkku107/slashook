@@ -1,4 +1,4 @@
-// Copyright 2022 slashook Developers
+// Copyright 2025 slashook Developers
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -6,47 +6,68 @@
 // copied, modified, or distributed except according to those terms.
 
 use crate::structs::{
-  embeds::Embed,
-  interactions::{InteractionCallbackData, ApplicationCommandOptionChoice, Attachments},
-  channels::{Message, AllowedMentions, Attachment, MessageFlags},
   components::{Component, Components},
-  utils::File
+  embeds::Embed,
+  interactions::{ApplicationCommandOptionChoice, Attachments, InteractionCallbackData},
+  messages::{AllowedMentions, Attachment, Message, MessageFlags, MessageReference},
+  polls::PollCreateRequest,
+  utils::File, Snowflake,
 };
 use serde::Serialize;
 use crate::tokio::sync::mpsc;
 use crate::rest::{Rest, RestError};
 
-type SimpleResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+/// Error for when a response failed due to the interaction having been responded to already.
+#[derive(Debug)]
+pub struct InteractionResponseError;
+impl std::fmt::Display for InteractionResponseError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Interaction has already been responded to.")
+  }
+}
+impl std::error::Error for InteractionResponseError { }
 
 /// Message that can be sent as a response to a command or other interaction
 ///
-/// This struct can be easily constructed from a `str`, `String`, [`Embed`](crate::structs::embeds::Embed) or [`Components`](crate::structs::components::Components)
+/// This struct can be easily constructed from a `str`, `String`, [`Embed`](crate::structs::embeds::Embed), [`Components`](crate::structs::components::Components),
+/// [`File`](crate::structs::utils::File) or [`PollCreateRequest`](crate::structs::polls::PollCreateRequest)
 /// with the `From` trait
 #[derive(Serialize, Clone, Debug)]
 pub struct MessageResponse {
-  /// Should the response is TTS or not
+  /// Whether the response is TTS
   pub tts: Option<bool>,
-  /// Content of the message
+  /// Message content (up to 2000 characters)
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
-  /// Flags of the message.\
-  /// Valid flags are [EPHEMERAL](crate::structs::channels::MessageFlags::EPHEMERAL) for interactions to only show the response to the invoking user and
-  /// [SUPPRESS_EMBEDS](crate::structs::channels::MessageFlags::SUPPRESS_EMBEDS) to hide embeds from showing in the message.
-  pub flags: Option<MessageFlags>,
-  /// Up to 10 embeds to send with the response
+  /// Up to 10 embeds (up to 6000 characters)
   #[serde(skip_serializing_if = "Option::is_none")]
   pub embeds: Option<Vec<Embed>>,
-  /// Components to send with the response
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub components: Option<Vec<Component>>,
-  /// Partial attachment objects indicating which to keep when editing.
-  #[serde(skip_serializing_if = "Option::is_none")]
-  pub attachments: Option<Vec<Attachment>>,
-  /// Which mentions should be parsed
+  /// [Allowed mentions](AllowedMentions) object
   #[serde(skip_serializing_if = "Option::is_none")]
   pub allowed_mentions: Option<AllowedMentions>,
+  /// [Message flags](MessageFlags) combined as a bitfield
+  /// (only [SUPPRESS_EMBEDS](MessageFlags::SUPPRESS_EMBEDS), [EPHEMERAL](MessageFlags::EPHEMERAL), and [SUPPRESS_NOTIFICATIONS](MessageFlags::SUPPRESS_NOTIFICATIONS) can be set for interaction responses)
+  pub flags: Option<MessageFlags>,
+  /// Message components
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub components: Option<Vec<Component>>,
+  /// Attachment objects with filename and description.\
+  /// Use `files` if you want to upload an attachment.\
+  /// This is for partial attachment objects indicating which to keep when editing.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub attachments: Option<Vec<Attachment>>,
+  /// Details about the poll
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub poll: Option<PollCreateRequest>,
+  /// Include to make your message a reply or a forward (not available for interaction responses)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub message_reference: Option<MessageReference>,
+  /// IDs of up to 3 stickers in the server to send in the message
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub sticker_ids: Option<Vec<Snowflake>>,
   /// Up to 10 files to send with the response
   #[serde(skip_serializing)]
-  pub files: Option<Vec<File>>
+  pub files: Option<Vec<File>>,
 }
 
 impl MessageResponse {
@@ -71,36 +92,6 @@ impl MessageResponse {
   /// ```
   pub fn set_content<T: ToString>(mut self, content: T) -> Self {
     self.content = Some(content.to_string());
-    self
-  }
-
-  /// Set the ephemeralness of the message
-  /// ```
-  /// # use slashook::commands::MessageResponse;
-  /// # use slashook::structs::channels::MessageFlags;
-  /// let response = MessageResponse::from("This is for your eyes only!")
-  ///   .set_ephemeral(true);
-  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::EPHEMERAL), true);
-  /// ```
-  pub fn set_ephemeral(mut self, ephemeral: bool) -> Self {
-    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
-    flags.set(MessageFlags::EPHEMERAL, ephemeral);
-    self.flags = Some(flags);
-    self
-  }
-
-  /// Set suppress embeds flag
-  /// ```
-  /// # use slashook::commands::MessageResponse;
-  /// # use slashook::structs::channels::MessageFlags;
-  /// let response = MessageResponse::from("No embeds here")
-  ///   .set_suppress_embeds(true);
-  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::SUPPRESS_EMBEDS), true);
-  /// ```
-  pub fn set_suppress_embeds(mut self, suppress: bool) -> Self {
-    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
-    flags.set(MessageFlags::SUPPRESS_EMBEDS, suppress);
-    self.flags = Some(flags);
     self
   }
 
@@ -132,6 +123,87 @@ impl MessageResponse {
     self
   }
 
+  /// Set the allowed mentions for the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::messages::{AllowedMentions, AllowedMentionType};
+  /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::USERS);
+  /// let response = MessageResponse::from("<@1234> Get pinged. Not @everyone or <@&1235> tho.")
+  ///   .set_allowed_mentions(allowed_mentions);
+  /// ```
+  pub fn set_allowed_mentions(mut self, allowed_mentions: AllowedMentions) -> Self {
+    self.allowed_mentions = Some(allowed_mentions);
+    self
+  }
+
+  /// Set the ephemeralness of the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::messages::MessageFlags;
+  /// let response = MessageResponse::from("This is for your eyes only!")
+  ///   .set_ephemeral(true);
+  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::EPHEMERAL), true);
+  /// ```
+  pub fn set_ephemeral(mut self, ephemeral: bool) -> Self {
+    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
+    flags.set(MessageFlags::EPHEMERAL, ephemeral);
+    self.flags = Some(flags);
+    self
+  }
+
+  /// Set suppress embeds flag
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::messages::MessageFlags;
+  /// let response = MessageResponse::from("No embeds here")
+  ///   .set_suppress_embeds(true);
+  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::SUPPRESS_EMBEDS), true);
+  /// ```
+  pub fn set_suppress_embeds(mut self, suppress: bool) -> Self {
+    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
+    flags.set(MessageFlags::SUPPRESS_EMBEDS, suppress);
+    self.flags = Some(flags);
+    self
+  }
+
+  /// Set suppress notifications flag
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::messages::MessageFlags;
+  /// let response = MessageResponse::from("No notifications @here")
+  ///   .set_suppress_notifications(true);
+  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::SUPPRESS_NOTIFICATIONS), true);
+  /// ```
+  pub fn set_suppress_notifications(mut self, suppress: bool) -> Self {
+    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
+    flags.set(MessageFlags::SUPPRESS_NOTIFICATIONS, suppress);
+    self.flags = Some(flags);
+    self
+  }
+
+  /// Set voice message flag
+  /// ```no_run
+  /// # use slashook::commands::{MessageResponse, CmdResult};
+  /// # use slashook::structs::{messages::MessageFlags, utils::File};
+  /// # use slashook::tokio::fs::File as TokioFile;
+  /// # #[slashook::main]
+  /// # async fn main() -> CmdResult {
+  /// let file = TokioFile::open("audio.ogg").await?;
+  /// let audio_file = File::from_file("audio.ogg", file).await?
+  ///   .set_duration_secs(1.1799999475479126)
+  ///   .set_waveform("AAM1YAAAAAAAAAA=");
+  /// let response = MessageResponse::from(audio_file).set_as_voice_message(true);
+  /// assert_eq!(response.flags.unwrap().contains(MessageFlags::IS_VOICE_MESSAGE), true);
+  /// # Ok(())
+  /// # }
+  /// ```
+  pub fn set_as_voice_message(mut self, is_voice_message: bool) -> Self {
+    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
+    flags.set(MessageFlags::IS_VOICE_MESSAGE, is_voice_message);
+    self.flags = Some(flags);
+    self
+  }
+
   /// Set the components on the message
   /// ```
   /// # use slashook::commands::MessageResponse;
@@ -146,19 +218,6 @@ impl MessageResponse {
   /// ```
   pub fn set_components(mut self, components: Components) -> Self {
     self.components = Some(components.0);
-    self
-  }
-
-  /// Set the allowed mentions for the message
-  /// ```
-  /// # use slashook::commands::MessageResponse;
-  /// # use slashook::structs::channels::{AllowedMentions, AllowedMentionType};
-  /// let allowed_mentions = AllowedMentions::new().add_parse(AllowedMentionType::users);
-  /// let response = MessageResponse::from("<@1234> Get pinged. Not @everyone or <@&1235> tho.")
-  ///   .set_allowed_mentions(allowed_mentions);
-  /// ```
-  pub fn set_allowed_mentions(mut self, allowed_mentions: AllowedMentions) -> Self {
-    self.allowed_mentions = Some(allowed_mentions);
     self
   }
 
@@ -185,18 +244,18 @@ impl MessageResponse {
   }
 
   /// Keep an existing attachment when editing
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
   /// # use slashook::commands::MessageResponse;
   /// # use slashook::structs::utils::File;
   /// # use slashook::tokio::fs::File as TokioFile;
-  /// # #[command("example")]
+  /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let msg_file = File::from_file("cat.png", TokioFile::open("cat.png").await?).await?;
   /// let msg_file2 = File::from_file("cat2.png", TokioFile::open("cat2.png").await?).await?;
   ///
-  /// res.defer(false)?;
+  /// res.defer(false).await?;
   ///
   /// let response = MessageResponse::from("Here's a picture of my cat")
   ///   .add_file(msg_file);
@@ -224,6 +283,50 @@ impl MessageResponse {
   /// ```
   pub fn clear_attachments(mut self) -> Self {
     self.attachments = Some(Vec::new());
+    self
+  }
+
+  /// Add a poll to the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::{polls::{PollCreateRequest, PollAnswer}, Emoji};
+  /// let response = MessageResponse::from("This message will contain a poll!")
+  ///   .set_poll(PollCreateRequest::new("Is this a good poll?")
+  ///     .add_answer(PollAnswer::new().set_text("Yes").set_emoji(Emoji::new_standard_emoji("✅")))
+  ///     .add_answer(PollAnswer::from("No").set_emoji(Emoji::new_custom_emoji("567088349484023818", "redtick", false)))
+  ///     .add_answer("Maybe")
+  ///     .set_duration(1)
+  ///   );
+  /// ```
+  pub fn set_poll(mut self, poll: PollCreateRequest) -> Self {
+    self.poll = Some(poll);
+    self
+  }
+
+  /// Set a reply or forward
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::messages::MessageReference;
+  /// let response = MessageResponse::from("This is a reply")
+  ///   .set_message_reference(MessageReference::new_reply("916413462467465246"));
+  /// assert_eq!(response.message_reference.unwrap().message_id, Some(String::from("916413462467465246")));
+  /// ```
+  pub fn set_message_reference(mut self, message_reference: MessageReference) -> Self {
+    self.message_reference = Some(message_reference);
+    self
+  }
+
+  /// Add a sticker to the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// let response = MessageResponse::from(":)")
+  ///   .add_sticker("749044136589393960");
+  /// assert_eq!(response.sticker_ids.unwrap().remove(0), String::from("749044136589393960"));
+  /// ```
+  pub fn add_sticker<T: ToString>(mut self, sticker_id: T) -> Self {
+    let mut sticker_ids = self.sticker_ids.unwrap_or_default();
+    sticker_ids.push(sticker_id.to_string());
+    self.sticker_ids = Some(sticker_ids);
     self
   }
 }
@@ -279,7 +382,8 @@ pub enum CommandResponse {
   DeferUpdate,
   UpdateMessage(MessageResponse),
   AutocompleteResult(Vec<ApplicationCommandOptionChoice>),
-  Modal(Modal)
+  Modal(Modal),
+  LaunchActivity,
 }
 
 /// Struct with methods for responding to interactions
@@ -293,82 +397,106 @@ pub struct CommandResponder {
 
 impl CommandResponder {
   /// Respond to an interaction with a message.\
-  /// Only valid for the first response. If you've already responded or deferred once, use the follow-up methods
-  /// ```no_run
+  /// If interaction has already been responded to, this function will call [`send_followup_message`](CommandResponder::send_followup_message) instead and a message can only be returned in this case.
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.send_message("Hello!")?;
+  ///   res.send_message("Hello!").await?;
   /// }
   /// ```
-  pub fn send_message<T: Into<MessageResponse>>(&self, response: T) -> SimpleResult<()> {
+  pub async fn send_message<T: Into<MessageResponse>>(&self, response: T) -> Result<Option<Message>, RestError> {
     let response = response.into();
-    self.tx.send(CommandResponse::SendMessage(response))?;
-    // TODO: Figure out why the sender doesn't realize it is closed and forward further send_message calls to send_followup_message
-    Ok(())
+    match self.tx.send(CommandResponse::SendMessage(response)) {
+      Ok(_) => {
+        self.tx.closed().await;
+        Ok(None)
+      },
+      Err(err) => {
+        if let CommandResponse::SendMessage(response) = err.0 {
+          return self.send_followup_message(response).await.map(Some);
+        }
+        Ok(None)
+      }
+    }
   }
 
   /// Respond to an interaction by editing the original message.\
-  /// Only valid for the first response to a component interaction. If you've already responded or deferred once, use the follow-up methods
-  /// ```no_run
+  /// If interaction has already been responded to, this function will call [`edit_original_message`](CommandResponder::edit_original_message) instead and a message can only be returned in this case.
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
   /// # use slashook::structs::components::{Components, Button};
-  /// ##[command("example_button")]
+  /// ##[command(name = "example_button", ignore = true)]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.update_message("Button was clicked!")?;
+  ///   res.update_message("Button was clicked!").await?;
   /// }
   /// ```
-  pub fn update_message<T: Into<MessageResponse>>(&self, response: T) -> SimpleResult<()> {
+  pub async fn update_message<T: Into<MessageResponse>>(&self, response: T) -> Result<Option<Message>, RestError> {
     let response = response.into();
-    self.tx.send(CommandResponse::UpdateMessage(response))?;
-    Ok(())
+    match self.tx.send(CommandResponse::UpdateMessage(response)) {
+      Ok(_) => {
+        self.tx.closed().await;
+        Ok(None)
+      },
+      Err(err) => {
+        if let CommandResponse::UpdateMessage(response) = err.0 {
+          return self.edit_original_message(response).await.map(Some);
+        }
+        Ok(None)
+      }
+    }
   }
 
   /// Give yourself more execution time.\
   /// If you don't respond within 3 seconds, Discord will disconnect and tell the user the interaction failed to run.
   /// By deferring, Discord will tell the user your bot is "thinking" and allow you to take your time. You can use the `send_followup_message` or `edit_original_message` methods to send the response.\
   /// The ephemeralness set here will be passed on to your first follow-up, no matter what ephemeralness you set there.
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.defer(false)?;
+  ///   res.defer(false).await?;
   ///   // Do something that takes longer than 3s
   ///   res.send_followup_message("Thank you for your patience!").await?;
   /// }
   /// ```
-  pub fn defer(&self, ephemeral: bool) -> SimpleResult<()> {
+  pub async fn defer(&self, ephemeral: bool) -> Result<(), InteractionResponseError> {
     let mut flags = MessageFlags::empty();
     flags.set(MessageFlags::EPHEMERAL, ephemeral);
-    self.tx.send(CommandResponse::DeferMessage(flags))?;
+    self.tx.send(CommandResponse::DeferMessage(flags)).map_err(|_| InteractionResponseError)?;
+    self.tx.closed().await;
     Ok(())
   }
 
   /// Much like `defer` but for component interactions and it shows nothing visibly to the user.
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example_button")]
+  /// ##[command(name = "example_button", ignore = true)]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.defer_update()?;
+  ///   res.defer_update().await?;
   ///   // Do something that takes longer than 3s
   ///   res.edit_original_message("Finally it changed!").await?;
   /// }
   /// ```
-  pub fn defer_update(&self) -> SimpleResult<()> {
-    self.tx.send(CommandResponse::DeferUpdate)?;
+  pub async fn defer_update(&self) -> Result<(), InteractionResponseError> {
+    self.tx.send(CommandResponse::DeferUpdate).map_err(|_| InteractionResponseError)?;
+    self.tx.closed().await;
     Ok(())
   }
 
   /// Respond to an autocomplete interaction with autocomplete choices
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// # use slashook::structs::interactions::ApplicationCommandOptionChoice;
-  /// ##[command("example")]
+  /// # use slashook::structs::interactions::{ApplicationCommandOptionChoice, InteractionOptionType};
+  /// ##[command(name = "example", description = "An example command", options = [{
+  ///   name = "choice", description = "Choose an option",
+  ///   autocomplete = true, option_type = InteractionOptionType::STRING
+  /// }])]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   if input.is_autocomplete() {
   ///     let search = input.args.get(&input.focused.unwrap()).unwrap().as_string().unwrap();
@@ -377,21 +505,22 @@ impl CommandResponder {
   ///       ApplicationCommandOptionChoice::new("An autocompleted choice", "autocomplete1"),
   ///       ApplicationCommandOptionChoice::new("Another autocompleted choice", "autocomplete2")
   ///     ];
-  ///     return res.autocomplete(choices)?;
+  ///     return res.autocomplete(choices).await?;
   ///   }
   /// }
   /// ```
-  pub fn autocomplete(&self, results: Vec<ApplicationCommandOptionChoice>) -> SimpleResult<()> {
-    self.tx.send(CommandResponse::AutocompleteResult(results))?;
+  pub async fn autocomplete(&self, results: Vec<ApplicationCommandOptionChoice>) -> Result<(), InteractionResponseError> {
+    self.tx.send(CommandResponse::AutocompleteResult(results)).map_err(|_| InteractionResponseError)?;
+    self.tx.closed().await;
     Ok(())
   }
 
   /// Respond to an interaction with a modal
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse, Modal};
   /// # use slashook::structs::components::{Components, TextInput};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   let text_input = TextInput::new()
   ///     .set_label("Tell us something")
@@ -399,21 +528,42 @@ impl CommandResponder {
   ///   let components = Components::new().add_text_input(text_input);
   ///   let modal = Modal::new("example_command", "modal1", "Please fill this form")
   ///     .set_components(components);
-  ///   return res.open_modal(modal)?;
+  ///   return res.open_modal(modal).await?;
   /// }
   /// ```
-  pub fn open_modal(&self, modal: Modal) -> SimpleResult<()> {
-    self.tx.send(CommandResponse::Modal(modal))?;
+  pub async fn open_modal(&self, modal: Modal) -> Result<(), InteractionResponseError> {
+    self.tx.send(CommandResponse::Modal(modal)).map_err(|_| InteractionResponseError)?;
+    self.tx.closed().await;
+    Ok(())
+  }
+
+  /// Respond to an interaction by launching the activity associated with the app.
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::interactions::{ApplicationCommandType, ApplicationCommandHandlerType};
+  /// ##[command(
+  ///   name = "launch",
+  ///   command_type = ApplicationCommandType::PRIMARY_ENTRY_POINT,
+  ///   handler = ApplicationCommandHandlerType::APP_HANDLER
+  /// )]
+  /// fn launch(input: CommandInput, res: CommandResponder) {
+  ///   return res.launch_activity().await?;
+  /// }
+  /// ```
+  pub async fn launch_activity(&self) -> Result<(), InteractionResponseError> {
+    self.tx.send(CommandResponse::LaunchActivity).map_err(|_| InteractionResponseError)?;
+    self.tx.closed().await;
     Ok(())
   }
 
   /// Send more messages after the initial response
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.send_message("First message!")?;
+  ///   res.send_message("First message!").await?;
   ///   res.send_followup_message("Second message!").await?;
   /// }
   /// ```
@@ -430,14 +580,14 @@ impl CommandResponder {
   }
 
   /// Edits a follow-up message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.send_message("First message!")?;
+  ///   res.send_message("First message!").await?;
   ///   let msg = res.send_followup_message("Second message!").await?;
-  ///   res.edit_followup_message(msg.id, "Second message but edited!").await?;
+  ///   res.edit_followup_message(msg.id.unwrap(), "Second message but edited!").await?;
   /// }
   /// ```
   pub async fn edit_followup_message<T: Into<MessageResponse>>(&self, id: String, response: T) -> Result<Message, RestError> {
@@ -465,12 +615,12 @@ impl CommandResponder {
 
   /// Gets the original message\
   /// Same as running `get_followup_message` with id of `@original`
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.send_message("First message!")?;
+  ///   res.send_message("First message!").await?;
   ///   let msg = res.get_original_message().await?;
   ///   println!("I responded with {}", msg.content);
   /// }
@@ -480,14 +630,14 @@ impl CommandResponder {
   }
 
   /// Deletes a follow-up message
-  /// ```no_run
+  /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse};
-  /// ##[command("example")]
+  /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
-  ///   res.send_message("First message!")?;
+  ///   res.send_message("First message!").await?;
   ///   let msg = res.send_followup_message("If you see me say hi").await?;
-  ///   res.delete_followup_message(msg.id).await?;
+  ///   res.delete_followup_message(msg.id.unwrap()).await?;
   /// }
   /// ```
   pub async fn delete_followup_message(&self, id: String) -> Result<(), RestError> {
@@ -506,12 +656,15 @@ impl From<&str> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: Some(String::from(s)),
-      flags: None,
       embeds: None,
+      allowed_mentions: None,
+      flags: None,
       components: None,
       attachments: None,
-      allowed_mentions: None,
-      files: None
+      poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
     }
   }
 }
@@ -521,12 +674,15 @@ impl From<String> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: Some(s),
-      flags: None,
       embeds: None,
+      allowed_mentions: None,
+      flags: None,
       components: None,
       attachments: None,
-      allowed_mentions: None,
-      files: None
+      poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
     }
   }
 }
@@ -536,12 +692,33 @@ impl From<Embed> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      flags: None,
       embeds: Some(vec![e]),
+      allowed_mentions: None,
+      flags: None,
       components: None,
       attachments: None,
+      poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
+    }
+  }
+}
+
+impl From<Vec<Embed>> for MessageResponse {
+  fn from(e: Vec<Embed>) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      embeds: Some(e),
       allowed_mentions: None,
-      files: None
+      flags: None,
+      components: None,
+      attachments: None,
+      poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
     }
   }
 }
@@ -551,12 +728,87 @@ impl From<Components> for MessageResponse {
     MessageResponse {
       tts: Some(false),
       content: None,
-      flags: None,
       embeds: None,
+      allowed_mentions: None,
+      flags: None,
       components: Some(c.0),
       attachments: None,
+      poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
+    }
+  }
+}
+
+impl From<File> for MessageResponse {
+  fn from(f: File) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      embeds: None,
       allowed_mentions: None,
-      files: None
+      flags: None,
+      components: None,
+      attachments: None,
+      poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: Some(vec![f]),
+    }
+  }
+}
+
+impl From<Vec<File>> for MessageResponse {
+  fn from(f: Vec<File>) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      embeds: None,
+      allowed_mentions: None,
+      flags: None,
+      components: None,
+      attachments: None,
+      poll: None,
+      message_reference: None,
+      sticker_ids: None,
+      files: Some(f),
+    }
+  }
+}
+
+impl From<PollCreateRequest> for MessageResponse {
+  fn from(poll: PollCreateRequest) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      embeds: None,
+      allowed_mentions: None,
+      flags: None,
+      components: None,
+      attachments: None,
+      poll: Some(poll),
+      message_reference: None,
+      sticker_ids: None,
+      files: None,
+    }
+  }
+}
+
+impl From<MessageReference> for MessageResponse {
+  fn from(reference: MessageReference) -> MessageResponse {
+    MessageResponse {
+      tts: Some(false),
+      content: None,
+      embeds: None,
+      allowed_mentions: None,
+      flags: None,
+      components: None,
+      attachments: None,
+      poll: None,
+      message_reference: Some(reference),
+      sticker_ids: None,
+      files: None,
     }
   }
 }

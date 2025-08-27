@@ -1,4 +1,4 @@
-// Copyright 2022 slashook Developers
+// Copyright 2025 slashook Developers
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -6,6 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 use serde::de::{self, Deserialize, Deserializer};
+use serde::ser::{Serialize, Serializer};
 use bitflags::bitflags;
 
 bitflags! {
@@ -17,6 +18,7 @@ bitflags! {
   /// assert_eq!(permissions.contains(Permissions::SEND_MESSAGES), true);
   /// assert_eq!(permissions.contains(Permissions::MANAGE_MESSAGES), false);
   /// ```
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct Permissions: u64 {
     /// Allows creation of instant invites
     const CREATE_INSTANT_INVITE = 1 << 0;
@@ -38,9 +40,9 @@ bitflags! {
     const PRIORITY_SPEAKER = 1 << 8;
     /// Allows the user to go live
     const STREAM = 1 << 9;
-    /// Allows guild members to view a channel, which includes reading messages in text channels
+    /// Allows guild members to view a channel, which includes reading messages in text channels and joining voice channels
     const VIEW_CHANNEL = 1 << 10;
-    /// Allows for sending messages in a channel (does not allow sending messages in threads)
+    /// Allows for sending messages in a channel and creating threads in a forum (does not allow sending messages in threads)
     const SEND_MESSAGES = 1 << 11;
     /// Allows for sending of `/tts` messages
     const SEND_TTS_MESSAGES = 1 << 12;
@@ -52,7 +54,7 @@ bitflags! {
     const ATTACH_FILES = 1 << 15;
     /// Allows for reading of message history
     const READ_MESSAGE_HISTORY = 1 << 16;
-    /// Allows for using the @everyone tag to notify all users in a channel, and the @here tag to notify all online users in a channel
+    /// Allows for using the `@everyone` tag to notify all users in a channel, and the `@here` tag to notify all online users in a channel
     const MENTION_EVERYONE = 1 << 17;
     /// Allows the usage of custom emojis from other servers
     const USE_EXTERNAL_EMOJIS = 1 << 18;
@@ -78,8 +80,8 @@ bitflags! {
     const MANAGE_ROLES = 1 << 28;
     /// Allows management and editing of webhooks
     const MANAGE_WEBHOOKS = 1 << 29;
-    /// Allows management and editing of emojis and stickers
-    const MANAGE_EMOJIS_AND_STICKERS = 1 << 30;
+    /// Allows management and editing of emojis, stickers, and soundboard sounds
+    const MANAGE_GUILD_EXPERSSIONS = 1 << 30;
     /// Allows members to use application commands, including slash commands and context menu commands.
     const USE_APPLICATION_COMMANDS = 1 << 31;
     /// Allows for requesting to speak in stage channels.
@@ -96,10 +98,32 @@ bitflags! {
     const USE_EXTERNAL_STICKERS = 1 << 37;
     /// Allows for sending messages in threads
     const SEND_MESSAGES_IN_THREADS = 1 << 38;
-    /// Allows for launching activities (applications with the [`EMBEDDED`](crate::structs::applications::ApplicationFlags::EMBEDDED) flag) in a voice channel
-    const START_EMBEDDED_ACTIVITIES = 1 << 39;
+    /// Allows for using Activities (applications with the [`EMBEDDED`](crate::structs::applications::ApplicationFlags::EMBEDDED) flag) in a voice channel
+    const USE_EMBEDDED_ACTIVITIES = 1 << 39;
     /// Allows for timing out users to prevent them from sending or reacting to messages in chat and threads, and from speaking in voice and stage channels
     const MODERATE_MEMBERS = 1 << 40;
+    /// Allows for viewing role subscription insights
+    const VIEW_CREATOR_MONETIZATION_ANALYTICS = 1 << 41;
+    /// Allows for using soundboard in a voice channel
+    const USE_SOUNDBOARD = 1 << 42;
+    /// Allows for creating emojis, stickers, and soundboard sounds, and editing and deleting those created by the current user.
+    const CREATE_GUILD_EXPRESSIONS = 1 << 43;
+    /// Allows for creating scheduled events, and editing and deleting those created by the current user.
+    const CREATE_EVENTS = 1 << 44;
+    /// Allows the usage of custom soundboard sounds from other servers
+    const USE_EXTERNAL_SOUNDS = 1 << 45;
+    /// Allows sending voice messages
+    const SEND_VOICE_MESSAGES = 1 << 46;
+    /// Allows sending polls
+    const SEND_POLLS = 1 << 49;
+    /// Allows user-installed apps to send public responses. When disabled, users will still be allowed to use their apps but the responses will be ephemeral. This only applies to apps not also installed to the server.
+    const USE_EXTERNAL_APPS = 1 << 50;
+  }
+}
+
+impl From<u64> for Permissions {
+  fn from(value: u64) -> Self {
+    Self::from_bits_retain(value)
   }
 }
 
@@ -107,6 +131,12 @@ impl<'de> Deserialize<'de> for Permissions {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let string = String::deserialize(d)?;
     let bits: u64 = string.parse().map_err(de::Error::custom)?;
-    Ok(Self::from_bits_truncate(bits))
+    Ok(Self::from_bits_retain(bits))
+  }
+}
+
+impl Serialize for Permissions {
+  fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    s.collect_str(&self.bits())
   }
 }

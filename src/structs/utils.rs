@@ -1,4 +1,4 @@
-// Copyright 2022 slashook Developers
+// Copyright 2025 slashook Developers
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -7,6 +7,7 @@
 
 //! Misc utility structs
 
+use base64::Engine;
 use serde::{Serialize, Deserialize};
 use crate::tokio::{fs, io::AsyncReadExt};
 use std::convert::TryFrom;
@@ -34,7 +35,11 @@ pub struct File {
   /// The bytes in the file
   pub data: Vec<u8>,
   /// Optional alt text for the file
-  pub description: Option<String>
+  pub description: Option<String>,
+  /// The duration in seconds for a voice message
+  pub duration_secs: Option<f64>,
+  /// The waveform for a voice message
+  pub waveform: Option<String>
 }
 
 impl Color {
@@ -86,7 +91,9 @@ impl File {
     Self {
       filename: filename.to_string(),
       data: data.into(),
-      description: None
+      description: None,
+      duration_secs: None,
+      waveform: None
     }
   }
 
@@ -107,7 +114,9 @@ impl File {
     Ok(Self {
       filename: filename.to_string(),
       data,
-      description: None
+      description: None,
+      duration_secs: None,
+      waveform: None
     })
   }
 
@@ -126,5 +135,27 @@ impl File {
   pub fn set_description<T: ToString>(mut self, description: T) -> Self {
     self.description = Some(description.to_string());
     self
+  }
+
+  /// Set the duration
+  pub fn set_duration_secs(mut self, duration_secs: f64) -> Self {
+    self.duration_secs = Some(duration_secs);
+    self
+  }
+
+  /// Set the waveform
+  pub fn set_waveform<T: ToString>(mut self, waveform: T) -> Self {
+    self.waveform = Some(waveform.to_string());
+    self
+  }
+}
+
+#[allow(clippy::to_string_trait_impl)]
+impl ToString for File {
+  /// Returns the file as a base64 data URL
+  fn to_string(&self) -> String {
+      let mime = infer::get(&self.data).map(|t| t.mime_type()).unwrap_or("application/octet-stream");
+      let b64 = base64::prelude::BASE64_STANDARD.encode(&self.data);
+      format!("data:{mime};base64,{b64}")
   }
 }

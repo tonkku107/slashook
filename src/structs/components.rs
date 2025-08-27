@@ -1,4 +1,4 @@
-// Copyright 2022 slashook Developers
+// Copyright 2025 slashook Developers
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -11,7 +11,11 @@ use serde::{Serialize, Deserialize};
 use serde::de;
 use serde_json::Value;
 use serde_repr::{Serialize_repr, Deserialize_repr};
-use super::emojis::Emoji;
+use super::{
+  channels::ChannelType,
+  Emoji,
+  Snowflake
+};
 
 /// Discord Component Types
 #[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
@@ -22,11 +26,20 @@ pub enum ComponentType {
   ACTION_ROW = 1,
   /// A button object
   BUTTON = 2,
-  /// A select menu for picking from choices
-  SELECT_MENU = 3,
+  /// A select menu for picking from defined text options
+  STRING_SELECT = 3,
   /// A text input object
   TEXT_INPUT = 4,
+  /// A select menu for users
+  USER_SELECT = 5,
+  /// A select menu for roles
+  ROLE_SELECT = 6,
+  /// A select menu for mentionables (users and roles)
+  MENTIONABLE_SELECT = 7,
+  /// A select menu for channels
+  CHANNEL_SELECT = 8,
   /// A component that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -61,9 +74,9 @@ pub struct ActionRow {
 
 /// A Button component
 ///
-/// Non-link buttons must have a `custom_id` and cannot have a `url`.\
+/// Most buttons must have a `custom_id` and one of `label` or `emoji` and cannot have a `url` or `sku_id`.\
 /// Link buttons must have a `url` and cannot have a `custom_id`.\
-/// One of `label` or `emoji` is required.
+/// Premium buttons must have a `sku_id` and cannot have `custom_id`, `label`, `url`, or `emoji`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Button {
   #[serde(rename = "type")]
@@ -76,6 +89,8 @@ pub struct Button {
   pub emoji: Option<Emoji>,
   /// A developer-defined identifier for the button, max 100 characters
   pub custom_id: Option<String>,
+  /// Identifier for a purchasable [SKU](super::monetization::SKU), only available when using premium-style buttons
+  pub sku_id: Option<Snowflake>,
   /// A url for link-style buttons
   pub url: Option<String>,
   /// Whether the button is disabled (default `false`)
@@ -97,7 +112,10 @@ pub enum ButtonStyle {
   DANGER = 4,
   /// A grey button that navigates to a URL
   LINK = 5,
+  /// A blurple button that links to a SKU
+  PREMIUM = 6,
   /// A button style that hasn't been implemented yet
+  #[serde(other)]
   UNKNOWN
 }
 
@@ -108,11 +126,15 @@ pub struct SelectMenu {
   component_type: ComponentType,
   /// A developer-defined identifier for the select menu, max 100 characters
   pub custom_id: String,
-  /// The choices in the select, max 25
+  /// Specified choices in a select menu (only required and available for string selects; max 25
   #[serde(default)]
-  pub options: Vec<SelectOption>,
+  pub options: Option<Vec<SelectOption>>,
+  /// List of channel types to include in the channel select component
+  pub channel_types: Option<Vec<ChannelType>>,
   /// Custom placeholder text if nothing is selected, max 100 characters
   pub placeholder: Option<String>,
+  /// List of default values for auto-populated select menu components; number of default values must be in the range defined by `min_values` and `max_values`
+  pub default_values: Option<Vec<DefaultValue>>,
   /// The minimum number of items that must be chosen; default 1, min 0, max 25
   pub min_values: Option<i64>,
   /// The maximum number of items that can be chosen; default 1, max 25
@@ -121,6 +143,20 @@ pub struct SelectMenu {
   pub disabled: Option<bool>,
   /// Values of the chosen items from a modal interaction
   pub values: Option<Vec<String>>
+}
+
+/// Possible types for a select menu
+pub enum SelectMenuType {
+  /// Select menu for picking from defined text options
+  STRING,
+  /// Select menu for users
+  USER,
+  /// Select menu for roles
+  ROLE,
+  /// Select menu for mentionables (users and roles)
+  MENTIONABLE,
+  /// Select menu for channels
+  CHANNEL,
 }
 
 /// Choices in a Select Menu
@@ -136,6 +172,32 @@ pub struct SelectOption {
   pub emoji: Option<Emoji>,
   /// Will render this option as selected by default
   pub default: Option<bool>
+}
+
+/// Discord Select Default Value Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct DefaultValue {
+  /// ID of a user, role, or channel
+  pub id: Snowflake,
+  #[serde(rename = "type")]
+  /// Type of value that `id` represents
+  pub value_type: DefaultValueType
+}
+
+/// Discord Select Default Value Type
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[allow(non_camel_case_types)]
+#[serde(rename_all = "lowercase")]
+pub enum DefaultValueType {
+  /// ID represents user
+  USER,
+  /// ID represents role
+  ROLE,
+  /// ID represents channel
+  CHANNEL,
+  /// Representation that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
 }
 
 /// A Text Input component
@@ -239,8 +301,8 @@ impl Components {
   /// Adds a select menu to the last action row\
   /// A select menu takes up 5 slots of a row
   /// ```
-  /// # use slashook::structs::components::{Components, SelectMenu};
-  /// let select_menu = SelectMenu::new();
+  /// # use slashook::structs::components::{Components, SelectMenu, SelectMenuType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING);
   /// let components = Components::new()
   ///   .add_select_menu(select_menu);
   /// ```
@@ -313,39 +375,14 @@ impl Button {
   pub fn new() -> Self {
     Self {
       component_type: ComponentType::BUTTON,
-      custom_id: None,
-      disabled: Some(false),
       style: ButtonStyle::PRIMARY,
       label: None,
       emoji: None,
-      url: None
+      custom_id: None,
+      sku_id: None,
+      url: None,
+      disabled: Some(false),
     }
-  }
-
-  /// Set the custom_id for a button.\
-  /// The command argument is used by the library to choose which command to run when the button is clicked.
-  /// The custom_id is formatted as `command/id`
-  /// ```
-  /// # use slashook::structs::components::Button;
-  /// let button = Button::new()
-  ///   .set_id("example_button", "cool-button");
-  /// assert_eq!(button.custom_id, Some(String::from("example_button/cool-button")));
-  /// ```
-  pub fn set_id<T: ToString, U: ToString>(mut self, command: T, id: U) -> Self {
-    self.custom_id = Some(format!("{}/{}", command.to_string(), id.to_string()));
-    self
-  }
-
-  /// Set the disabled state of the button
-  /// ```
-  /// # use slashook::structs::components::Button;
-  /// let button = Button::new()
-  ///   .set_disabled(true);
-  /// assert_eq!(button.disabled, Some(true));
-  /// ```
-  pub fn set_disabled(mut self, disabled: bool) -> Self {
-    self.disabled = Some(disabled);
-    self
   }
 
   /// Set the style of the button
@@ -385,6 +422,33 @@ impl Button {
     self
   }
 
+  /// Set the custom_id for a button.\
+  /// The command argument is used by the library to choose which command to run when the button is clicked.
+  /// The custom_id is formatted as `command/id`
+  /// ```
+  /// # use slashook::structs::components::Button;
+  /// let button = Button::new()
+  ///   .set_id("example_button", "cool-button");
+  /// assert_eq!(button.custom_id, Some(String::from("example_button/cool-button")));
+  /// ```
+  pub fn set_id<T: ToString, U: ToString>(mut self, command: T, id: U) -> Self {
+    self.custom_id = Some(format!("{}/{}", command.to_string(), id.to_string()));
+    self
+  }
+
+  /// Set the SKU for a premium-style button
+  /// ```
+  /// # use slashook::structs::components::{Button, ButtonStyle};
+  /// let button = Button::new()
+  ///   .set_style(ButtonStyle::PREMIUM)
+  ///   .set_sku_id("1180218955160375406");
+  /// assert_eq!(button.sku_id, Some(String::from("1180218955160375406")));
+  /// ```
+  pub fn set_sku_id<T: ToString>(mut self, sku_id: T) -> Self {
+    self.sku_id = Some(sku_id.to_string());
+    self
+  }
+
   /// Set the url for a link-style button
   /// ```
   /// # use slashook::structs::components::{Button, ButtonStyle};
@@ -397,21 +461,40 @@ impl Button {
     self.url = Some(url.to_string());
     self
   }
+
+  /// Set the disabled state of the button
+  /// ```
+  /// # use slashook::structs::components::Button;
+  /// let button = Button::new()
+  ///   .set_disabled(true);
+  /// assert_eq!(button.disabled, Some(true));
+  /// ```
+  pub fn set_disabled(mut self, disabled: bool) -> Self {
+    self.disabled = Some(disabled);
+    self
+  }
 }
 
 impl SelectMenu {
   /// Creates a new select menu
-  pub fn new() -> Self {
+  pub fn new(menu_type: SelectMenuType) -> Self {
     Self {
-      component_type: ComponentType::SELECT_MENU,
+      component_type: menu_type.into(),
       custom_id: String::from(""),
       disabled: Some(false),
-      options: Vec::new(),
+      options: None,
+      channel_types: None,
       placeholder: None,
+      default_values: None,
       min_values: None,
       max_values: None,
       values: None,
     }
+  }
+
+  /// Get the type of the select menu
+  pub fn get_type(&self) -> SelectMenuType {
+    self.component_type.clone().try_into().unwrap()
   }
 
   /// Set the custom_id for a select menu.\
@@ -419,8 +502,8 @@ impl SelectMenu {
   /// The custom_id is formatted as `command/id`\
   /// The command name will be ignored when used in a modal.
   /// ```
-  /// # use slashook::structs::components::SelectMenu;
-  /// let select_menu = SelectMenu::new()
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
   ///   .set_id("example_select", "choice");
   /// assert_eq!(select_menu.custom_id, String::from("example_select/choice"));
   /// ```
@@ -431,8 +514,8 @@ impl SelectMenu {
 
   /// Set the disabled state of the select menu
   /// ```
-  /// # use slashook::structs::components::SelectMenu;
-  /// let select_menu = SelectMenu::new()
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
   ///   .set_disabled(true);
   /// assert_eq!(select_menu.disabled, Some(true));
   /// ```
@@ -443,20 +526,37 @@ impl SelectMenu {
 
   /// Add a choice to the select menu
   /// ```
-  /// # use slashook::structs::components::{SelectMenu, SelectOption};
-  /// let select_menu = SelectMenu::new()
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType, SelectOption};
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
   ///   .add_option(SelectOption::new("First choice", "1"))
   ///   .add_option(SelectOption::new("Second choice", "2"));
   /// ```
   pub fn add_option(mut self, option: SelectOption) -> Self {
-    self.options.push(option);
+    let mut options = self.options.unwrap_or_default();
+    options.push(option);
+    self.options = Some(options);
+    self
+  }
+
+  /// Add a channel type to a channel select menu
+  /// ```
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType, SelectOption};
+  /// # use slashook::structs::channels::{ChannelType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::CHANNEL)
+  ///   .add_channel_type(ChannelType::GUILD_TEXT)
+  ///   .add_channel_type(ChannelType::GUILD_VOICE);
+  /// ```
+  pub fn add_channel_type(mut self, channel_type: ChannelType) -> Self {
+    let mut types = self.channel_types.unwrap_or_default();
+    types.push(channel_type);
+    self.channel_types = Some(types);
     self
   }
 
   /// Set the placeholder of the select menu
   /// ```
-  /// # use slashook::structs::components::SelectMenu;
-  /// let select_menu = SelectMenu::new()
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
   ///   .set_placeholder("Choose an option");
   /// assert_eq!(select_menu.placeholder, Some(String::from("Choose an option")));
   /// ```
@@ -465,10 +565,27 @@ impl SelectMenu {
     self
   }
 
+  /// Add a default value to a select menu
+  /// ```
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType, SelectOption, DefaultValueType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::MENTIONABLE)
+  ///   .add_default_value("189365301488517121", DefaultValueType::USER)
+  ///   .add_default_value("344579593916907520", DefaultValueType::ROLE);
+  /// ```
+  pub fn add_default_value<T: ToString>(mut self, id: T, value_type: DefaultValueType) -> Self {
+    let mut default_values = self.default_values.unwrap_or_default();
+    default_values.push(DefaultValue {
+      id: id.to_string(),
+      value_type,
+    });
+    self.default_values = Some(default_values);
+    self
+  }
+
   /// Set the minimum required choices for a select menu
   /// ```
-  /// # use slashook::structs::components::SelectMenu;
-  /// let select_menu = SelectMenu::new()
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
   ///   .set_min_values(2);
   /// assert_eq!(select_menu.min_values, Some(2));
   /// ```
@@ -479,8 +596,8 @@ impl SelectMenu {
 
   /// Set the maximum amount of choices for a select menu
   /// ```
-  /// # use slashook::structs::components::SelectMenu;
-  /// let select_menu = SelectMenu::new()
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
   ///   .set_max_values(5);
   /// assert_eq!(select_menu.max_values, Some(5));
   /// ```
@@ -674,7 +791,7 @@ impl Default for Button {
 
 impl Default for SelectMenu {
   fn default() -> Self {
-    Self::new()
+    Self::new(SelectMenuType::STRING)
   }
 }
 
@@ -690,6 +807,33 @@ impl Default for TextInputStyle {
   }
 }
 
+impl From<SelectMenuType> for ComponentType {
+  fn from(menu_type: SelectMenuType) -> Self {
+    match menu_type {
+      SelectMenuType::STRING => Self::STRING_SELECT,
+      SelectMenuType::USER => Self::USER_SELECT,
+      SelectMenuType::ROLE => Self::ROLE_SELECT,
+      SelectMenuType::MENTIONABLE => Self::MENTIONABLE_SELECT,
+      SelectMenuType::CHANNEL => Self::CHANNEL_SELECT,
+    }
+  }
+}
+
+impl TryFrom<ComponentType> for SelectMenuType {
+  type Error = anyhow::Error;
+
+  fn try_from(component_type: ComponentType) -> anyhow::Result<Self> {
+    Ok(match component_type {
+      ComponentType::STRING_SELECT => SelectMenuType::STRING,
+      ComponentType::USER_SELECT => SelectMenuType::USER,
+      ComponentType::ROLE_SELECT => SelectMenuType::ROLE,
+      ComponentType::MENTIONABLE_SELECT => SelectMenuType::MENTIONABLE,
+      ComponentType::CHANNEL_SELECT => SelectMenuType::CHANNEL,
+      _ => anyhow::bail!("Not a valid component type for select menu")
+    })
+  }
+}
+
 impl<'de> serde::Deserialize<'de> for Component {
   fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let value = Value::deserialize(d)?;
@@ -699,6 +843,10 @@ impl<'de> serde::Deserialize<'de> for Component {
       2 => Component::Button(Box::new(Button::deserialize(value).map_err(de::Error::custom)?)),
       3 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
       4 => Component::TextInput(TextInput::deserialize(value).map_err(de::Error::custom)?),
+      5 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
+      6 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
+      7 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
+      8 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
   }

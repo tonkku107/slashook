@@ -1,4 +1,4 @@
-// Copyright 2022 slashook Developers
+// Copyright 2025 slashook Developers
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -12,18 +12,75 @@ use serde_repr::{Serialize_repr, Deserialize_repr};
 use serde_json::Value;
 use std::collections::HashMap;
 use super::{
-  Snowflake,
-  embeds::Embed,
-  users::User,
-  guilds::{GuildMember, Role},
-  channels::{Channel, Message, MessageFlags, AllowedMentions, Attachment},
+  channels::{Channel, ChannelType},
   components::{Component, ComponentType},
-  utils::File
+  embeds::Embed,
+  guilds::{GuildMember, Role},
+  messages::{Message, MessageFlags, AllowedMentions, Attachment},
+  monetization::Entitlement,
+  polls::PollCreateRequest,
+  users::User,
+  utils::File,
+  Permissions,
+  Snowflake,
 };
-use crate::commands::{MessageResponse, Modal};
+use crate::{
+  rest::{Rest, RestError},
+  commands::{MessageResponse, Modal, responder::CommandResponse},
+  internal_utils::in_case_of_discord_fuckups::snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason
+};
+
+/// Discord ApplicationCommand Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ApplicationCommand {
+  /// Unique ID of command
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub id: Option<Snowflake>,
+  /// [Type of command](ApplicationCommandType), defaults to `CHAT_INPUT`
+  #[serde(rename = "type")]
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub command_type: Option<ApplicationCommandType>,
+  /// ID of the parent application
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub application_id: Option<Snowflake>,
+  /// Guild ID of the command, if not global
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub guild_id: Option<Snowflake>,
+  /// [Name of command](https://discord.com/developers/docs/interactions/application-commands#application-command-object-application-command-naming), 1-32 characters
+  pub name: String,
+  /// Localization dictionary for `name` field. Values follow the same restrictions as `name`
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub name_localizations: Option<HashMap<String, String>>,
+  /// Description for `CHAT_INPUT` commands, 1-100 characters. Empty string for `USER` and `MESSAGE` commands
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub description: Option<String>,
+  /// Localization dictionary for `description` field. Values follow the same restrictions as `description`
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub description_localizations: Option<HashMap<String, String>>,
+  /// Parameters for the command, max of 25
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub options: Option<Vec<ApplicationCommandOption>>,
+  /// Set of [permissions](Permissions) represented as a bit set
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_member_permissions: Option<Permissions>,
+  /// Indicates whether the command is age-restricted, defaults to `false`
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub nsfw: Option<bool>,
+  /// [Installation context(s)](https://discord.com/developers/docs/resources/application#installation-context) where the command is available, only for globally-scoped commands. Defaults to `GUILD_INSTALL` (`0`)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub integration_types: Option<Vec<IntegrationType>>,
+  /// [Interaction context(s)](InteractionContextType) where the command can be used, only for globally-scoped commands. By default, all interaction context types included for new commands.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub contexts: Option<Vec<InteractionContextType>>,
+  /// Autoincrementing version identifier updated during substantial record changes
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub version: Option<Snowflake>,
+  /// Determines whether the interaction is handled by the app's interactions handler or by Discord
+  pub handler: Option<ApplicationCommandHandlerType>,
+}
 
 /// Discord Application Command Types
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum ApplicationCommandType {
@@ -33,17 +90,93 @@ pub enum ApplicationCommandType {
   USER = 2,
   /// A UI-based command that shows up when you right click or tap on a message
   MESSAGE = 3,
+  /// A UI-based command that represents the primary way to invoke an app's [Activity](https://discord.com/developers/docs/activities/overview)
+  PRIMARY_ENTRY_POINT = 4,
   /// An application command type that hasn't been implemented yet
-  UNKNOWN
+  #[serde(other)]
+  UNKNOWN,
+}
+
+/// Discord Application Command Option Object
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
+pub struct ApplicationCommandOption {
+  /// Type of option
+  #[serde(rename = "type")]
+  pub option_type: InteractionOptionType,
+  /// 1-32 character name
+  pub name: String,
+  /// Localization dictionary for the `name` field. Values follow the same restrictions as `name`
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub name_localizations: Option<HashMap<String, String>>,
+  /// 1-100 character description
+  pub description: String,
+  /// Localization dictionary for the `description` field. Values follow the same restrictions as `description`
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub description_localizations: Option<HashMap<String, String>>,
+  /// If the parameter is required or optional--default `false`
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub required: Option<bool>,
+  /// Choices for `STRING`, `INTEGER`, and `NUMBER` types for the user to pick from, max 25
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub choices: Option<Vec<ApplicationCommandOptionChoice>>,
+  /// If the option is a subcommand or subcommand group type, these nested options will be the parameters
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub options: Option<Vec<ApplicationCommandOption>>,
+  /// If the option is a channel type, the channels shown will be restricted to these types
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub channel_types: Option<Vec<ChannelType>>,
+  /// If the option is an `INTEGER` or `NUMBER` type, the minimum value permitted
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub min_value: Option<f64>,
+  /// If the option is an `INTEGER` or `NUMBER` type, the maximum value permitted
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub max_value: Option<f64>,
+  /// For option type `STRING`, the minimum allowed length (minimum of `0`, maximum of `6000`)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub min_length: Option<i64>,
+  /// For option type `STRING`, the maximum allowed length (minimum of `1`, maximum of `6000`)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub max_length: Option<i64>,
+  /// If autocomplete interactions are enabled for this `STRING`, `INTEGER`, or `NUMBER` type option
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub autocomplete: Option<bool>,
 }
 
 /// Discord Application Command Option Choice Object
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Default, Clone, Debug)]
 pub struct ApplicationCommandOptionChoice {
   /// 1-100 character choice name
   pub name: String,
+  /// Localization dictionary for the name field. Values follow the same restrictions as name
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub name_localizations: Option<HashMap<String, String>>,
   /// Value of the choice, up to 100 characters if string
   pub value: Value,
+}
+
+/// Discord Application Intgration Types
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum IntegrationType {
+  /// App is installable to servers
+  GUILD_INSTALL = 0,
+  /// App is installable to users
+  USER_INSTALL = 1,
+  /// Integration type that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
+}
+
+/// Discord Integration Owners Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct IntegrationOwners {
+  /// ID of the authorizing guild. Value will be 0 if used in the bot's DM channel
+  #[serde(rename = "0")]
+  pub guild_id: Option<Snowflake>,
+  /// ID of the authorizing user
+  #[serde(rename = "1")]
+  pub user_id: Option<Snowflake>,
 }
 
 #[doc(hidden)]
@@ -54,15 +187,23 @@ pub struct Interaction {
   #[serde(rename = "type")]
   pub interaction_type: InteractionType,
   pub data: Option<InteractionData>,
+  // Commented out because it's practically empty, doesn't even contain the name
+  // pub guild: Option<Guild>,
   pub guild_id: Option<Snowflake>,
+  pub channel: Option<Channel>,
   pub channel_id: Option<Snowflake>,
   pub member: Option<GuildMember>,
   pub user: Option<User>,
   pub token: String,
   pub version: u8,
   pub message: Option<Message>,
+  pub app_permissions: Permissions,
   pub locale: Option<String>,
-  pub guild_locale: Option<String>
+  pub guild_locale: Option<String>,
+  pub entitlements: Vec<Entitlement>,
+  pub authorizing_integration_owners: Option<IntegrationOwners>,
+  pub context: Option<InteractionContextType>,
+  pub attachment_size_limit: i64,
 }
 
 /// Discord Interaction Types
@@ -81,23 +222,26 @@ pub enum InteractionType {
   /// Modal submit interaction
   MODAL_SUBMIT = 5,
   /// Interaction type that hasn't been implemented yet
-  UNKNOWN
+  #[serde(other)]
+  UNKNOWN,
 }
 
 #[doc(hidden)]
 #[derive(Deserialize, Clone, Debug)]
 pub struct InteractionData {
+  #[serde(deserialize_with="snowflake_that_is_usually_a_string_but_sometimes_an_int_for_no_reason", default)]
   pub id: Option<Snowflake>,
   pub name: Option<String>,
   #[serde(rename = "type")]
   pub command_type: Option<ApplicationCommandType>,
   pub resolved: Option<InteractionDataResolved>,
   pub options: Option<Vec<InteractionOption>>,
+  pub guild_id: Option<Snowflake>,
+  pub target_id: Option<Snowflake>,
   pub custom_id: Option<String>,
   pub component_type: Option<ComponentType>,
   pub values: Option<Vec<String>>,
-  pub target_id: Option<Snowflake>,
-  pub components: Option<Vec<Component>>
+  pub components: Option<Vec<Component>>,
 }
 
 /// Discord Interaction Data Resolved Object
@@ -114,7 +258,7 @@ pub struct InteractionDataResolved {
   /// The ids and partial Message objects
   pub messages: Option<HashMap<Snowflake, Message>>,
   /// The ids and attachment objects
-  pub attachments: Option<HashMap<Snowflake, Attachment>>
+  pub attachments: Option<HashMap<Snowflake, Attachment>>,
 }
 
 #[doc(hidden)]
@@ -125,26 +269,40 @@ pub struct InteractionOption {
   pub option_type: InteractionOptionType,
   pub value: Option<Value>,
   pub options: Option<Vec<InteractionOption>>,
-  pub focused: Option<bool>
+  pub focused: Option<bool>,
 }
 
-#[doc(hidden)]
-#[derive(Deserialize_repr, Clone, Debug)]
+/// Discord Application Command Option Type
+#[derive(Serialize_repr, Deserialize_repr, Default, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum InteractionOptionType {
+  /// A subcommand
   SUB_COMMAND = 1,
+  /// A subcommand group
   SUB_COMMAND_GROUP = 2,
+  /// A string
   STRING = 3,
+  /// An integer, Any integer between -2^53 and 2^53
   INTEGER = 4,
+  /// A boolean
   BOOLEAN = 5,
+  /// A user
   USER = 6,
+  /// A channel, Includes all channel types + categories
   CHANNEL = 7,
+  /// A role
   ROLE = 8,
+  /// A mentionable, Includes users and roles
   MENTIONABLE = 9,
+  /// A number, Any double between -2^53 and 2^53
   NUMBER = 10,
+  /// An attachment object
   ATTACHMENT = 11,
-  UNKNOWN
+  /// An unknown option type that hasn't been implemented yet
+  #[default]
+  #[serde(other)]
+  UNKNOWN,
 }
 
 /// Represents the possible values from command arguments
@@ -169,7 +327,37 @@ pub enum OptionValue {
   /// Represents multiple string values as a vec
   Values(Vec<String>),
   /// Represents any unknown value
-  Other(Value)
+  Other(Value),
+}
+
+/// Discord Interaction Context Types
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum InteractionContextType {
+  /// Interaction can be used within servers
+  GUILD = 0,
+  /// Interaction can be used within DMs with the app's bot user
+  BOT_DM = 1,
+  /// Interaction can be used within Group DMs and DMs other than the app's bot user
+  PRIVATE_CHANNEL = 2,
+  /// Interaction Context Type that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
+}
+
+/// Discord Entry Point Command Handler Types
+#[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum ApplicationCommandHandlerType {
+  /// The app handles the interaction using an interaction token
+  APP_HANDLER = 1,
+  /// Discord handles the interaction by launching an Activity and sending a follow-up message without coordinating with the app
+  DISCORD_LAUNCH_ACTIVITY = 2,
+  /// Command Handler Type that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
 }
 
 #[doc(hidden)]
@@ -177,7 +365,7 @@ pub enum OptionValue {
 pub struct InteractionCallback {
   #[serde(rename = "type")]
   pub response_type: InteractionCallbackType,
-  pub data: Option<InteractionCallbackData>
+  pub data: Option<InteractionCallbackData>,
 }
 
 #[doc(hidden)]
@@ -191,13 +379,15 @@ pub enum InteractionCallbackType {
   DEFERRED_UPDATE_MESSAGE = 6,
   UPDATE_MESSAGE = 7,
   APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8,
-  MODAL = 9
+  MODAL = 9,
+  LAUNCH_ACTIVITY = 12,
 }
 
 #[doc(hidden)]
 #[derive(Serialize, Clone, Debug)]
 pub struct InteractionCallbackData {
   pub tts: Option<bool>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub content: Option<String>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub embeds: Option<Vec<Embed>>,
@@ -208,11 +398,117 @@ pub struct InteractionCallbackData {
   pub components: Option<Vec<Component>>,
   #[serde(skip_serializing_if = "Option::is_none")]
   pub attachments: Option<Vec<Attachment>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub poll: Option<PollCreateRequest>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub choices: Option<Vec<ApplicationCommandOptionChoice>>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub custom_id: Option<String>,
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub title: Option<String>,
   #[serde(skip_serializing)]
-  pub files: Option<Vec<File>>
+  pub files: Option<Vec<File>>,
+}
+
+impl ApplicationCommand {
+  /// Takes a list of application commands, overwriting the existing global command list for this application.
+  pub async fn bulk_overwrite_global_commands<T: ToString>(rest: &Rest, application_id: T, commands: Vec<Self>) -> Result<Vec<Self>, RestError> {
+    rest.put(format!("/applications/{}/commands", application_id.to_string()), commands).await
+  }
+
+  /// Takes a list of application commands, overwriting the existing command list for this application for the targeted guild.
+  pub async fn bulk_overwrite_guild_commands<T: ToString, U: ToString>(rest: &Rest, application_id: T, guild_id: U, commands: Vec<Self>) -> Result<Vec<Self>, RestError> {
+    rest.put(format!("/applications/{}/guilds/{}/commands", application_id.to_string(), guild_id.to_string()), commands).await
+  }
+}
+
+impl TryFrom<u8> for ApplicationCommandType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
+impl TryFrom<u8> for IntegrationType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
+impl TryFrom<u8> for InteractionOptionType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
+impl TryFrom<u8> for InteractionContextType {
+  type Error = serde_json::Error;
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    serde_json::from_value(value.into())
+  }
+}
+
+#[doc(hidden)]
+impl From<CommandResponse> for InteractionCallback {
+  fn from(response: CommandResponse) -> InteractionCallback {
+    match response {
+      CommandResponse::DeferMessage(flags) => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE,
+          data: Some(flags.into()),
+        }
+      },
+
+      CommandResponse::DeferUpdate => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::DEFERRED_UPDATE_MESSAGE,
+          data: None,
+        }
+      }
+
+      CommandResponse::SendMessage(msg) => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::CHANNEL_MESSAGE_WITH_SOURCE,
+          data: Some(msg.into()),
+        }
+      },
+
+      CommandResponse::UpdateMessage(msg) => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::UPDATE_MESSAGE,
+          data: Some(msg.into()),
+        }
+      },
+
+      CommandResponse::AutocompleteResult(results) => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::APPLICATION_COMMAND_AUTOCOMPLETE_RESULT,
+          data: Some(results.into()),
+        }
+      },
+
+      CommandResponse::Modal(modal) => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::MODAL,
+          data: Some(modal.into()),
+        }
+      },
+
+      CommandResponse::LaunchActivity => {
+        InteractionCallback {
+          response_type: InteractionCallbackType::LAUNCH_ACTIVITY,
+          data: None,
+        }
+      },
+
+    }
+  }
 }
 
 #[doc(hidden)]
@@ -225,6 +521,7 @@ impl From<MessageResponse> for InteractionCallbackData {
       embeds: msg.embeds,
       components: msg.components,
       attachments: msg.attachments,
+      poll: msg.poll,
       allowed_mentions: msg.allowed_mentions,
       choices: None,
       custom_id: None,
@@ -244,6 +541,7 @@ impl From<MessageFlags> for InteractionCallbackData {
       embeds: None,
       components: None,
       attachments: None,
+      poll: None,
       allowed_mentions: None,
       choices: None,
       custom_id: None,
@@ -263,6 +561,7 @@ impl From<Vec<ApplicationCommandOptionChoice>> for InteractionCallbackData {
       embeds: None,
       components: None,
       attachments: None,
+      poll: None,
       allowed_mentions: None,
       choices: Some(results),
       custom_id: None,
@@ -282,6 +581,7 @@ impl From<Modal> for InteractionCallbackData {
       embeds: None,
       components: Some(modal.components),
       attachments: None,
+      poll: None,
       allowed_mentions: None,
       choices: None,
       custom_id: Some(modal.custom_id),
@@ -291,7 +591,7 @@ impl From<Modal> for InteractionCallbackData {
   }
 }
 
-/// Trait for structs that have an [Attachment](crate::structs::channels::Attachment) Vec.
+/// Trait for structs that have an [Attachment] Vec.
 /// Functions for use with [post_files](crate::rest::Rest::post_files) and [patch_files](crate::rest::Rest::patch_files)
 pub trait Attachments {
   /// Returns the attachments that have been set and possibly removes the originals.
@@ -434,7 +734,11 @@ impl OptionValue {
 impl ApplicationCommandOptionChoice {
   /// Creates a new choice with a name and value
   pub fn new<T: ToString, U: Into<Value>>(name: T, value: U) -> Self {
-    Self { name: name.to_string(), value: value.into() }
+    Self {
+      name: name.to_string(),
+      name_localizations: None,
+      value: value.into()
+    }
   }
 }
 
