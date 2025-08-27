@@ -274,6 +274,11 @@ impl Components {
     Self(vec![Component::ActionRow(ActionRow::new())])
   }
 
+  /// Creates a new set of components with a label to start off. Components can be added with the methods in this struct as if it was a row
+  pub fn new_label(label: Label) -> Self {
+    Self(vec![Component::Label(label)])
+  }
+
   /// Creates an empty set of components useful for clearing out components when editing a message
   /// ```
   /// # use slashook::commands::{MessageResponse};
@@ -306,6 +311,12 @@ impl Components {
     self
   }
 
+  /// Adds a new label. Component can be added with the methods in this struct as if it was a row
+  pub fn add_label(mut self, label: Label) -> Self {
+    self.0.push(Component::Label(label));
+    self
+  }
+
   /// Adds a button to the last action row\
   /// A button takes up 1 slot of a row
   /// ```
@@ -330,7 +341,7 @@ impl Components {
     self
   }
 
-  /// Adds a select menu to the last action row\
+  /// Adds a select menu to the last action row or label\
   /// A select menu takes up 5 slots of a row
   /// ```
   /// # use slashook::structs::components::{Components, SelectMenu, SelectMenuType};
@@ -339,22 +350,32 @@ impl Components {
   ///   .add_select_menu(select_menu);
   /// ```
   /// ## Panics
-  /// Will panic if the action row cannot fit any more select menus
+  /// Will panic if the action row or label cannot fit any more select menus
   pub fn add_select_menu(mut self, select_menu: SelectMenu) -> Self {
-    let row = self.0.pop().expect("No action row available");
-    if let Component::ActionRow(mut row) = row {
-      if row.available_slots() < 5 {
-        panic!("The current row doesn't have enough space to contain this component.");
-      }
-      row.components.push(Component::SelectMenu(select_menu));
-      self.0.push(Component::ActionRow(row));
-    } else {
-      panic!("Component is not an Action Row");
+    let component = self.0.pop().expect("No action row or label available");
+
+    match component {
+      Component::ActionRow(mut row) => {
+        if row.available_slots() < 5 {
+          panic!("The current row doesn't have enough space to contain this component.");
+        }
+        row.components.push(Component::SelectMenu(select_menu));
+        self.0.push(Component::ActionRow(row));
+      },
+      Component::Label(mut label) => {
+        let Component::Unknown = *label.component else {
+          panic!("The label can only contain one component.");
+        };
+        label = label.set_component(Component::SelectMenu(select_menu));
+        self.0.push(Component::Label(label));
+      },
+      _ => panic!("Component is not an Action Row or Label"),
     }
+
     self
   }
 
-  /// Adds a text input to the last action row\
+  /// Adds a text input to the last action row or label\
   /// A text input takes up 5 slots of a row\
   /// Note: text inputs are only valid for modals.
   /// ```
@@ -364,18 +385,28 @@ impl Components {
   ///   .add_text_input(text_input);
   /// ```
   /// ## Panics
-  /// Will panic if the action row cannot fit any more text inputs
+  /// Will panic if the action row or label cannot fit any more text inputs
   pub fn add_text_input(mut self, text_input: TextInput) -> Self {
-    let row = self.0.pop().expect("No action row available");
-    if let Component::ActionRow(mut row) = row {
-      if row.available_slots() < 5 {
-        panic!("The current row doesn't have enough space to contain this component.");
-      }
-      row.components.push(Component::TextInput(text_input));
-      self.0.push(Component::ActionRow(row));
-    } else {
-      panic!("Component is not an Action Row");
+    let component = self.0.pop().expect("No action row or label available");
+
+    match component {
+      Component::ActionRow(mut row) => {
+        if row.available_slots() < 5 {
+          panic!("The current row doesn't have enough space to contain this component.");
+        }
+        row.components.push(Component::TextInput(text_input));
+        self.0.push(Component::ActionRow(row));
+      },
+      Component::Label(mut label) => {
+        let Component::Unknown = *label.component else {
+          panic!("The label can only contain one component.");
+        };
+        label = label.set_component(Component::TextInput(text_input));
+        self.0.push(Component::Label(label));
+      },
+      _ => panic!("Component is not an Action Row or Label"),
     }
+
     self
   }
 }
