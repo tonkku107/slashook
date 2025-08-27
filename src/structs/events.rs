@@ -81,7 +81,7 @@ pub enum EventType {
 #[derive(Clone, Debug)]
 pub enum EventData {
   /// Sent when an app was authorized by a user to a server or their account
-  ApplicationAuthorized(ApplicationAuthorizedEventData),
+  ApplicationAuthorized(Box<ApplicationAuthorizedEventData>),
   /// Entitlement was created
   EntitlementCreate(Entitlement),
   /// User was added to a Quest (currently unavailable)
@@ -122,7 +122,7 @@ impl<'de> Deserialize<'de> for EventBody {
 
     if let Some(raw_data) = value.get_mut("data") {
       let event_data = match event_body.event_type {
-        EventType::APPLICATION_AUTHORIZED => EventData::ApplicationAuthorized(ApplicationAuthorizedEventData::deserialize(&*raw_data).map_err(de::Error::custom)?),
+        EventType::APPLICATION_AUTHORIZED => EventData::ApplicationAuthorized(Box::new(ApplicationAuthorizedEventData::deserialize(&*raw_data).map_err(de::Error::custom)?)),
         EventType::ENTITLEMENT_CREATE => EventData::EntitlementCreate(Entitlement::deserialize(&*raw_data).map_err(de::Error::custom)?),
         EventType::QUEST_USER_ENROLLMENT => EventData::QuestUserEnrollment(raw_data.take()),
         EventType::UNKNOWN => EventData::Unknown(raw_data.take()),
