@@ -665,7 +665,7 @@ impl SelectMenu {
   /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
   /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
   ///   .set_required(false);
-  /// assert_eq!(select_menu.disabled, Some(false));
+  /// assert_eq!(select_menu.required, Some(false));
   /// ```
   pub fn set_required(mut self, required: bool) -> Self {
     self.required = Some(required);
