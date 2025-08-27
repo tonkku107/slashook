@@ -209,23 +209,26 @@ pub enum DefaultValueType {
 pub struct TextInput {
   #[serde(rename = "type")]
   component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
   /// A developer-defined identifier for the input, max 100 characters
   pub custom_id: String,
   /// The [Text Input Style](TextInputStyle)
   #[serde(default)]
   pub style: TextInputStyle,
   /// The label for this component
-  #[serde(default)]
+  #[serde(default, skip_serializing_if = "String::is_empty")]
+  #[deprecated = "Use the Label component instead"]
   pub label: String,
   /// The minimum input length for a text input, min 0, max 4000
   pub min_length: Option<i64>,
   /// The maximum input length for a text input, min 1, max 4000
   pub max_length: Option<i64>,
-  /// Whether this component is required to be filled, default false
+  /// Whether this component is required to be filled (defaults to `true`)
   pub required: Option<bool>,
   /// A pre-filled value for this component, max 4000 characters
   pub value: Option<String>,
-  /// Custom placeholder text if nothing is selected, max 100 characters
+  /// Custom placeholder text if the input is empty; max 100 characters
   pub placeholder: Option<String>
 }
 
@@ -683,8 +686,10 @@ impl TextInput {
   pub fn new() -> Self {
     Self {
       component_type: ComponentType::TEXT_INPUT,
+      id: None,
       custom_id: String::from(""),
       style: TextInputStyle::SHORT,
+      #[allow(deprecated)]
       label: String::from(""),
       min_length: None,
       max_length: None,
@@ -725,6 +730,8 @@ impl TextInput {
   ///   .set_label("Cool text input");
   /// assert_eq!(text_input.label, String::from("Cool text input"));
   /// ```
+  #[deprecated = "Use the Label component instead"]
+  #[allow(deprecated)]
   pub fn set_label<T: ToString>(mut self, label: T) -> Self {
     self.label = label.to_string();
     self
