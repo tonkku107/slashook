@@ -55,7 +55,7 @@ pub enum Component {
   /// A Button component
   Button(Box<Button>),
   /// A Select Menu component
-  SelectMenu(SelectMenu),
+  SelectMenu(Box<SelectMenu>),
   /// A Text Input component
   TextInput(TextInput),
   /// Container associating a label and description with a component
@@ -359,14 +359,14 @@ impl Components {
         if row.available_slots() < 5 {
           panic!("The current row doesn't have enough space to contain this component.");
         }
-        row.components.push(Component::SelectMenu(select_menu));
+        row.components.push(Component::SelectMenu(Box::new(select_menu)));
         self.0.push(Component::ActionRow(row));
       },
       Component::Label(mut label) => {
         let Component::Unknown = *label.component else {
           panic!("The label can only contain one component.");
         };
-        label = label.set_component(Component::SelectMenu(select_menu));
+        label = label.set_component(Component::SelectMenu(Box::new(select_menu)));
         self.0.push(Component::Label(label));
       },
       _ => panic!("Component is not an Action Row or Label"),
@@ -907,7 +907,7 @@ impl Into<Component> for Button {
 
 impl Into<Component> for SelectMenu {
   fn into(self) -> Component {
-    Component::SelectMenu(self)
+    Component::SelectMenu(Box::new(self))
   }
 }
 
@@ -993,12 +993,12 @@ impl<'de> serde::Deserialize<'de> for Component {
     Ok(match value.get("type").and_then(Value::as_u64).ok_or_else(|| de::Error::custom("Expected a field \"type\" of type u64"))? {
       1 => Component::ActionRow(ActionRow::deserialize(value).map_err(de::Error::custom)?),
       2 => Component::Button(Box::new(Button::deserialize(value).map_err(de::Error::custom)?)),
-      3 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
+      3 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
       4 => Component::TextInput(TextInput::deserialize(value).map_err(de::Error::custom)?),
-      5 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
-      6 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
-      7 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
-      8 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
+      5 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
+      6 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
+      7 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
+      8 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
