@@ -14,7 +14,8 @@ use serde_repr::{Serialize_repr, Deserialize_repr};
 use super::{
   channels::ChannelType,
   Emoji,
-  Snowflake
+  interactions::InteractionDataResolved,
+  Snowflake,
 };
 
 /// Discord Component Types
@@ -128,14 +129,16 @@ pub enum ButtonStyle {
 pub struct SelectMenu {
   #[serde(rename = "type")]
   component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
   /// A developer-defined identifier for the select menu, max 100 characters
   pub custom_id: String,
-  /// Specified choices in a select menu (only required and available for string selects; max 25
+  /// Specified choices in a select menu (only required and available for string selects; max 25)
   #[serde(default)]
   pub options: Option<Vec<SelectOption>>,
   /// List of channel types to include in the channel select component
   pub channel_types: Option<Vec<ChannelType>>,
-  /// Custom placeholder text if nothing is selected, max 100 characters
+  /// Custom placeholder text if nothing is selected or default, max 150 characters
   pub placeholder: Option<String>,
   /// List of default values for auto-populated select menu components; number of default values must be in the range defined by `min_values` and `max_values`
   pub default_values: Option<Vec<DefaultValue>>,
@@ -143,9 +146,15 @@ pub struct SelectMenu {
   pub min_values: Option<i64>,
   /// The maximum number of items that can be chosen; default 1, max 25
   pub max_values: Option<i64>,
-  /// Disable the select, default false
+  /// Whether the string select is required to answer in a modal (defaults to `true`)
+  pub required: Option<bool>,
+  /// Whether select menu is disabled in a message (defaults to `false`)
   pub disabled: Option<bool>,
+  /// Resolved entities from selected options
+  #[serde(skip_serializing)]
+  pub resolved: Option<InteractionDataResolved>,
   /// Values of the chosen items from a modal interaction
+  #[serde(skip_serializing)]
   pub values: Option<Vec<String>>
 }
 
@@ -503,14 +512,17 @@ impl SelectMenu {
   pub fn new(menu_type: SelectMenuType) -> Self {
     Self {
       component_type: menu_type.into(),
+      id: None,
       custom_id: String::from(""),
-      disabled: Some(false),
       options: None,
       channel_types: None,
       placeholder: None,
       default_values: None,
       min_values: None,
       max_values: None,
+      required: None,
+      disabled: Some(false),
+      resolved: None,
       values: None,
     }
   }
@@ -532,18 +544,6 @@ impl SelectMenu {
   /// ```
   pub fn set_id<T: ToString, U: ToString>(mut self, command: T, id: U) -> Self {
     self.custom_id = format!("{}/{}", command.to_string(), id.to_string());
-    self
-  }
-
-  /// Set the disabled state of the select menu
-  /// ```
-  /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
-  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
-  ///   .set_disabled(true);
-  /// assert_eq!(select_menu.disabled, Some(true));
-  /// ```
-  pub fn set_disabled(mut self, disabled: bool) -> Self {
-    self.disabled = Some(disabled);
     self
   }
 
@@ -626,6 +626,30 @@ impl SelectMenu {
   /// ```
   pub fn set_max_values(mut self, max_values: i64) -> Self {
     self.max_values = Some(max_values);
+    self
+  }
+
+  /// Set the required state of the select menu
+  /// ```
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
+  ///   .set_required(false);
+  /// assert_eq!(select_menu.disabled, Some(false));
+  /// ```
+  pub fn set_required(mut self, required: bool) -> Self {
+    self.required = Some(required);
+    self
+  }
+
+  /// Set the disabled state of the select menu
+  /// ```
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
+  ///   .set_disabled(true);
+  /// assert_eq!(select_menu.disabled, Some(true));
+  /// ```
+  pub fn set_disabled(mut self, disabled: bool) -> Self {
+    self.disabled = Some(disabled);
     self
   }
 }
