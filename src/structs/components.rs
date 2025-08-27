@@ -38,6 +38,8 @@ pub enum ComponentType {
   MENTIONABLE_SELECT = 7,
   /// A select menu for channels
   CHANNEL_SELECT = 8,
+  /// Container associating a label and description with a component
+  LABEL = 18,
   /// A component that hasn't been implemented yet
   #[serde(other)]
   UNKNOWN
@@ -55,6 +57,8 @@ pub enum Component {
   SelectMenu(SelectMenu),
   /// A Text Input component
   TextInput(TextInput),
+  /// Container associating a label and description with a component
+  Label(Label),
   /// A component that hasn't been implemented yet
   Unknown
 }
@@ -234,6 +238,22 @@ pub enum TextInputStyle {
   SHORT = 1,
   /// A multi-line input
   PARAGRAPH = 2
+}
+
+/// A Label component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Label {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// The label text
+  #[serde(default)]
+  pub label: String,
+  /// An optional description text for the label
+  pub description: Option<String>,
+  /// The component within the label
+  pub component: Box<Component>,
 }
 
 impl Components {
@@ -771,6 +791,76 @@ impl TextInput {
   }
 }
 
+impl Label {
+  /// Creates a new Label. Component can be set with [`set_component`](Label::set_component) or [`Components`]
+  pub fn new<T: ToString>(label: T) -> Self {
+    Self {
+      component_type: ComponentType::LABEL,
+        id: None,
+        label: label.to_string(),
+        description: None,
+        component: Box::new(Component::Unknown),
+    }
+  }
+
+  /// Set the label
+  pub fn set_label<T: ToString>(mut self, label: T) -> Self {
+    self.label = label.to_string();
+    self
+  }
+
+  /// Set the description
+  /// ```
+  /// # use slashook::structs::components::{TextInput, Label};
+  /// let text_input = TextInput::new()
+  ///   .set_id("input");
+  /// let text_input_label = Label::new("Cool text input")
+  ///   .set_description("Isn't it so cool?")
+  ///   .set_component(text_input);
+  /// assert_eq!(text_input_label.description, Some(String::from("Isn't it so cool?")));
+  /// ```
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = Some(description.to_string());
+    self
+  }
+
+  /// Set the component
+  pub fn set_component<C: Into<Component>>(mut self, component: C) -> Self {
+    self.component = Box::new(component.into());
+    self
+  }
+}
+
+impl Into<Component> for ActionRow {
+  fn into(self) -> Component {
+    Component::ActionRow(self)
+  }
+}
+
+impl Into<Component> for Button {
+  fn into(self) -> Component {
+    Component::Button(Box::new(self))
+  }
+}
+
+impl Into<Component> for SelectMenu {
+  fn into(self) -> Component {
+    Component::SelectMenu(self)
+  }
+}
+
+impl Into<Component> for TextInput {
+  fn into(self) -> Component {
+    Component::TextInput(self)
+  }
+}
+
+impl Into<Component> for Label {
+  fn into(self) -> Component {
+    Component::Label(self)
+  }
+}
+
 impl Default for Components {
   fn default() -> Self {
     Self::new()
@@ -847,6 +937,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       6 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
       7 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
       8 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
+      18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
   }
