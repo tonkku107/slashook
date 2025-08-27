@@ -348,7 +348,7 @@ impl Modal {
   /// The custom_id is formatted as `command/id`
   /// ```
   /// # use slashook::commands::Modal;
-  /// let modal = Modal::new("example_command", "modal1", "Please fill this form");
+  /// let modal = Modal::new("example_modal", "modal1", "Please fill this form");
   /// ```
   pub fn new<T: ToString, U: ToString, V: ToString>(command: T, id: U, title: V) -> Self {
     Self {
@@ -361,12 +361,20 @@ impl Modal {
   /// Set the components on the modal
   /// ```
   /// # use slashook::commands::Modal;
-  /// # use slashook::structs::components::{Components, TextInput};
+  /// # use slashook::structs::components::{Components, TextInput, SelectMenu, SelectMenuType, SelectOption, Label};
   /// let text_input = TextInput::new()
-  ///   .set_label("Tell us something")
   ///   .set_id("input");
-  /// let components = Components::new().add_text_input(text_input);
-  /// let modal = Modal::new("example_command", "modal1", "Please fill this form")
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
+  ///   .add_option(SelectOption::new("Yes", "yes"))
+  ///   .add_option(SelectOption::new("No", "no"))
+  ///   .set_id("", "select");
+  /// let components = Components::new_label(
+  ///   Label::new("Tell us something").set_description("It could be anything")
+  /// )
+  ///   .add_text_input(text_input)
+  ///   .add_label(Label::new("Yes or No"))
+  ///   .add_select_menu(select_menu);
+  /// let modal = Modal::new("example_modal", "modal1", "Please fill this form")
   ///   .set_components(components);
   /// ```
   pub fn set_components(mut self, components: Components) -> Self {
@@ -519,14 +527,22 @@ impl CommandResponder {
   /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder, MessageResponse, Modal};
-  /// # use slashook::structs::components::{Components, TextInput};
+  /// # use slashook::structs::components::{Components, TextInput, SelectMenu, SelectMenuType, SelectOption, Label};
   /// ##[command(name = "example", description = "An example command")]
   /// fn example(input: CommandInput, res: CommandResponder) {
   ///   let text_input = TextInput::new()
-  ///     .set_label("Tell us something")
   ///     .set_id("input");
-  ///   let components = Components::new().add_text_input(text_input);
-  ///   let modal = Modal::new("example_command", "modal1", "Please fill this form")
+  ///   let select_menu = SelectMenu::new(SelectMenuType::STRING)
+  ///     .add_option(SelectOption::new("Yes", "yes"))
+  ///     .add_option(SelectOption::new("No", "no"))
+  ///     .set_id("", "select");
+  ///   let components = Components::new_label(
+  ///     Label::new("Tell us something").set_description("It could be anything")
+  ///   )
+  ///     .add_text_input(text_input)
+  ///     .add_label(Label::new("Yes or No"))
+  ///     .add_select_menu(select_menu);
+  ///   let modal = Modal::new("example_modal", "modal1", "Please fill this form")
   ///     .set_components(components);
   ///   return res.open_modal(modal).await?;
   /// }
