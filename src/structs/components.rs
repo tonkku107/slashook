@@ -43,7 +43,7 @@ pub enum ComponentType {
   LABEL = 18,
   /// A component that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// A component
@@ -61,7 +61,7 @@ pub enum Component {
   /// Container associating a label and description with a component
   Label(Label),
   /// A component that hasn't been implemented yet
-  Unknown
+  Unknown,
 }
 
 /// A helper struct for building components for a message
@@ -74,7 +74,7 @@ pub struct ActionRow {
   #[serde(rename = "type")]
   component_type: ComponentType,
   /// Components inside this row
-  pub components: Vec<Component>
+  pub components: Vec<Component>,
 }
 
 /// A Button component
@@ -99,7 +99,7 @@ pub struct Button {
   /// A url for link-style buttons
   pub url: Option<String>,
   /// Whether the button is disabled (default `false`)
-  pub disabled: Option<bool>
+  pub disabled: Option<bool>,
 }
 
 /// Discord Button Styles
@@ -121,7 +121,7 @@ pub enum ButtonStyle {
   PREMIUM = 6,
   /// A button style that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// A Select Menu component
@@ -155,7 +155,7 @@ pub struct SelectMenu {
   pub resolved: Option<InteractionDataResolved>,
   /// Values of the chosen items from a modal interaction
   #[serde(skip_serializing)]
-  pub values: Option<Vec<String>>
+  pub values: Option<Vec<String>>,
 }
 
 /// Possible types for a select menu
@@ -184,7 +184,7 @@ pub struct SelectOption {
   /// An emoji to be shown with the option
   pub emoji: Option<Emoji>,
   /// Will render this option as selected by default
-  pub default: Option<bool>
+  pub default: Option<bool>,
 }
 
 /// Discord Select Default Value Object
@@ -194,7 +194,7 @@ pub struct DefaultValue {
   pub id: Snowflake,
   #[serde(rename = "type")]
   /// Type of value that `id` represents
-  pub value_type: DefaultValueType
+  pub value_type: DefaultValueType,
 }
 
 /// Discord Select Default Value Type
@@ -238,7 +238,7 @@ pub struct TextInput {
   /// A pre-filled value for this component, max 4000 characters
   pub value: Option<String>,
   /// Custom placeholder text if the input is empty; max 100 characters
-  pub placeholder: Option<String>
+  pub placeholder: Option<String>,
 }
 
 /// Discord Text Input Styles
@@ -249,7 +249,7 @@ pub enum TextInputStyle {
   /// A single-line input
   SHORT = 1,
   /// A multi-line input
-  PARAGRAPH = 2
+  PARAGRAPH = 2,
 }
 
 /// A Label component
@@ -697,7 +697,7 @@ impl SelectOption {
       value: value.to_string(),
       description: None,
       emoji: None,
-      default: Some(false)
+      default: Some(false),
     }
   }
 
@@ -750,7 +750,7 @@ impl TextInput {
       max_length: None,
       required: None,
       value: None,
-      placeholder: None
+      placeholder: None,
     }
   }
 
@@ -981,7 +981,7 @@ impl TryFrom<ComponentType> for SelectMenuType {
       ComponentType::ROLE_SELECT => SelectMenuType::ROLE,
       ComponentType::MENTIONABLE_SELECT => SelectMenuType::MENTIONABLE,
       ComponentType::CHANNEL_SELECT => SelectMenuType::CHANNEL,
-      _ => anyhow::bail!("Not a valid component type for select menu")
+      _ => anyhow::bail!("Not a valid component type for select menu"),
     })
   }
 }
