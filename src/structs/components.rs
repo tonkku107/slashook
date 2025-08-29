@@ -14,7 +14,8 @@ use serde_repr::{Serialize_repr, Deserialize_repr};
 use super::{
   channels::ChannelType,
   Emoji,
-  Snowflake
+  interactions::InteractionDataResolved,
+  Snowflake,
 };
 
 /// Discord Component Types
@@ -38,9 +39,11 @@ pub enum ComponentType {
   MENTIONABLE_SELECT = 7,
   /// A select menu for channels
   CHANNEL_SELECT = 8,
+  /// Container associating a label and description with a component
+  LABEL = 18,
   /// A component that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// A component
@@ -52,11 +55,13 @@ pub enum Component {
   /// A Button component
   Button(Box<Button>),
   /// A Select Menu component
-  SelectMenu(SelectMenu),
+  SelectMenu(Box<SelectMenu>),
   /// A Text Input component
   TextInput(TextInput),
+  /// Container associating a label and description with a component
+  Label(Label),
   /// A component that hasn't been implemented yet
-  Unknown
+  Unknown,
 }
 
 /// A helper struct for building components for a message
@@ -69,7 +74,7 @@ pub struct ActionRow {
   #[serde(rename = "type")]
   component_type: ComponentType,
   /// Components inside this row
-  pub components: Vec<Component>
+  pub components: Vec<Component>,
 }
 
 /// A Button component
@@ -94,7 +99,7 @@ pub struct Button {
   /// A url for link-style buttons
   pub url: Option<String>,
   /// Whether the button is disabled (default `false`)
-  pub disabled: Option<bool>
+  pub disabled: Option<bool>,
 }
 
 /// Discord Button Styles
@@ -116,7 +121,7 @@ pub enum ButtonStyle {
   PREMIUM = 6,
   /// A button style that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// A Select Menu component
@@ -124,13 +129,16 @@ pub enum ButtonStyle {
 pub struct SelectMenu {
   #[serde(rename = "type")]
   component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
   /// A developer-defined identifier for the select menu, max 100 characters
   pub custom_id: String,
-  /// Specified choices in a select menu (only required and available for string selects; max 25
+  /// Specified choices in a select menu (only required and available for string selects; max 25)
+  #[serde(default)]
   pub options: Option<Vec<SelectOption>>,
   /// List of channel types to include in the channel select component
   pub channel_types: Option<Vec<ChannelType>>,
-  /// Custom placeholder text if nothing is selected, max 100 characters
+  /// Custom placeholder text if nothing is selected or default, max 150 characters
   pub placeholder: Option<String>,
   /// List of default values for auto-populated select menu components; number of default values must be in the range defined by `min_values` and `max_values`
   pub default_values: Option<Vec<DefaultValue>>,
@@ -138,8 +146,16 @@ pub struct SelectMenu {
   pub min_values: Option<i64>,
   /// The maximum number of items that can be chosen; default 1, max 25
   pub max_values: Option<i64>,
-  /// Disable the select, default false
-  pub disabled: Option<bool>
+  /// Whether the string select is required to answer in a modal (defaults to `true`)
+  pub required: Option<bool>,
+  /// Whether select menu is disabled in a message (defaults to `false`)
+  pub disabled: Option<bool>,
+  /// Resolved entities from selected options
+  #[serde(skip_serializing)]
+  pub resolved: Option<InteractionDataResolved>,
+  /// Values of the chosen items from a modal interaction
+  #[serde(skip_serializing)]
+  pub values: Option<Vec<String>>,
 }
 
 /// Possible types for a select menu
@@ -168,7 +184,7 @@ pub struct SelectOption {
   /// An emoji to be shown with the option
   pub emoji: Option<Emoji>,
   /// Will render this option as selected by default
-  pub default: Option<bool>
+  pub default: Option<bool>,
 }
 
 /// Discord Select Default Value Object
@@ -178,7 +194,7 @@ pub struct DefaultValue {
   pub id: Snowflake,
   #[serde(rename = "type")]
   /// Type of value that `id` represents
-  pub value_type: DefaultValueType
+  pub value_type: DefaultValueType,
 }
 
 /// Discord Select Default Value Type
@@ -202,24 +218,27 @@ pub enum DefaultValueType {
 pub struct TextInput {
   #[serde(rename = "type")]
   component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
   /// A developer-defined identifier for the input, max 100 characters
   pub custom_id: String,
   /// The [Text Input Style](TextInputStyle)
   #[serde(default)]
   pub style: TextInputStyle,
   /// The label for this component
-  #[serde(default)]
+  #[serde(default, skip_serializing_if = "String::is_empty")]
+  #[deprecated = "Use the Label component instead"]
   pub label: String,
   /// The minimum input length for a text input, min 0, max 4000
   pub min_length: Option<i64>,
   /// The maximum input length for a text input, min 1, max 4000
   pub max_length: Option<i64>,
-  /// Whether this component is required to be filled, default false
+  /// Whether this component is required to be filled (defaults to `true`)
   pub required: Option<bool>,
   /// A pre-filled value for this component, max 4000 characters
   pub value: Option<String>,
-  /// Custom placeholder text if nothing is selected, max 100 characters
-  pub placeholder: Option<String>
+  /// Custom placeholder text if the input is empty; max 100 characters
+  pub placeholder: Option<String>,
 }
 
 /// Discord Text Input Styles
@@ -230,13 +249,34 @@ pub enum TextInputStyle {
   /// A single-line input
   SHORT = 1,
   /// A multi-line input
-  PARAGRAPH = 2
+  PARAGRAPH = 2,
+}
+
+/// A Label component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Label {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// The label text
+  #[serde(default)]
+  pub label: String,
+  /// An optional description text for the label
+  pub description: Option<String>,
+  /// The component within the label
+  pub component: Box<Component>,
 }
 
 impl Components {
   /// Creates a new set of components with an Action Row to start off
   pub fn new() -> Self {
     Self(vec![Component::ActionRow(ActionRow::new())])
+  }
+
+  /// Creates a new set of components with a label to start off. Components can be added with the methods in this struct as if it was a row
+  pub fn new_label(label: Label) -> Self {
+    Self(vec![Component::Label(label)])
   }
 
   /// Creates an empty set of components useful for clearing out components when editing a message
@@ -271,6 +311,12 @@ impl Components {
     self
   }
 
+  /// Adds a new label. Component can be added with the methods in this struct as if it was a row
+  pub fn add_label(mut self, label: Label) -> Self {
+    self.0.push(Component::Label(label));
+    self
+  }
+
   /// Adds a button to the last action row\
   /// A button takes up 1 slot of a row
   /// ```
@@ -295,7 +341,7 @@ impl Components {
     self
   }
 
-  /// Adds a select menu to the last action row\
+  /// Adds a select menu to the last action row or label\
   /// A select menu takes up 5 slots of a row
   /// ```
   /// # use slashook::structs::components::{Components, SelectMenu, SelectMenuType};
@@ -304,22 +350,32 @@ impl Components {
   ///   .add_select_menu(select_menu);
   /// ```
   /// ## Panics
-  /// Will panic if the action row cannot fit any more select menus
+  /// Will panic if the action row or label cannot fit any more select menus
   pub fn add_select_menu(mut self, select_menu: SelectMenu) -> Self {
-    let row = self.0.pop().expect("No action row available");
-    if let Component::ActionRow(mut row) = row {
-      if row.available_slots() < 5 {
-        panic!("The current row doesn't have enough space to contain this component.");
-      }
-      row.components.push(Component::SelectMenu(select_menu));
-      self.0.push(Component::ActionRow(row));
-    } else {
-      panic!("Component is not an Action Row");
+    let component = self.0.pop().expect("No action row or label available");
+
+    match component {
+      Component::ActionRow(mut row) => {
+        if row.available_slots() < 5 {
+          panic!("The current row doesn't have enough space to contain this component.");
+        }
+        row.components.push(Component::SelectMenu(Box::new(select_menu)));
+        self.0.push(Component::ActionRow(row));
+      },
+      Component::Label(mut label) => {
+        let Component::Unknown = *label.component else {
+          panic!("The label can only contain one component.");
+        };
+        label = label.set_component(Component::SelectMenu(Box::new(select_menu)));
+        self.0.push(Component::Label(label));
+      },
+      _ => panic!("Component is not an Action Row or Label"),
     }
+
     self
   }
 
-  /// Adds a text input to the last action row\
+  /// Adds a text input to the last action row or label\
   /// A text input takes up 5 slots of a row\
   /// Note: text inputs are only valid for modals.
   /// ```
@@ -329,18 +385,28 @@ impl Components {
   ///   .add_text_input(text_input);
   /// ```
   /// ## Panics
-  /// Will panic if the action row cannot fit any more text inputs
+  /// Will panic if the action row or label cannot fit any more text inputs
   pub fn add_text_input(mut self, text_input: TextInput) -> Self {
-    let row = self.0.pop().expect("No action row available");
-    if let Component::ActionRow(mut row) = row {
-      if row.available_slots() < 5 {
-        panic!("The current row doesn't have enough space to contain this component.");
-      }
-      row.components.push(Component::TextInput(text_input));
-      self.0.push(Component::ActionRow(row));
-    } else {
-      panic!("Component is not an Action Row");
+    let component = self.0.pop().expect("No action row or label available");
+
+    match component {
+      Component::ActionRow(mut row) => {
+        if row.available_slots() < 5 {
+          panic!("The current row doesn't have enough space to contain this component.");
+        }
+        row.components.push(Component::TextInput(text_input));
+        self.0.push(Component::ActionRow(row));
+      },
+      Component::Label(mut label) => {
+        let Component::Unknown = *label.component else {
+          panic!("The label can only contain one component.");
+        };
+        label = label.set_component(Component::TextInput(text_input));
+        self.0.push(Component::Label(label));
+      },
+      _ => panic!("Component is not an Action Row or Label"),
     }
+
     self
   }
 }
@@ -477,14 +543,18 @@ impl SelectMenu {
   pub fn new(menu_type: SelectMenuType) -> Self {
     Self {
       component_type: menu_type.into(),
+      id: None,
       custom_id: String::from(""),
-      disabled: Some(false),
       options: None,
       channel_types: None,
       placeholder: None,
       default_values: None,
       min_values: None,
-      max_values: None
+      max_values: None,
+      required: None,
+      disabled: Some(false),
+      resolved: None,
+      values: None,
     }
   }
 
@@ -495,7 +565,8 @@ impl SelectMenu {
 
   /// Set the custom_id for a select menu.\
   /// The command argument is used by the library to choose which command to run when the select menu is updated.
-  /// The custom_id is formatted as `command/id`
+  /// The custom_id is formatted as `command/id`\
+  /// The command name will be ignored when used in a modal.
   /// ```
   /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
   /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
@@ -504,18 +575,6 @@ impl SelectMenu {
   /// ```
   pub fn set_id<T: ToString, U: ToString>(mut self, command: T, id: U) -> Self {
     self.custom_id = format!("{}/{}", command.to_string(), id.to_string());
-    self
-  }
-
-  /// Set the disabled state of the select menu
-  /// ```
-  /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
-  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
-  ///   .set_disabled(true);
-  /// assert_eq!(select_menu.disabled, Some(true));
-  /// ```
-  pub fn set_disabled(mut self, disabled: bool) -> Self {
-    self.disabled = Some(disabled);
     self
   }
 
@@ -600,6 +659,30 @@ impl SelectMenu {
     self.max_values = Some(max_values);
     self
   }
+
+  /// Set the required state of the select menu
+  /// ```
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
+  ///   .set_required(false);
+  /// assert_eq!(select_menu.required, Some(false));
+  /// ```
+  pub fn set_required(mut self, required: bool) -> Self {
+    self.required = Some(required);
+    self
+  }
+
+  /// Set the disabled state of the select menu
+  /// ```
+  /// # use slashook::structs::components::{SelectMenu, SelectMenuType};
+  /// let select_menu = SelectMenu::new(SelectMenuType::STRING)
+  ///   .set_disabled(true);
+  /// assert_eq!(select_menu.disabled, Some(true));
+  /// ```
+  pub fn set_disabled(mut self, disabled: bool) -> Self {
+    self.disabled = Some(disabled);
+    self
+  }
 }
 
 impl SelectOption {
@@ -614,7 +697,7 @@ impl SelectOption {
       value: value.to_string(),
       description: None,
       emoji: None,
-      default: Some(false)
+      default: Some(false),
     }
   }
 
@@ -658,14 +741,16 @@ impl TextInput {
   pub fn new() -> Self {
     Self {
       component_type: ComponentType::TEXT_INPUT,
+      id: None,
       custom_id: String::from(""),
       style: TextInputStyle::SHORT,
+      #[allow(deprecated)]
       label: String::from(""),
       min_length: None,
       max_length: None,
       required: None,
       value: None,
-      placeholder: None
+      placeholder: None,
     }
   }
 
@@ -700,6 +785,8 @@ impl TextInput {
   ///   .set_label("Cool text input");
   /// assert_eq!(text_input.label, String::from("Cool text input"));
   /// ```
+  #[deprecated = "Use the Label component instead"]
+  #[allow(deprecated)]
   pub fn set_label<T: ToString>(mut self, label: T) -> Self {
     self.label = label.to_string();
     self
@@ -766,6 +853,76 @@ impl TextInput {
   }
 }
 
+impl Label {
+  /// Creates a new Label. Component can be set with [`set_component`](Label::set_component) or [`Components`]
+  pub fn new<T: ToString>(label: T) -> Self {
+    Self {
+      component_type: ComponentType::LABEL,
+        id: None,
+        label: label.to_string(),
+        description: None,
+        component: Box::new(Component::Unknown),
+    }
+  }
+
+  /// Set the label
+  pub fn set_label<T: ToString>(mut self, label: T) -> Self {
+    self.label = label.to_string();
+    self
+  }
+
+  /// Set the description
+  /// ```
+  /// # use slashook::structs::components::{TextInput, Label};
+  /// let text_input = TextInput::new()
+  ///   .set_id("input");
+  /// let text_input_label = Label::new("Cool text input")
+  ///   .set_description("Isn't it so cool?")
+  ///   .set_component(text_input);
+  /// assert_eq!(text_input_label.description, Some(String::from("Isn't it so cool?")));
+  /// ```
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = Some(description.to_string());
+    self
+  }
+
+  /// Set the component
+  pub fn set_component<C: Into<Component>>(mut self, component: C) -> Self {
+    self.component = Box::new(component.into());
+    self
+  }
+}
+
+impl From<ActionRow> for Component {
+  fn from(value: ActionRow) -> Self {
+    Self::ActionRow(value)
+  }
+}
+
+impl From<Button> for Component {
+  fn from(value: Button) -> Self {
+    Self::Button(Box::new(value))
+  }
+}
+
+impl From<SelectMenu> for Component {
+  fn from(value: SelectMenu) -> Self {
+    Self::SelectMenu(Box::new(value))
+  }
+}
+
+impl From<TextInput> for Component {
+  fn from(value: TextInput) -> Self {
+    Self::TextInput(value)
+  }
+}
+
+impl From<Label> for Component {
+  fn from(value: Label) -> Self {
+    Self::Label(value)
+  }
+}
+
 impl Default for Components {
   fn default() -> Self {
     Self::new()
@@ -824,7 +981,7 @@ impl TryFrom<ComponentType> for SelectMenuType {
       ComponentType::ROLE_SELECT => SelectMenuType::ROLE,
       ComponentType::MENTIONABLE_SELECT => SelectMenuType::MENTIONABLE,
       ComponentType::CHANNEL_SELECT => SelectMenuType::CHANNEL,
-      _ => anyhow::bail!("Not a valid component type for select menu")
+      _ => anyhow::bail!("Not a valid component type for select menu"),
     })
   }
 }
@@ -836,12 +993,13 @@ impl<'de> serde::Deserialize<'de> for Component {
     Ok(match value.get("type").and_then(Value::as_u64).ok_or_else(|| de::Error::custom("Expected a field \"type\" of type u64"))? {
       1 => Component::ActionRow(ActionRow::deserialize(value).map_err(de::Error::custom)?),
       2 => Component::Button(Box::new(Button::deserialize(value).map_err(de::Error::custom)?)),
-      3 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
+      3 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
       4 => Component::TextInput(TextInput::deserialize(value).map_err(de::Error::custom)?),
-      5 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
-      6 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
-      7 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
-      8 => Component::SelectMenu(SelectMenu::deserialize(value).map_err(de::Error::custom)?),
+      5 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
+      6 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
+      7 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
+      8 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
+      18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
   }

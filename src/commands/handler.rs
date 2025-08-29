@@ -299,9 +299,17 @@ impl CommandHandler {
         Component::ActionRow(action_row) => {
           Self::parse_component_values(action_row.components, input);
         },
+        Component::Label(label) => {
+          Self::parse_component_values(vec![*label.component], input);
+        },
         Component::TextInput(text_input) => {
           let value = OptionValue::String(text_input.value.unwrap_or_default());
           input.args.insert(text_input.custom_id, value);
+        },
+        Component::SelectMenu(select_menu) => {
+          let values = OptionValue::Values(select_menu.values.unwrap_or_default());
+          let (_, custom_id) = select_menu.custom_id.split_once('/').unwrap_or(("", select_menu.custom_id.as_str()));
+          input.args.insert(custom_id.to_string(), values);
         },
         _ => {}
       }
