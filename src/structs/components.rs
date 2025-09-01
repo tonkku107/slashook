@@ -47,6 +47,8 @@ pub enum ComponentType {
   THUMBNAIL = 11,
   /// Display images and other media
   MEDIA_GALLERY = 12,
+  /// Displays an attached file
+  FILE = 13,
   /// Container associating a label and description with a component
   LABEL = 18,
   /// A component that hasn't been implemented yet
@@ -74,6 +76,8 @@ pub enum Component {
   Thumbnail(Thumbnail),
   /// Display images and other media
   MediaGallery(MediaGallery),
+  /// Displays an attached file
+  File(File),
   /// Container associating a label and description with a component
   Label(Label),
   /// A component that hasn't been implemented yet
@@ -353,6 +357,25 @@ pub struct MediaGalleryItem {
   pub description: Option<String>,
   /// Whether the media should be a spoiler (or blurred out). Defaults to `false`
   pub spoiler: Option<bool>,
+}
+
+/// A File component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct File {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// This unfurled media item is unique in that it **only** supports attachment references using the `attachment://<filename>` syntax
+  pub file: UnfurledMediaItem,
+  /// Whether the media should be a spoiler (or blurred out). Defaults to `false`
+  pub spoiler: Option<bool>,
+  /// The name of the file. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub name: Option<String>,
+  /// The size of the file in bytes. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub size: Option<i64>,
 }
 
 /// A Label component
@@ -1090,6 +1113,32 @@ impl MediaGalleryItem {
   }
 }
 
+impl File {
+  /// Creates a new file with url
+  pub fn new<T: ToString>(url: T) -> Self {
+    Self {
+      component_type: ComponentType::FILE,
+      id: None,
+      file: UnfurledMediaItem::new(url),
+      spoiler: None,
+      name: None,
+      size: None,
+    }
+  }
+
+  /// Sets the file
+  pub fn set_file<T: ToString>(mut self, url: T) -> Self {
+    self.file = UnfurledMediaItem::new(url);
+    self
+  }
+
+  /// Sets spoiler
+  pub fn set_spoiler(mut self, spoiler: bool) -> Self {
+    self.spoiler = Some(spoiler);
+    self
+  }
+}
+
 impl Label {
   /// Creates a new Label. Component can be set with [`set_component`](Label::set_component) or [`Components`]
   pub fn new<T: ToString>(label: T) -> Self {
@@ -1175,6 +1224,12 @@ impl From<Thumbnail> for Component {
 impl From<MediaGallery> for Component {
   fn from(value: MediaGallery) -> Self {
     Self::MediaGallery(value)
+  }
+}
+
+impl From<File> for Component {
+  fn from(value: File) -> Self {
+    Self::File(value)
   }
 }
 
@@ -1282,6 +1337,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       10 => Component::TextDisplay(TextDisplay::deserialize(value).map_err(de::Error::custom)?),
       11 => Component::Thumbnail(Thumbnail::deserialize(value).map_err(de::Error::custom)?),
       12 => Component::MediaGallery(MediaGallery::deserialize(value).map_err(de::Error::custom)?),
+      13 => Component::File(File::deserialize(value).map_err(de::Error::custom)?),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
