@@ -204,6 +204,14 @@ impl MessageResponse {
     self
   }
 
+  /// Use Components V2 on the message
+  pub fn set_components_v2(mut self, components_v2: bool) -> Self {
+    let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
+    flags.set(MessageFlags::IS_COMPONENTS_V2, components_v2);
+    self.flags = Some(flags);
+    self
+  }
+
   /// Set the components on the message
   /// ```
   /// # use slashook::commands::MessageResponse;
