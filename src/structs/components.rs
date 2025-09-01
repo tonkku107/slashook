@@ -73,6 +73,8 @@ pub struct Components(pub Vec<Component>);
 pub struct ActionRow {
   #[serde(rename = "type")]
   component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
   /// Components inside this row
   pub components: Vec<Component>,
 }
@@ -86,6 +88,8 @@ pub struct ActionRow {
 pub struct Button {
   #[serde(rename = "type")]
   component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
   /// One of [button styles](ButtonStyle)
   pub style: ButtonStyle,
   /// Text that appears on the button, max 80 characters
@@ -416,6 +420,7 @@ impl ActionRow {
   pub fn new() -> Self {
     Self {
       component_type: ComponentType::ACTION_ROW,
+      id: None,
       components: Vec::new()
     }
   }
@@ -438,6 +443,7 @@ impl Button {
   pub fn new() -> Self {
     Self {
       component_type: ComponentType::BUTTON,
+      id: None,
       style: ButtonStyle::PRIMARY,
       label: None,
       emoji: None,
