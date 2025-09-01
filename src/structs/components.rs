@@ -49,6 +49,8 @@ pub enum ComponentType {
   MEDIA_GALLERY = 12,
   /// Displays an attached file
   FILE = 13,
+  /// Component to add vertical padding between other components
+  SEPARATOR = 14,
   /// Container associating a label and description with a component
   LABEL = 18,
   /// A component that hasn't been implemented yet
@@ -78,6 +80,8 @@ pub enum Component {
   MediaGallery(MediaGallery),
   /// Displays an attached file
   File(File),
+  /// Component to add vertical padding between other components
+  Separator(Separator),
   /// Container associating a label and description with a component
   Label(Label),
   /// A component that hasn't been implemented yet
@@ -376,6 +380,33 @@ pub struct File {
   /// The size of the file in bytes. This field is ignored and provided by the API as part of the response
   #[serde(skip_serializing)]
   pub size: Option<i64>,
+}
+
+/// A Separator component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Separator {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// Whether a visual divider should be displayed in the component. Defaults to `true`
+  pub divider: Option<bool>,
+  /// Size of separator padding. Defaults to [`SeparatorSpacing::SMALL`]
+  pub spacing: Option<SeparatorSpacing>,
+}
+
+/// Discord Separator Spacing Enum
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum SeparatorSpacing {
+  /// Small padding
+  SMALL = 1,
+  /// Large padding
+  LARGE = 2,
+  /// Spacing that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
 }
 
 /// A Label component
@@ -1139,6 +1170,30 @@ impl File {
   }
 }
 
+impl Separator {
+  /// Creates a new separator
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::SEPARATOR,
+      id: None,
+      divider: None,
+      spacing: None,
+    }
+  }
+
+  /// Set divider
+  pub fn set_divider(mut self, divider: bool) -> Self {
+    self.divider = Some(divider);
+    self
+  }
+
+  /// Set the spacing
+  pub fn set_spacing(mut self, spacing: SeparatorSpacing) -> Self {
+    self.spacing = Some(spacing);
+    self
+  }
+}
+
 impl Label {
   /// Creates a new Label. Component can be set with [`set_component`](Label::set_component) or [`Components`]
   pub fn new<T: ToString>(label: T) -> Self {
@@ -1233,6 +1288,12 @@ impl From<File> for Component {
   }
 }
 
+impl From<Separator> for Component {
+  fn from(value: Separator) -> Self {
+    Self::Separator(value)
+  }
+}
+
 impl From<Label> for Component {
   fn from(value: Label) -> Self {
     Self::Label(value)
@@ -1293,6 +1354,12 @@ impl Default for MediaGallery {
   }
 }
 
+impl Default for Separator {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl From<SelectMenuType> for ComponentType {
   fn from(menu_type: SelectMenuType) -> Self {
     match menu_type {
@@ -1338,6 +1405,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       11 => Component::Thumbnail(Thumbnail::deserialize(value).map_err(de::Error::custom)?),
       12 => Component::MediaGallery(MediaGallery::deserialize(value).map_err(de::Error::custom)?),
       13 => Component::File(File::deserialize(value).map_err(de::Error::custom)?),
+      14 => Component::Separator(Separator::deserialize(value).map_err(de::Error::custom)?),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
