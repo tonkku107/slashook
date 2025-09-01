@@ -11,6 +11,8 @@ use serde::{Serialize, Deserialize};
 use serde::de;
 use serde_json::Value;
 use serde_repr::{Serialize_repr, Deserialize_repr};
+use crate::structs::utils::Color;
+
 use super::{
   channels::ChannelType,
   Emoji,
@@ -51,6 +53,8 @@ pub enum ComponentType {
   FILE = 13,
   /// Component to add vertical padding between other components
   SEPARATOR = 14,
+  /// Container that visually groups a set of components
+  CONTAINER = 17,
   /// Container associating a label and description with a component
   LABEL = 18,
   /// A component that hasn't been implemented yet
@@ -82,6 +86,8 @@ pub enum Component {
   File(File),
   /// Component to add vertical padding between other components
   Separator(Separator),
+  /// Container that visually groups a set of components
+  Container(Container),
   /// Container associating a label and description with a component
   Label(Label),
   /// A component that hasn't been implemented yet
@@ -407,6 +413,21 @@ pub enum SeparatorSpacing {
   /// Spacing that hasn't been implemented yet
   #[serde(other)]
   UNKNOWN,
+}
+
+/// A Container component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Container {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// Child components that are encapsulated within the Container
+  pub components: Vec<Component>,
+  /// Color for the accent on the container as RGB from `0x000000` to `0xFFFFFF`
+  pub accent_color: Option<Color>,
+  /// Whether the container should be a spoiler (or blurred out). Defaults to `false`.
+  pub spoiler: Option<bool>,
 }
 
 /// A Label component
@@ -1194,6 +1215,38 @@ impl Separator {
   }
 }
 
+impl Container {
+  /// Creates a new container
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::CONTAINER,
+      id: None,
+      components: Vec::new(),
+      accent_color: None,
+      spoiler: None,
+    }
+  }
+
+  /// Add a component
+  pub fn add_component<C: Into<Component>>(mut self, component: C) -> Self {
+    self.components.push(component.into());
+    self
+  }
+
+  /// Sets the accent color
+  pub fn set_accent_color<T: TryInto<Color>>(mut self, accent_color: T) -> Result<Self, T::Error> {
+    let color = accent_color.try_into()?;
+    self.accent_color = Some(color);
+    Ok(self)
+  }
+
+  /// Sets spoiler
+  pub fn set_spoiler(mut self, spoiler: bool) -> Self {
+    self.spoiler = Some(spoiler);
+    self
+  }
+}
+
 impl Label {
   /// Creates a new Label. Component can be set with [`set_component`](Label::set_component) or [`Components`]
   pub fn new<T: ToString>(label: T) -> Self {
@@ -1294,6 +1347,12 @@ impl From<Separator> for Component {
   }
 }
 
+impl From<Container> for Component {
+  fn from(value: Container) -> Self {
+    Self::Container(value)
+  }
+}
+
 impl From<Label> for Component {
   fn from(value: Label) -> Self {
     Self::Label(value)
@@ -1360,6 +1419,12 @@ impl Default for Separator {
   }
 }
 
+impl Default for Container {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl From<SelectMenuType> for ComponentType {
   fn from(menu_type: SelectMenuType) -> Self {
     match menu_type {
@@ -1406,6 +1471,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       12 => Component::MediaGallery(MediaGallery::deserialize(value).map_err(de::Error::custom)?),
       13 => Component::File(File::deserialize(value).map_err(de::Error::custom)?),
       14 => Component::Separator(Separator::deserialize(value).map_err(de::Error::custom)?),
+      17 => Component::Container(Container::deserialize(value).map_err(de::Error::custom)?),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
