@@ -45,6 +45,8 @@ pub enum ComponentType {
   TEXT_DISPLAY = 10,
   /// Small image that can be used as an accessory
   THUMBNAIL = 11,
+  /// Display images and other media
+  MEDIA_GALLERY = 12,
   /// Container associating a label and description with a component
   LABEL = 18,
   /// A component that hasn't been implemented yet
@@ -70,6 +72,8 @@ pub enum Component {
   TextDisplay(TextDisplay),
   /// Small image that can be used as an accessory
   Thumbnail(Thumbnail),
+  /// Display images and other media
+  MediaGallery(MediaGallery),
   /// Container associating a label and description with a component
   Label(Label),
   /// A component that hasn't been implemented yet
@@ -327,6 +331,28 @@ pub struct UnfurledMediaItem {
   /// The id of the uploaded attachment. This field is ignored and provided by the API as part of the response
   #[serde(skip_serializing)]
   pub attachment_id: Option<Snowflake>,
+}
+
+/// A Media Gallery component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MediaGallery {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// 1 to 10 media gallery items
+  pub items: Vec<MediaGalleryItem>,
+}
+
+/// Discord Media Gallery Item Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MediaGalleryItem {
+  /// A url or attachment provided as an [unfurled media item](UnfurledMediaItem)
+  pub media: UnfurledMediaItem,
+  /// Alt text for the media, max 1024 characters
+  pub description: Option<String>,
+  /// Whether the media should be a spoiler (or blurred out). Defaults to `false`
+  pub spoiler: Option<bool>,
 }
 
 /// A Label component
@@ -1018,6 +1044,52 @@ impl UnfurledMediaItem {
   }
 }
 
+impl MediaGallery {
+  /// Creates a new media gallery
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::MEDIA_GALLERY,
+      id: None,
+      items: Vec::new(),
+    }
+  }
+
+  /// Add a media gallery item
+  pub fn add_item(mut self, item: MediaGalleryItem) -> Self {
+    self.items.push(item);
+    self
+  }
+}
+
+impl MediaGalleryItem {
+  /// Creates a new media gallery item with url
+  pub fn new<T: ToString>(url: T) -> Self {
+    Self {
+      media: UnfurledMediaItem::new(url),
+      description: None,
+      spoiler: None,
+    }
+  }
+
+  /// Sets the media
+  pub fn set_media<T: ToString>(mut self, url: T) -> Self {
+    self.media = UnfurledMediaItem::new(url);
+    self
+  }
+
+  /// Sets the description
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = Some(description.to_string());
+    self
+  }
+
+  /// Sets spoiler
+  pub fn set_spoiler(mut self, spoiler: bool) -> Self {
+    self.spoiler = Some(spoiler);
+    self
+  }
+}
+
 impl Label {
   /// Creates a new Label. Component can be set with [`set_component`](Label::set_component) or [`Components`]
   pub fn new<T: ToString>(label: T) -> Self {
@@ -1100,6 +1172,12 @@ impl From<Thumbnail> for Component {
   }
 }
 
+impl From<MediaGallery> for Component {
+  fn from(value: MediaGallery) -> Self {
+    Self::MediaGallery(value)
+  }
+}
+
 impl From<Label> for Component {
   fn from(value: Label) -> Self {
     Self::Label(value)
@@ -1154,6 +1232,12 @@ impl Default for TextDisplay {
   }
 }
 
+impl Default for MediaGallery {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl From<SelectMenuType> for ComponentType {
   fn from(menu_type: SelectMenuType) -> Self {
     match menu_type {
@@ -1197,6 +1281,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       9 => Component::Section(Section::deserialize(value).map_err(de::Error::custom)?),
       10 => Component::TextDisplay(TextDisplay::deserialize(value).map_err(de::Error::custom)?),
       11 => Component::Thumbnail(Thumbnail::deserialize(value).map_err(de::Error::custom)?),
+      12 => Component::MediaGallery(MediaGallery::deserialize(value).map_err(de::Error::custom)?),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
