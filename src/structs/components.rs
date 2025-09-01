@@ -23,7 +23,7 @@ use super::{
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum ComponentType {
-  /// A container for other components
+  /// Container to display a row of interactive components
   ACTION_ROW = 1,
   /// A button object
   BUTTON = 2,
@@ -50,13 +50,13 @@ pub enum ComponentType {
 #[derive(Serialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum Component {
-  /// An Action Row component
+  /// Container to display a row of interactive components
   ActionRow(ActionRow),
-  /// A Button component
+  /// A button object
   Button(Box<Button>),
-  /// A Select Menu component
+  /// A select menu for picking from defined text options
   SelectMenu(Box<SelectMenu>),
-  /// A Text Input component
+  /// A text input object
   TextInput(TextInput),
   /// Container associating a label and description with a component
   Label(Label),
