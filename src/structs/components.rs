@@ -43,6 +43,8 @@ pub enum ComponentType {
   SECTION = 9,
   /// Markdown text
   TEXT_DISPLAY = 10,
+  /// Small image that can be used as an accessory
+  THUMBNAIL = 11,
   /// Container associating a label and description with a component
   LABEL = 18,
   /// A component that hasn't been implemented yet
@@ -66,6 +68,8 @@ pub enum Component {
   Section(Section),
   /// Markdown text
   TextDisplay(TextDisplay),
+  /// Small image that can be used as an accessory
+  Thumbnail(Thumbnail),
   /// Container associating a label and description with a component
   Label(Label),
   /// A component that hasn't been implemented yet
@@ -286,6 +290,43 @@ pub struct TextDisplay {
   pub id: Option<i64>,
   /// Text that will be displayed similar to a message
   pub content: String,
+}
+
+/// A Thumbnail component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Thumbnail {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// A url or attachment provided as an [unfurled media item](UnfurledMediaItem)
+  pub media: UnfurledMediaItem,
+  /// Alt text for the media, max 1024 characters
+  pub description: Option<String>,
+  /// Whether the thumbnail should be a spoiler (or blurred out). Defaults to `false`
+  pub spoiler: Option<bool>,
+}
+
+/// Discord Unfurled Media Item Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct UnfurledMediaItem {
+  /// Supports arbitrary urls and `attachment://<filename>` references
+  pub url: String,
+  /// The proxied url of the media item. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub proxy_url: Option<String>,
+  /// The height of the media item. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub height: Option<i64>,
+  /// The width of the media item. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub width: Option<i64>,
+  /// The [media type](https://en.wikipedia.org/wiki/Media_type) of the content. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub content_type: Option<String>,
+  /// The id of the uploaded attachment. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub attachment_id: Option<Snowflake>,
 }
 
 /// A Label component
@@ -932,6 +973,51 @@ impl TextDisplay {
   }
 }
 
+impl Thumbnail {
+  /// Creates a new thumbnail with a url
+  pub fn new<T: ToString>(url: T) -> Self {
+    Self {
+      component_type: ComponentType::THUMBNAIL,
+      id: None,
+      media: UnfurledMediaItem::new(url),
+      description: None,
+      spoiler: None,
+    }
+  }
+
+  /// Sets the media
+  pub fn set_media<T: ToString>(mut self, url: T) -> Self {
+    self.media = UnfurledMediaItem::new(url);
+    self
+  }
+
+  /// Sets the description
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = Some(description.to_string());
+    self
+  }
+
+  /// Sets spoiler
+  pub fn set_spoiler(mut self, spoiler: bool) -> Self {
+    self.spoiler = Some(spoiler);
+    self
+  }
+}
+
+impl UnfurledMediaItem {
+  /// Creates a new unfurled media item from an url
+  pub fn new<T: ToString>(url: T) -> Self {
+    Self {
+      url: url.to_string(),
+      proxy_url: None,
+      height: None,
+      width: None,
+      content_type: None,
+      attachment_id: None,
+    }
+  }
+}
+
 impl Label {
   /// Creates a new Label. Component can be set with [`set_component`](Label::set_component) or [`Components`]
   pub fn new<T: ToString>(label: T) -> Self {
@@ -1005,6 +1091,12 @@ impl From<Section> for Component {
 impl From<TextDisplay> for Component {
   fn from(value: TextDisplay) -> Self {
     Self::TextDisplay(value)
+  }
+}
+
+impl From<Thumbnail> for Component {
+  fn from(value: Thumbnail) -> Self {
+    Self::Thumbnail(value)
   }
 }
 
@@ -1104,6 +1196,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       8 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
       9 => Component::Section(Section::deserialize(value).map_err(de::Error::custom)?),
       10 => Component::TextDisplay(TextDisplay::deserialize(value).map_err(de::Error::custom)?),
+      11 => Component::Thumbnail(Thumbnail::deserialize(value).map_err(de::Error::custom)?),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
