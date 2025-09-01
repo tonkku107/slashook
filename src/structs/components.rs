@@ -39,6 +39,8 @@ pub enum ComponentType {
   MENTIONABLE_SELECT = 7,
   /// A select menu for channels
   CHANNEL_SELECT = 8,
+  /// Container to display text alongside an accessory component
+  SECTION = 9,
   /// Container associating a label and description with a component
   LABEL = 18,
   /// A component that hasn't been implemented yet
@@ -58,6 +60,8 @@ pub enum Component {
   SelectMenu(Box<SelectMenu>),
   /// A text input object
   TextInput(TextInput),
+  /// Container to display text alongside an accessory component
+  Section(Section),
   /// Container associating a label and description with a component
   Label(Label),
   /// A component that hasn't been implemented yet
@@ -254,6 +258,19 @@ pub enum TextInputStyle {
   SHORT = 1,
   /// A multi-line input
   PARAGRAPH = 2,
+}
+
+/// A Section component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Section {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// One to three child components representing the content of the section that is contextually associated to the accessory
+  pub components: Vec<Component>,
+  /// A component that is contextually associated to the content of the section
+  pub accessory: Box<Component>,
 }
 
 /// A Label component
@@ -859,15 +876,39 @@ impl TextInput {
   }
 }
 
+impl Section {
+  /// Creates a new section
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::SECTION,
+      id: None,
+      components: Vec::new(),
+      accessory: Box::new(Component::Unknown),
+    }
+  }
+
+  /// Add a component
+  pub fn add_component<C: Into<Component>>(mut self, component: C) -> Self {
+    self.components.push(component.into());
+    self
+  }
+
+  /// Set the accessory component
+  pub fn set_accessory<C: Into<Component>>(mut self, component: C) -> Self {
+    self.accessory = Box::new(component.into());
+    self
+  }
+}
+
 impl Label {
   /// Creates a new Label. Component can be set with [`set_component`](Label::set_component) or [`Components`]
   pub fn new<T: ToString>(label: T) -> Self {
     Self {
       component_type: ComponentType::LABEL,
-        id: None,
-        label: label.to_string(),
-        description: None,
-        component: Box::new(Component::Unknown),
+      id: None,
+      label: label.to_string(),
+      description: None,
+      component: Box::new(Component::Unknown),
     }
   }
 
@@ -923,6 +964,12 @@ impl From<TextInput> for Component {
   }
 }
 
+impl From<Section> for Component {
+  fn from(value: Section) -> Self {
+    Self::Section(value)
+  }
+}
+
 impl From<Label> for Component {
   fn from(value: Label) -> Self {
     Self::Label(value)
@@ -962,6 +1009,12 @@ impl Default for TextInput {
 impl Default for TextInputStyle {
   fn default() -> Self {
     Self::SHORT
+  }
+}
+
+impl Default for Section {
+  fn default() -> Self {
+    Self::new()
   }
 }
 
@@ -1005,6 +1058,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       6 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
       7 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
       8 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
+      9 => Component::Section(Section::deserialize(value).map_err(de::Error::custom)?),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
