@@ -41,6 +41,8 @@ pub enum ComponentType {
   CHANNEL_SELECT = 8,
   /// Container to display text alongside an accessory component
   SECTION = 9,
+  /// Markdown text
+  TEXT_DISPLAY = 10,
   /// Container associating a label and description with a component
   LABEL = 18,
   /// A component that hasn't been implemented yet
@@ -62,6 +64,8 @@ pub enum Component {
   TextInput(TextInput),
   /// Container to display text alongside an accessory component
   Section(Section),
+  /// Markdown text
+  TextDisplay(TextDisplay),
   /// Container associating a label and description with a component
   Label(Label),
   /// A component that hasn't been implemented yet
@@ -271,6 +275,17 @@ pub struct Section {
   pub components: Vec<Component>,
   /// A component that is contextually associated to the content of the section
   pub accessory: Box<Component>,
+}
+
+/// A Text Display component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TextDisplay {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// Text that will be displayed similar to a message
+  pub content: String,
 }
 
 /// A Label component
@@ -900,6 +915,23 @@ impl Section {
   }
 }
 
+impl TextDisplay {
+  /// Creates a new Text Display with content
+  pub fn new<T: ToString>(content: T) -> Self {
+    Self {
+      component_type: ComponentType::TEXT_DISPLAY,
+      id: None,
+      content: content.to_string(),
+    }
+  }
+
+  /// Set the content
+  pub fn set_content<T: ToString>(mut self, content: T) -> Self {
+    self.content = content.to_string();
+    self
+  }
+}
+
 impl Label {
   /// Creates a new Label. Component can be set with [`set_component`](Label::set_component) or [`Components`]
   pub fn new<T: ToString>(label: T) -> Self {
@@ -970,6 +1002,12 @@ impl From<Section> for Component {
   }
 }
 
+impl From<TextDisplay> for Component {
+  fn from(value: TextDisplay) -> Self {
+    Self::TextDisplay(value)
+  }
+}
+
 impl From<Label> for Component {
   fn from(value: Label) -> Self {
     Self::Label(value)
@@ -1018,6 +1056,12 @@ impl Default for Section {
   }
 }
 
+impl Default for TextDisplay {
+  fn default() -> Self {
+    Self::new(String::new())
+  }
+}
+
 impl From<SelectMenuType> for ComponentType {
   fn from(menu_type: SelectMenuType) -> Self {
     match menu_type {
@@ -1059,6 +1103,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       7 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
       8 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
       9 => Component::Section(Section::deserialize(value).map_err(de::Error::custom)?),
+      10 => Component::TextDisplay(TextDisplay::deserialize(value).map_err(de::Error::custom)?),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
