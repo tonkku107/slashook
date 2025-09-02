@@ -457,7 +457,7 @@ impl Components {
     Self(vec![Component::Label(label)])
   }
 
-  /// Creates an empty set of components useful for clearing out components when editing a message
+  /// Creates an empty set of components useful for components v2 or clearing out components when editing a message
   /// ```
   /// # use slashook::commands::{MessageResponse};
   /// # use slashook::structs::components::Components;
@@ -466,6 +466,12 @@ impl Components {
   /// ```
   pub fn empty() -> Self {
     Self(Vec::new())
+  }
+
+  /// Adds a component
+  pub fn add_component<C: Into<Component>>(mut self, component: C) -> Self {
+    self.0.push(component.into());
+    self
   }
 
   /// Adds a new row\
@@ -597,6 +603,12 @@ impl ActionRow {
       id: None,
       components: Vec::new()
     }
+  }
+
+  /// Adds a component to the action row
+  pub fn add_component<C: Into<Component>>(mut self, component: C) -> Self {
+    self.components.push(component.into());
+    self
   }
 
   fn available_slots(&self) -> usize {
