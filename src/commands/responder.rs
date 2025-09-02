@@ -205,6 +205,18 @@ impl MessageResponse {
   }
 
   /// Use Components V2 on the message
+  /// ```
+  /// # use slashook::commands::MessageResponse;
+  /// # use slashook::structs::components::{Components, TextDisplay, Container};
+  /// let text = TextDisplay::new("some text");
+  /// let inner_text = TextDisplay::new("more text");
+  /// let container = Container::new().add_component(inner_text);
+  /// let components = Components::empty()
+  ///   .add_component(text)
+  ///   .add_component(container);
+  /// let response = MessageResponse::from(components)
+  ///   .set_components_v2(true);
+  /// ```
   pub fn set_components_v2(mut self, components_v2: bool) -> Self {
     let mut flags = self.flags.unwrap_or_else(MessageFlags::empty);
     flags.set(MessageFlags::IS_COMPONENTS_V2, components_v2);

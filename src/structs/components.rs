@@ -94,7 +94,30 @@ pub enum Component {
   Unknown,
 }
 
-/// A helper struct for building components for a message
+/// A helper struct for building components for a message\
+/// Example using components v1:
+/// ```
+/// # use slashook::structs::components::{Components, Button, SelectMenu, SelectMenuType};
+/// let button = Button::new()
+///   .set_label("Button")
+///   .set_id("example", "button");
+/// let menu = SelectMenu::new(SelectMenuType::USER)
+///   .set_id("example", "user");
+/// let components = Components::new()
+///   .add_button(button)
+///   .add_row()
+///   .add_select_menu(menu);
+/// ```
+/// Example using components v2:
+/// ```
+/// # use slashook::structs::components::{Components, TextDisplay, Container};
+/// let text = TextDisplay::new("some text");
+/// let inner_text = TextDisplay::new("more text");
+/// let container = Container::new().add_component(inner_text);
+/// let components = Components::empty()
+///   .add_component(text)
+///   .add_component(container);
+/// ```
 #[derive(Clone, Debug)]
 pub struct Components(pub Vec<Component>);
 
@@ -606,6 +629,12 @@ impl ActionRow {
   }
 
   /// Adds a component to the action row
+  /// ```
+  /// # use slashook::structs::components::{ActionRow, Button};
+  /// let button = Button::new().set_label("A button");
+  /// let row = ActionRow::new().add_component(button);
+  /// assert_eq!(row.components.len(), 1);
+  /// ```
   pub fn add_component<C: Into<Component>>(mut self, component: C) -> Self {
     self.components.push(component.into());
     self
@@ -1057,12 +1086,24 @@ impl Section {
   }
 
   /// Add a component
+  /// ```
+  /// # use slashook::structs::components::{Section, TextDisplay};
+  /// let text = TextDisplay::new("some text inside a section");
+  /// let section = Section::new().add_component(text);
+  /// assert_eq!(section.components.len(), 1);
+  /// ```
   pub fn add_component<C: Into<Component>>(mut self, component: C) -> Self {
     self.components.push(component.into());
     self
   }
 
   /// Set the accessory component
+  /// ```
+  /// # use slashook::structs::components::{Section, Button, Component};
+  /// let button = Button::new().set_label("Accessory button");
+  /// let section = Section::new().set_accessory(button);
+  /// assert!(matches!(*section.accessory, Component::Button(_)));
+  /// ```
   pub fn set_accessory<C: Into<Component>>(mut self, component: C) -> Self {
     self.accessory = Box::new(component.into());
     self
@@ -1071,6 +1112,11 @@ impl Section {
 
 impl TextDisplay {
   /// Creates a new Text Display with content
+  /// ```
+  /// # use slashook::structs::components::{TextDisplay};
+  /// let text = TextDisplay::new("Some text");
+  /// assert_eq!(text.content, String::from("Some text"));
+  /// ```
   pub fn new<T: ToString>(content: T) -> Self {
     Self {
       component_type: ComponentType::TEXT_DISPLAY,
@@ -1080,6 +1126,12 @@ impl TextDisplay {
   }
 
   /// Set the content
+  /// ```
+  /// # use slashook::structs::components::{TextDisplay};
+  /// let text = TextDisplay::new("Some text")
+  ///   .set_content("Actually this text");
+  /// assert_eq!(text.content, String::from("Actually this text"));
+  /// ```
   pub fn set_content<T: ToString>(mut self, content: T) -> Self {
     self.content = content.to_string();
     self
@@ -1088,6 +1140,11 @@ impl TextDisplay {
 
 impl Thumbnail {
   /// Creates a new thumbnail with a url
+  /// ```
+  /// # use slashook::structs::components::{Thumbnail};
+  /// let thumbnail = Thumbnail::new("https://example.com/image.png");
+  /// assert_eq!(thumbnail.media.url, String::from("https://example.com/image.png"));
+  /// ```
   pub fn new<T: ToString>(url: T) -> Self {
     Self {
       component_type: ComponentType::THUMBNAIL,
@@ -1099,18 +1156,36 @@ impl Thumbnail {
   }
 
   /// Sets the media
+  /// ```
+  /// # use slashook::structs::components::{Thumbnail};
+  /// let thumbnail = Thumbnail::new("https://example.com/image.png")
+  ///   .set_media("https://example.com/image2.jpg");
+  /// assert_eq!(thumbnail.media.url, String::from("https://example.com/image2.jpg"));
+  /// ```
   pub fn set_media<T: ToString>(mut self, url: T) -> Self {
     self.media = UnfurledMediaItem::new(url);
     self
   }
 
   /// Sets the description
+  /// ```
+  /// # use slashook::structs::components::{Thumbnail};
+  /// let thumbnail = Thumbnail::new("https://example.com/image.png")
+  ///   .set_description("An example image");
+  /// assert_eq!(thumbnail.description, Some(String::from("An example image")));
+  /// ```
   pub fn set_description<T: ToString>(mut self, description: T) -> Self {
     self.description = Some(description.to_string());
     self
   }
 
   /// Sets spoiler
+  /// ```
+  /// # use slashook::structs::components::{Thumbnail};
+  /// let thumbnail = Thumbnail::new("https://example.com/image.png")
+  ///   .set_spoiler(true);
+  /// assert_eq!(thumbnail.spoiler, Some(true));
+  /// ```
   pub fn set_spoiler(mut self, spoiler: bool) -> Self {
     self.spoiler = Some(spoiler);
     self
@@ -1142,6 +1217,13 @@ impl MediaGallery {
   }
 
   /// Add a media gallery item
+  /// ```
+  /// # use slashook::structs::components::{MediaGallery, MediaGalleryItem};
+  /// let item = MediaGalleryItem::new("https://example.com/image.png");
+  /// let gallery = MediaGallery::new()
+  ///   .add_item(item);
+  /// assert_eq!(gallery.items.len(), 1);
+  /// ```
   pub fn add_item(mut self, item: MediaGalleryItem) -> Self {
     self.items.push(item);
     self
@@ -1150,6 +1232,11 @@ impl MediaGallery {
 
 impl MediaGalleryItem {
   /// Creates a new media gallery item with url
+  /// ```
+  /// # use slashook::structs::components::{MediaGalleryItem};
+  /// let item = MediaGalleryItem::new("https://example.com/image.png");
+  /// assert_eq!(item.media.url, String::from("https://example.com/image.png"));
+  /// ```
   pub fn new<T: ToString>(url: T) -> Self {
     Self {
       media: UnfurledMediaItem::new(url),
@@ -1159,18 +1246,36 @@ impl MediaGalleryItem {
   }
 
   /// Sets the media
+  /// ```
+  /// # use slashook::structs::components::{MediaGalleryItem};
+  /// let item = MediaGalleryItem::new("https://example.com/image.png")
+  ///   .set_media("https://example.com/image2.jpg");
+  /// assert_eq!(item.media.url, String::from("https://example.com/image2.jpg"));
+  /// ```
   pub fn set_media<T: ToString>(mut self, url: T) -> Self {
     self.media = UnfurledMediaItem::new(url);
     self
   }
 
   /// Sets the description
+  /// ```
+  /// # use slashook::structs::components::{MediaGalleryItem};
+  /// let item = MediaGalleryItem::new("https://example.com/image.png")
+  ///   .set_description("An example image");
+  /// assert_eq!(item.description, Some(String::from("An example image")));
+  /// ```
   pub fn set_description<T: ToString>(mut self, description: T) -> Self {
     self.description = Some(description.to_string());
     self
   }
 
   /// Sets spoiler
+  /// ```
+  /// # use slashook::structs::components::{MediaGalleryItem};
+  /// let item = MediaGalleryItem::new("https://example.com/image.png")
+  ///   .set_spoiler(true);
+  /// assert_eq!(item.spoiler, Some(true));
+  /// ```
   pub fn set_spoiler(mut self, spoiler: bool) -> Self {
     self.spoiler = Some(spoiler);
     self
@@ -1179,6 +1284,11 @@ impl MediaGalleryItem {
 
 impl File {
   /// Creates a new file with url
+  /// ```
+  /// # use slashook::structs::components::{File};
+  /// let file = File::new("attachment://image.png");
+  /// assert_eq!(file.file.url, String::from("attachment://image.png"));
+  /// ```
   pub fn new<T: ToString>(url: T) -> Self {
     Self {
       component_type: ComponentType::FILE,
@@ -1191,12 +1301,24 @@ impl File {
   }
 
   /// Sets the file
+  /// ```
+  /// # use slashook::structs::components::{File};
+  /// let file = File::new("attachment://image.png")
+  ///   .set_file("attachment://image2.jpg");
+  /// assert_eq!(file.file.url, String::from("attachment://image2.jpg"));
+  /// ```
   pub fn set_file<T: ToString>(mut self, url: T) -> Self {
     self.file = UnfurledMediaItem::new(url);
     self
   }
 
   /// Sets spoiler
+  /// ```
+  /// # use slashook::structs::components::{File};
+  /// let file = File::new("attachment://image.png")
+  ///   .set_spoiler(true);
+  /// assert_eq!(file.spoiler, Some(true));
+  /// ```
   pub fn set_spoiler(mut self, spoiler: bool) -> Self {
     self.spoiler = Some(spoiler);
     self
@@ -1215,12 +1337,24 @@ impl Separator {
   }
 
   /// Set divider
+  /// ```
+  /// # use slashook::structs::components::{Separator};
+  /// let separator = Separator::new()
+  ///   .set_divider(false);
+  /// assert_eq!(separator.divider, Some(false));
+  /// ```
   pub fn set_divider(mut self, divider: bool) -> Self {
     self.divider = Some(divider);
     self
   }
 
   /// Set the spacing
+  /// ```
+  /// # use slashook::structs::components::{Separator, SeparatorSpacing};
+  /// let separator = Separator::new()
+  ///   .set_spacing(SeparatorSpacing::LARGE);
+  /// assert!(matches!(separator.spacing, Some(SeparatorSpacing::LARGE)));
+  /// ```
   pub fn set_spacing(mut self, spacing: SeparatorSpacing) -> Self {
     self.spacing = Some(spacing);
     self
@@ -1240,12 +1374,28 @@ impl Container {
   }
 
   /// Add a component
+  /// ```
+  /// # use slashook::structs::components::{Container, TextDisplay};
+  /// let text = TextDisplay::new("some text");
+  /// let container = Container::new()
+  ///   .add_component(text);
+  /// assert_eq!(container.components.len(), 1);
+  /// ```
   pub fn add_component<C: Into<Component>>(mut self, component: C) -> Self {
     self.components.push(component.into());
     self
   }
 
   /// Sets the accent color
+  /// ```
+  /// # use slashook::structs::components::{Container, TextDisplay};
+  /// let text = TextDisplay::new("some text in a blue accented container");
+  /// let container = Container::new()
+  ///   .add_component(text)
+  ///   .set_accent_color("#0000FF")
+  ///   .unwrap();
+  /// assert_eq!(container.accent_color.unwrap().to_hex(), "#0000ff");
+  /// ```
   pub fn set_accent_color<T: TryInto<Color>>(mut self, accent_color: T) -> Result<Self, T::Error> {
     let color = accent_color.try_into()?;
     self.accent_color = Some(color);
@@ -1253,6 +1403,14 @@ impl Container {
   }
 
   /// Sets spoiler
+  /// ```
+  /// # use slashook::structs::components::{Container, TextDisplay};
+  /// let text = TextDisplay::new("spoilered text");
+  /// let container = Container::new()
+  ///   .add_component(text)
+  ///   .set_spoiler(true);
+  /// assert_eq!(container.spoiler, Some(true));
+  /// ```
   pub fn set_spoiler(mut self, spoiler: bool) -> Self {
     self.spoiler = Some(spoiler);
     self
@@ -1261,6 +1419,11 @@ impl Container {
 
 impl Label {
   /// Creates a new Label. Component can be set with [`set_component`](Label::set_component) or [`Components`]
+  /// ```
+  /// # use slashook::structs::components::{Label};
+  /// let label = Label::new("Labeled component");
+  /// assert_eq!(label.label, String::from("Labeled component"));
+  /// ```
   pub fn new<T: ToString>(label: T) -> Self {
     Self {
       component_type: ComponentType::LABEL,
@@ -1272,6 +1435,12 @@ impl Label {
   }
 
   /// Set the label
+  /// ```
+  /// # use slashook::structs::components::{Label};
+  /// let label = Label::new("Labeled component")
+  ///   .set_label("Different label");
+  /// assert_eq!(label.label, String::from("Different label"));
+  /// ```
   pub fn set_label<T: ToString>(mut self, label: T) -> Self {
     self.label = label.to_string();
     self
@@ -1293,6 +1462,14 @@ impl Label {
   }
 
   /// Set the component
+  /// ```
+  /// # use slashook::structs::components::{TextInput, Label, Component};
+  /// let text_input = TextInput::new()
+  ///   .set_id("input");
+  /// let text_input_label = Label::new("Cool text input")
+  ///   .set_component(text_input);
+  /// assert!(matches!(*text_input_label.component, Component::TextInput(_)));
+  /// ```
   pub fn set_component<C: Into<Component>>(mut self, component: C) -> Self {
     self.component = Box::new(component.into());
     self
