@@ -15,6 +15,7 @@ use super::structs::{
 };
 use signature_headers::SignatureHeaders;
 use rocket::{
+  data::{Limits, ToByteUnit},
   http::Status,
   request::Request,
   response::{self, Response, Responder, content},
@@ -178,7 +179,8 @@ pub(crate) async fn start(config: Config, command_sender: mpsc::UnboundedSender:
     .merge(("address", config.ip))
     .merge(("port", config.port))
     .merge(("ident", crate::USER_AGENT))
-    .merge(("log_level", rocket::config::LogLevel::Off));
+    .merge(("log_level", rocket::config::LogLevel::Off))
+    .merge(("limits", Limits::new().limit("bytes", 1.mebibytes())));
 
   let result = rocket::custom(figment)
     .mount("/", routes![index, events])
