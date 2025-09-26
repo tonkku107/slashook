@@ -324,8 +324,8 @@ pub enum OptionValue {
   Number(f64),
   /// Represents an attachment value
   Attachment(Attachment),
-  /// Represents multiple string values as a vec
-  Values(Vec<String>),
+  /// Represents multiple values as a vec
+  Values(Vec<OptionValue>),
   /// Represents any unknown value
   Other(Value),
 }
@@ -717,13 +717,13 @@ impl OptionValue {
     }
   }
 
-  /// Returns true if the value is a vec of strings
+  /// Returns true if the value contains multiple values
   pub fn is_values(&self) -> bool {
     matches!(self, Self::Values(_))
   }
 
-  /// If the value is a vec of strings, returns them. Returns None otherwise.
-  pub fn as_values(&self) -> Option<&Vec<String>> {
+  /// If the value contains multiple values, returns them. Returns None otherwise.
+  pub fn as_values(&self) -> Option<&Vec<OptionValue>> {
     match self {
       Self::Values(v) => Some(v),
       _ => None

@@ -246,9 +246,14 @@ impl CommandHandler {
     Ok(())
   }
 
-  fn parse_select_values(&self, values: Vec<String>, resolved: &Option<InteractionDataResolved>, input: &mut CommandInput) -> anyhow::Result<()> {
+  fn parse_select_values(&self, menu_type: ComponentType, values: Vec<String>, resolved: &Option<InteractionDataResolved>) -> anyhow::Result<(Vec<String>, Vec<OptionValue>)> {
     let mut resolved_values = Vec::new();
-    match input.component_type.as_ref().context("Somehow trying to parse values without a component type")? {
+    match menu_type {
+      ComponentType::STRING_SELECT => {
+        for value in values.iter() {
+          resolved_values.push(OptionValue::String(value.to_string()));
+        }
+      },
       ComponentType::USER_SELECT => {
         for value in values.iter() {
           resolved_values.push(OptionValue::User(
@@ -288,32 +293,31 @@ impl CommandHandler {
       }
       _ => {},
     };
-    input.values = Some(values);
-    input.resolved_values = Some(resolved_values);
-    Ok(())
+    Ok((values, resolved_values))
   }
 
-  fn parse_component_values(components: Vec<Component>, input: &mut CommandInput) {
+  fn parse_component_values(&self, components: Vec<Component>, resolved: &Option<InteractionDataResolved>, input: &mut CommandInput) -> anyhow::Result<()> {
     for component in components.into_iter() {
       match component {
         Component::ActionRow(action_row) => {
-          Self::parse_component_values(action_row.components, input);
+          self.parse_component_values(action_row.components, resolved, input)?;
         },
         Component::Label(label) => {
-          Self::parse_component_values(vec![*label.component], input);
+          self.parse_component_values(vec![*label.component], resolved, input)?;
         },
         Component::TextInput(text_input) => {
           let value = OptionValue::String(text_input.value.unwrap_or_default());
           input.args.insert(text_input.custom_id, value);
         },
         Component::SelectMenu(select_menu) => {
-          let values = OptionValue::Values(select_menu.values.unwrap_or_default());
+          let (_, values) = self.parse_select_values(select_menu.component_type, select_menu.values.unwrap_or_default(), resolved)?;
           let (_, custom_id) = select_menu.custom_id.split_once('/').unwrap_or(("", select_menu.custom_id.as_str()));
-          input.args.insert(custom_id.to_string(), values);
+          input.args.insert(custom_id.to_string(), OptionValue::Values(values));
         },
         _ => {}
       }
     }
+    Ok(())
   }
 
   fn parse_mentionable(&self, resolved: &InteractionDataResolved, option_value: &str) -> anyhow::Result<OptionValue> {
@@ -444,11 +448,14 @@ impl CommandHandler {
     }
 
     if let Some(components) = data.components {
-      Self::parse_component_values(components, &mut input);
+      self.parse_component_values(components, &data.resolved, &mut input)?;
     }
 
     if let Some(values) = data.values {
-      self.parse_select_values(values, &data.resolved, &mut input)?;
+      let menu_type = input.component_type.clone().context("No component type with values present")?;
+      let (values, resolved_values) = self.parse_select_values(menu_type, values, &data.resolved)?;
+      input.values = Some(values);
+      input.resolved_values = Some(resolved_values);
     }
 
     if input.command_type.is_some() {
