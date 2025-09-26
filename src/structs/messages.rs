@@ -335,6 +335,8 @@ bitflags! {
     const IS_VOICE_MESSAGE = 1 << 13;
     /// This message has a snapshot (via Message Forwarding)
     const HAS_SNAPSHOT = 1 << 14;
+    /// Allows you to create fully component-driven messages
+    const IS_COMPONENTS_V2 = 1 << 15;
   }
 }
 

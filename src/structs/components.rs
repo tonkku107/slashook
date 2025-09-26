@@ -11,6 +11,8 @@ use serde::{Serialize, Deserialize};
 use serde::de;
 use serde_json::Value;
 use serde_repr::{Serialize_repr, Deserialize_repr};
+use crate::structs::utils::Color;
+
 use super::{
   channels::ChannelType,
   Emoji,
@@ -23,7 +25,7 @@ use super::{
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum ComponentType {
-  /// A container for other components
+  /// Container to display a row of interactive components
   ACTION_ROW = 1,
   /// A button object
   BUTTON = 2,
@@ -39,6 +41,20 @@ pub enum ComponentType {
   MENTIONABLE_SELECT = 7,
   /// A select menu for channels
   CHANNEL_SELECT = 8,
+  /// Container to display text alongside an accessory component
+  SECTION = 9,
+  /// Markdown text
+  TEXT_DISPLAY = 10,
+  /// Small image that can be used as an accessory
+  THUMBNAIL = 11,
+  /// Display images and other media
+  MEDIA_GALLERY = 12,
+  /// Displays an attached file
+  FILE = 13,
+  /// Component to add vertical padding between other components
+  SEPARATOR = 14,
+  /// Container that visually groups a set of components
+  CONTAINER = 17,
   /// Container associating a label and description with a component
   LABEL = 18,
   /// A component that hasn't been implemented yet
@@ -50,21 +66,58 @@ pub enum ComponentType {
 #[derive(Serialize, Clone, Debug)]
 #[serde(untagged)]
 pub enum Component {
-  /// An Action Row component
+  /// Container to display a row of interactive components
   ActionRow(ActionRow),
-  /// A Button component
+  /// A button object
   Button(Box<Button>),
-  /// A Select Menu component
+  /// A select menu for picking from defined text options
   SelectMenu(Box<SelectMenu>),
-  /// A Text Input component
+  /// A text input object
   TextInput(TextInput),
+  /// Container to display text alongside an accessory component
+  Section(Section),
+  /// Markdown text
+  TextDisplay(TextDisplay),
+  /// Small image that can be used as an accessory
+  Thumbnail(Thumbnail),
+  /// Display images and other media
+  MediaGallery(MediaGallery),
+  /// Displays an attached file
+  File(File),
+  /// Component to add vertical padding between other components
+  Separator(Separator),
+  /// Container that visually groups a set of components
+  Container(Container),
   /// Container associating a label and description with a component
   Label(Label),
   /// A component that hasn't been implemented yet
   Unknown,
 }
 
-/// A helper struct for building components for a message
+/// A helper struct for building components for a message\
+/// Example using components v1:
+/// ```
+/// # use slashook::structs::components::{Components, Button, SelectMenu, SelectMenuType};
+/// let button = Button::new()
+///   .set_label("Button")
+///   .set_id("example", "button");
+/// let menu = SelectMenu::new(SelectMenuType::USER)
+///   .set_id("example", "user");
+/// let components = Components::new()
+///   .add_button(button)
+///   .add_row()
+///   .add_select_menu(menu);
+/// ```
+/// Example using components v2:
+/// ```
+/// # use slashook::structs::components::{Components, TextDisplay, Container};
+/// let text = TextDisplay::new("some text");
+/// let inner_text = TextDisplay::new("more text");
+/// let container = Container::new().add_component(inner_text);
+/// let components = Components::empty()
+///   .add_component(text)
+///   .add_component(container);
+/// ```
 #[derive(Clone, Debug)]
 pub struct Components(pub Vec<Component>);
 
@@ -73,6 +126,8 @@ pub struct Components(pub Vec<Component>);
 pub struct ActionRow {
   #[serde(rename = "type")]
   component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
   /// Components inside this row
   pub components: Vec<Component>,
 }
@@ -86,6 +141,8 @@ pub struct ActionRow {
 pub struct Button {
   #[serde(rename = "type")]
   component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
   /// One of [button styles](ButtonStyle)
   pub style: ButtonStyle,
   /// Text that appears on the button, max 80 characters
@@ -252,6 +309,150 @@ pub enum TextInputStyle {
   PARAGRAPH = 2,
 }
 
+/// A Section component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Section {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// One to three child components representing the content of the section that is contextually associated to the accessory
+  pub components: Vec<Component>,
+  /// A component that is contextually associated to the content of the section
+  pub accessory: Box<Component>,
+}
+
+/// A Text Display component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TextDisplay {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// Text that will be displayed similar to a message
+  pub content: String,
+}
+
+/// A Thumbnail component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Thumbnail {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// A url or attachment provided as an [unfurled media item](UnfurledMediaItem)
+  pub media: UnfurledMediaItem,
+  /// Alt text for the media, max 1024 characters
+  pub description: Option<String>,
+  /// Whether the thumbnail should be a spoiler (or blurred out). Defaults to `false`
+  pub spoiler: Option<bool>,
+}
+
+/// Discord Unfurled Media Item Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct UnfurledMediaItem {
+  /// Supports arbitrary urls and `attachment://<filename>` references
+  pub url: String,
+  /// The proxied url of the media item. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub proxy_url: Option<String>,
+  /// The height of the media item. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub height: Option<i64>,
+  /// The width of the media item. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub width: Option<i64>,
+  /// The [media type](https://en.wikipedia.org/wiki/Media_type) of the content. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub content_type: Option<String>,
+  /// The id of the uploaded attachment. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub attachment_id: Option<Snowflake>,
+}
+
+/// A Media Gallery component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MediaGallery {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// 1 to 10 media gallery items
+  pub items: Vec<MediaGalleryItem>,
+}
+
+/// Discord Media Gallery Item Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MediaGalleryItem {
+  /// A url or attachment provided as an [unfurled media item](UnfurledMediaItem)
+  pub media: UnfurledMediaItem,
+  /// Alt text for the media, max 1024 characters
+  pub description: Option<String>,
+  /// Whether the media should be a spoiler (or blurred out). Defaults to `false`
+  pub spoiler: Option<bool>,
+}
+
+/// A File component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct File {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// This unfurled media item is unique in that it **only** supports attachment references using the `attachment://<filename>` syntax
+  pub file: UnfurledMediaItem,
+  /// Whether the media should be a spoiler (or blurred out). Defaults to `false`
+  pub spoiler: Option<bool>,
+  /// The name of the file. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub name: Option<String>,
+  /// The size of the file in bytes. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub size: Option<i64>,
+}
+
+/// A Separator component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Separator {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// Whether a visual divider should be displayed in the component. Defaults to `true`
+  pub divider: Option<bool>,
+  /// Size of separator padding. Defaults to [`SeparatorSpacing::SMALL`]
+  pub spacing: Option<SeparatorSpacing>,
+}
+
+/// Discord Separator Spacing Enum
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum SeparatorSpacing {
+  /// Small padding
+  SMALL = 1,
+  /// Large padding
+  LARGE = 2,
+  /// Spacing that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
+}
+
+/// A Container component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Container {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// Child components that are encapsulated within the Container
+  pub components: Vec<Component>,
+  /// Color for the accent on the container as RGB from `0x000000` to `0xFFFFFF`
+  pub accent_color: Option<Color>,
+  /// Whether the container should be a spoiler (or blurred out). Defaults to `false`.
+  pub spoiler: Option<bool>,
+}
+
 /// A Label component
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Label {
@@ -279,7 +480,7 @@ impl Components {
     Self(vec![Component::Label(label)])
   }
 
-  /// Creates an empty set of components useful for clearing out components when editing a message
+  /// Creates an empty set of components useful for components v2 or clearing out components when editing a message
   /// ```
   /// # use slashook::commands::{MessageResponse};
   /// # use slashook::structs::components::Components;
@@ -288,6 +489,12 @@ impl Components {
   /// ```
   pub fn empty() -> Self {
     Self(Vec::new())
+  }
+
+  /// Adds a component
+  pub fn add_component<C: Into<Component>>(mut self, component: C) -> Self {
+    self.0.push(component.into());
+    self
   }
 
   /// Adds a new row\
@@ -416,8 +623,21 @@ impl ActionRow {
   pub fn new() -> Self {
     Self {
       component_type: ComponentType::ACTION_ROW,
+      id: None,
       components: Vec::new()
     }
+  }
+
+  /// Adds a component to the action row
+  /// ```
+  /// # use slashook::structs::components::{ActionRow, Button};
+  /// let button = Button::new().set_label("A button");
+  /// let row = ActionRow::new().add_component(button);
+  /// assert_eq!(row.components.len(), 1);
+  /// ```
+  pub fn add_component<C: Into<Component>>(mut self, component: C) -> Self {
+    self.components.push(component.into());
+    self
   }
 
   fn available_slots(&self) -> usize {
@@ -438,6 +658,7 @@ impl Button {
   pub fn new() -> Self {
     Self {
       component_type: ComponentType::BUTTON,
+      id: None,
       style: ButtonStyle::PRIMARY,
       label: None,
       emoji: None,
@@ -853,19 +1074,373 @@ impl TextInput {
   }
 }
 
+impl Section {
+  /// Creates a new section
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::SECTION,
+      id: None,
+      components: Vec::new(),
+      accessory: Box::new(Component::Unknown),
+    }
+  }
+
+  /// Add a component
+  /// ```
+  /// # use slashook::structs::components::{Section, TextDisplay};
+  /// let text = TextDisplay::new("some text inside a section");
+  /// let section = Section::new().add_component(text);
+  /// assert_eq!(section.components.len(), 1);
+  /// ```
+  pub fn add_component<C: Into<Component>>(mut self, component: C) -> Self {
+    self.components.push(component.into());
+    self
+  }
+
+  /// Set the accessory component
+  /// ```
+  /// # use slashook::structs::components::{Section, Button, Component};
+  /// let button = Button::new().set_label("Accessory button");
+  /// let section = Section::new().set_accessory(button);
+  /// assert!(matches!(*section.accessory, Component::Button(_)));
+  /// ```
+  pub fn set_accessory<C: Into<Component>>(mut self, component: C) -> Self {
+    self.accessory = Box::new(component.into());
+    self
+  }
+}
+
+impl TextDisplay {
+  /// Creates a new Text Display with content
+  /// ```
+  /// # use slashook::structs::components::{TextDisplay};
+  /// let text = TextDisplay::new("Some text");
+  /// assert_eq!(text.content, String::from("Some text"));
+  /// ```
+  pub fn new<T: ToString>(content: T) -> Self {
+    Self {
+      component_type: ComponentType::TEXT_DISPLAY,
+      id: None,
+      content: content.to_string(),
+    }
+  }
+
+  /// Set the content
+  /// ```
+  /// # use slashook::structs::components::{TextDisplay};
+  /// let text = TextDisplay::new("Some text")
+  ///   .set_content("Actually this text");
+  /// assert_eq!(text.content, String::from("Actually this text"));
+  /// ```
+  pub fn set_content<T: ToString>(mut self, content: T) -> Self {
+    self.content = content.to_string();
+    self
+  }
+}
+
+impl Thumbnail {
+  /// Creates a new thumbnail with a url
+  /// ```
+  /// # use slashook::structs::components::{Thumbnail};
+  /// let thumbnail = Thumbnail::new("https://example.com/image.png");
+  /// assert_eq!(thumbnail.media.url, String::from("https://example.com/image.png"));
+  /// ```
+  pub fn new<T: ToString>(url: T) -> Self {
+    Self {
+      component_type: ComponentType::THUMBNAIL,
+      id: None,
+      media: UnfurledMediaItem::new(url),
+      description: None,
+      spoiler: None,
+    }
+  }
+
+  /// Sets the media
+  /// ```
+  /// # use slashook::structs::components::{Thumbnail};
+  /// let thumbnail = Thumbnail::new("https://example.com/image.png")
+  ///   .set_media("https://example.com/image2.jpg");
+  /// assert_eq!(thumbnail.media.url, String::from("https://example.com/image2.jpg"));
+  /// ```
+  pub fn set_media<T: ToString>(mut self, url: T) -> Self {
+    self.media = UnfurledMediaItem::new(url);
+    self
+  }
+
+  /// Sets the description
+  /// ```
+  /// # use slashook::structs::components::{Thumbnail};
+  /// let thumbnail = Thumbnail::new("https://example.com/image.png")
+  ///   .set_description("An example image");
+  /// assert_eq!(thumbnail.description, Some(String::from("An example image")));
+  /// ```
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = Some(description.to_string());
+    self
+  }
+
+  /// Sets spoiler
+  /// ```
+  /// # use slashook::structs::components::{Thumbnail};
+  /// let thumbnail = Thumbnail::new("https://example.com/image.png")
+  ///   .set_spoiler(true);
+  /// assert_eq!(thumbnail.spoiler, Some(true));
+  /// ```
+  pub fn set_spoiler(mut self, spoiler: bool) -> Self {
+    self.spoiler = Some(spoiler);
+    self
+  }
+}
+
+impl UnfurledMediaItem {
+  /// Creates a new unfurled media item from an url
+  pub fn new<T: ToString>(url: T) -> Self {
+    Self {
+      url: url.to_string(),
+      proxy_url: None,
+      height: None,
+      width: None,
+      content_type: None,
+      attachment_id: None,
+    }
+  }
+}
+
+impl MediaGallery {
+  /// Creates a new media gallery
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::MEDIA_GALLERY,
+      id: None,
+      items: Vec::new(),
+    }
+  }
+
+  /// Add a media gallery item
+  /// ```
+  /// # use slashook::structs::components::{MediaGallery, MediaGalleryItem};
+  /// let item = MediaGalleryItem::new("https://example.com/image.png");
+  /// let gallery = MediaGallery::new()
+  ///   .add_item(item);
+  /// assert_eq!(gallery.items.len(), 1);
+  /// ```
+  pub fn add_item(mut self, item: MediaGalleryItem) -> Self {
+    self.items.push(item);
+    self
+  }
+}
+
+impl MediaGalleryItem {
+  /// Creates a new media gallery item with url
+  /// ```
+  /// # use slashook::structs::components::{MediaGalleryItem};
+  /// let item = MediaGalleryItem::new("https://example.com/image.png");
+  /// assert_eq!(item.media.url, String::from("https://example.com/image.png"));
+  /// ```
+  pub fn new<T: ToString>(url: T) -> Self {
+    Self {
+      media: UnfurledMediaItem::new(url),
+      description: None,
+      spoiler: None,
+    }
+  }
+
+  /// Sets the media
+  /// ```
+  /// # use slashook::structs::components::{MediaGalleryItem};
+  /// let item = MediaGalleryItem::new("https://example.com/image.png")
+  ///   .set_media("https://example.com/image2.jpg");
+  /// assert_eq!(item.media.url, String::from("https://example.com/image2.jpg"));
+  /// ```
+  pub fn set_media<T: ToString>(mut self, url: T) -> Self {
+    self.media = UnfurledMediaItem::new(url);
+    self
+  }
+
+  /// Sets the description
+  /// ```
+  /// # use slashook::structs::components::{MediaGalleryItem};
+  /// let item = MediaGalleryItem::new("https://example.com/image.png")
+  ///   .set_description("An example image");
+  /// assert_eq!(item.description, Some(String::from("An example image")));
+  /// ```
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = Some(description.to_string());
+    self
+  }
+
+  /// Sets spoiler
+  /// ```
+  /// # use slashook::structs::components::{MediaGalleryItem};
+  /// let item = MediaGalleryItem::new("https://example.com/image.png")
+  ///   .set_spoiler(true);
+  /// assert_eq!(item.spoiler, Some(true));
+  /// ```
+  pub fn set_spoiler(mut self, spoiler: bool) -> Self {
+    self.spoiler = Some(spoiler);
+    self
+  }
+}
+
+impl File {
+  /// Creates a new file with url
+  /// ```
+  /// # use slashook::structs::components::{File};
+  /// let file = File::new("attachment://image.png");
+  /// assert_eq!(file.file.url, String::from("attachment://image.png"));
+  /// ```
+  pub fn new<T: ToString>(url: T) -> Self {
+    Self {
+      component_type: ComponentType::FILE,
+      id: None,
+      file: UnfurledMediaItem::new(url),
+      spoiler: None,
+      name: None,
+      size: None,
+    }
+  }
+
+  /// Sets the file
+  /// ```
+  /// # use slashook::structs::components::{File};
+  /// let file = File::new("attachment://image.png")
+  ///   .set_file("attachment://image2.jpg");
+  /// assert_eq!(file.file.url, String::from("attachment://image2.jpg"));
+  /// ```
+  pub fn set_file<T: ToString>(mut self, url: T) -> Self {
+    self.file = UnfurledMediaItem::new(url);
+    self
+  }
+
+  /// Sets spoiler
+  /// ```
+  /// # use slashook::structs::components::{File};
+  /// let file = File::new("attachment://image.png")
+  ///   .set_spoiler(true);
+  /// assert_eq!(file.spoiler, Some(true));
+  /// ```
+  pub fn set_spoiler(mut self, spoiler: bool) -> Self {
+    self.spoiler = Some(spoiler);
+    self
+  }
+}
+
+impl Separator {
+  /// Creates a new separator
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::SEPARATOR,
+      id: None,
+      divider: None,
+      spacing: None,
+    }
+  }
+
+  /// Set divider
+  /// ```
+  /// # use slashook::structs::components::{Separator};
+  /// let separator = Separator::new()
+  ///   .set_divider(false);
+  /// assert_eq!(separator.divider, Some(false));
+  /// ```
+  pub fn set_divider(mut self, divider: bool) -> Self {
+    self.divider = Some(divider);
+    self
+  }
+
+  /// Set the spacing
+  /// ```
+  /// # use slashook::structs::components::{Separator, SeparatorSpacing};
+  /// let separator = Separator::new()
+  ///   .set_spacing(SeparatorSpacing::LARGE);
+  /// assert!(matches!(separator.spacing, Some(SeparatorSpacing::LARGE)));
+  /// ```
+  pub fn set_spacing(mut self, spacing: SeparatorSpacing) -> Self {
+    self.spacing = Some(spacing);
+    self
+  }
+}
+
+impl Container {
+  /// Creates a new container
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::CONTAINER,
+      id: None,
+      components: Vec::new(),
+      accent_color: None,
+      spoiler: None,
+    }
+  }
+
+  /// Add a component
+  /// ```
+  /// # use slashook::structs::components::{Container, TextDisplay};
+  /// let text = TextDisplay::new("some text");
+  /// let container = Container::new()
+  ///   .add_component(text);
+  /// assert_eq!(container.components.len(), 1);
+  /// ```
+  pub fn add_component<C: Into<Component>>(mut self, component: C) -> Self {
+    self.components.push(component.into());
+    self
+  }
+
+  /// Sets the accent color
+  /// ```
+  /// # use slashook::structs::components::{Container, TextDisplay};
+  /// let text = TextDisplay::new("some text in a blue accented container");
+  /// let container = Container::new()
+  ///   .add_component(text)
+  ///   .set_accent_color("#0000FF")
+  ///   .unwrap();
+  /// assert_eq!(container.accent_color.unwrap().to_hex(), "#0000ff");
+  /// ```
+  pub fn set_accent_color<T: TryInto<Color>>(mut self, accent_color: T) -> Result<Self, T::Error> {
+    let color = accent_color.try_into()?;
+    self.accent_color = Some(color);
+    Ok(self)
+  }
+
+  /// Sets spoiler
+  /// ```
+  /// # use slashook::structs::components::{Container, TextDisplay};
+  /// let text = TextDisplay::new("spoilered text");
+  /// let container = Container::new()
+  ///   .add_component(text)
+  ///   .set_spoiler(true);
+  /// assert_eq!(container.spoiler, Some(true));
+  /// ```
+  pub fn set_spoiler(mut self, spoiler: bool) -> Self {
+    self.spoiler = Some(spoiler);
+    self
+  }
+}
+
 impl Label {
   /// Creates a new Label. Component can be set with [`set_component`](Label::set_component) or [`Components`]
+  /// ```
+  /// # use slashook::structs::components::{Label};
+  /// let label = Label::new("Labeled component");
+  /// assert_eq!(label.label, String::from("Labeled component"));
+  /// ```
   pub fn new<T: ToString>(label: T) -> Self {
     Self {
       component_type: ComponentType::LABEL,
-        id: None,
-        label: label.to_string(),
-        description: None,
-        component: Box::new(Component::Unknown),
+      id: None,
+      label: label.to_string(),
+      description: None,
+      component: Box::new(Component::Unknown),
     }
   }
 
   /// Set the label
+  /// ```
+  /// # use slashook::structs::components::{Label};
+  /// let label = Label::new("Labeled component")
+  ///   .set_label("Different label");
+  /// assert_eq!(label.label, String::from("Different label"));
+  /// ```
   pub fn set_label<T: ToString>(mut self, label: T) -> Self {
     self.label = label.to_string();
     self
@@ -887,6 +1462,14 @@ impl Label {
   }
 
   /// Set the component
+  /// ```
+  /// # use slashook::structs::components::{TextInput, Label, Component};
+  /// let text_input = TextInput::new()
+  ///   .set_id("input");
+  /// let text_input_label = Label::new("Cool text input")
+  ///   .set_component(text_input);
+  /// assert!(matches!(*text_input_label.component, Component::TextInput(_)));
+  /// ```
   pub fn set_component<C: Into<Component>>(mut self, component: C) -> Self {
     self.component = Box::new(component.into());
     self
@@ -914,6 +1497,48 @@ impl From<SelectMenu> for Component {
 impl From<TextInput> for Component {
   fn from(value: TextInput) -> Self {
     Self::TextInput(value)
+  }
+}
+
+impl From<Section> for Component {
+  fn from(value: Section) -> Self {
+    Self::Section(value)
+  }
+}
+
+impl From<TextDisplay> for Component {
+  fn from(value: TextDisplay) -> Self {
+    Self::TextDisplay(value)
+  }
+}
+
+impl From<Thumbnail> for Component {
+  fn from(value: Thumbnail) -> Self {
+    Self::Thumbnail(value)
+  }
+}
+
+impl From<MediaGallery> for Component {
+  fn from(value: MediaGallery) -> Self {
+    Self::MediaGallery(value)
+  }
+}
+
+impl From<File> for Component {
+  fn from(value: File) -> Self {
+    Self::File(value)
+  }
+}
+
+impl From<Separator> for Component {
+  fn from(value: Separator) -> Self {
+    Self::Separator(value)
+  }
+}
+
+impl From<Container> for Component {
+  fn from(value: Container) -> Self {
+    Self::Container(value)
   }
 }
 
@@ -959,6 +1584,36 @@ impl Default for TextInputStyle {
   }
 }
 
+impl Default for Section {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for TextDisplay {
+  fn default() -> Self {
+    Self::new(String::new())
+  }
+}
+
+impl Default for MediaGallery {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for Separator {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for Container {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl From<SelectMenuType> for ComponentType {
   fn from(menu_type: SelectMenuType) -> Self {
     match menu_type {
@@ -999,6 +1654,13 @@ impl<'de> serde::Deserialize<'de> for Component {
       6 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
       7 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
       8 => Component::SelectMenu(Box::new(SelectMenu::deserialize(value).map_err(de::Error::custom)?)),
+      9 => Component::Section(Section::deserialize(value).map_err(de::Error::custom)?),
+      10 => Component::TextDisplay(TextDisplay::deserialize(value).map_err(de::Error::custom)?),
+      11 => Component::Thumbnail(Thumbnail::deserialize(value).map_err(de::Error::custom)?),
+      12 => Component::MediaGallery(MediaGallery::deserialize(value).map_err(de::Error::custom)?),
+      13 => Component::File(File::deserialize(value).map_err(de::Error::custom)?),
+      14 => Component::Separator(Separator::deserialize(value).map_err(de::Error::custom)?),
+      17 => Component::Container(Container::deserialize(value).map_err(de::Error::custom)?),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
