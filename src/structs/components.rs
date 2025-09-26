@@ -203,7 +203,7 @@ pub struct SelectMenu {
   pub min_values: Option<i64>,
   /// The maximum number of items that can be chosen; default 1, max 25
   pub max_values: Option<i64>,
-  /// Whether the string select is required to answer in a modal (defaults to `true`)
+  /// Whether the select menu is required to answer in a modal (defaults to `true`)
   pub required: Option<bool>,
   /// Whether select menu is disabled in a message (defaults to `false`)
   pub disabled: Option<bool>,
