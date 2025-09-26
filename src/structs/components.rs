@@ -185,7 +185,7 @@ pub enum ButtonStyle {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SelectMenu {
   #[serde(rename = "type")]
-  component_type: ComponentType,
+  pub(crate) component_type: ComponentType,
   /// Optional identifier for component
   pub id: Option<i64>,
   /// A developer-defined identifier for the select menu, max 100 characters
