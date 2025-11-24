@@ -57,6 +57,8 @@ pub enum ComponentType {
   CONTAINER = 17,
   /// Container associating a label and description with a component
   LABEL = 18,
+  /// Component for uploading files
+  FILE_UPLOAD = 19,
   /// A component that hasn't been implemented yet
   #[serde(other)]
   UNKNOWN,
@@ -90,6 +92,8 @@ pub enum Component {
   Container(Container),
   /// Container associating a label and description with a component
   Label(Label),
+  /// Component for uploading files
+  FileUpload(FileUpload),
   /// A component that hasn't been implemented yet
   Unknown,
 }
@@ -469,6 +473,25 @@ pub struct Label {
   pub component: Box<Component>,
 }
 
+/// A File Upload component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct FileUpload {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// ID for the file upload; 1-100 characters
+  pub custom_id: String,
+  /// Minimum number of items that must be uploaded (defaults to 1); min 0, max 10
+  pub min_values: Option<i64>,
+  /// Maximum number of items that can be uploaded (defaults to 1); max 10
+  pub max_values: Option<i64>,
+  /// Whether the file upload requires files to be uploaded before submitting the modal (defaults to `true`)
+  pub required: Option<bool>,
+  /// IDs of the uploaded files found in the [resolved data](InteractionDataResolved)
+  pub values: Option<Vec<Snowflake>>,
+}
+
 impl Components {
   /// Creates a new set of components with an Action Row to start off
   pub fn new() -> Self {
@@ -612,6 +635,33 @@ impl Components {
         self.0.push(Component::Label(label));
       },
       _ => panic!("Component is not an Action Row or Label"),
+    }
+
+    self
+  }
+
+  /// Adds a file upload to the last label\
+  /// Note: file uploads are only valid for modals.
+  /// ```
+  /// # use slashook::structs::components::{Components, Label, FileUpload};
+  /// let file_upload = FileUpload::new();
+  /// let components = Components::new_label(Label::new("Attachment"))
+  ///   .add_file_upload(file_upload);
+  /// ```
+  /// ## Panics
+  /// Will panic if the label cannot fit any more file uploads
+  pub fn add_file_upload(mut self, file_upload: FileUpload) -> Self {
+    let component = self.0.pop().expect("No label available");
+
+    match component {
+      Component::Label(mut label) => {
+        let Component::Unknown = *label.component else {
+          panic!("The label can only contain one component.");
+        };
+        label = label.set_component(Component::FileUpload(file_upload));
+        self.0.push(Component::Label(label));
+      },
+      _ => panic!("Component is not a Label"),
     }
 
     self
@@ -765,7 +815,7 @@ impl SelectMenu {
     Self {
       component_type: menu_type.into(),
       id: None,
-      custom_id: String::from(""),
+      custom_id: String::new(),
       options: None,
       channel_types: None,
       placeholder: None,
@@ -963,10 +1013,10 @@ impl TextInput {
     Self {
       component_type: ComponentType::TEXT_INPUT,
       id: None,
-      custom_id: String::from(""),
+      custom_id: String::new(),
       style: TextInputStyle::SHORT,
       #[allow(deprecated)]
-      label: String::from(""),
+      label: String::new(),
       min_length: None,
       max_length: None,
       required: None,
@@ -1476,6 +1526,69 @@ impl Label {
   }
 }
 
+impl FileUpload {
+  /// Creates a new file upload
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::FILE_UPLOAD,
+      id: None,
+      custom_id: String::new(),
+      min_values: None,
+      max_values: None,
+      required: None,
+      values: None,
+    }
+  }
+
+  /// Set the custom ID for a file upload.
+  /// ```
+  /// # use slashook::structs::components::FileUpload;
+  /// let file_upload = FileUpload::new()
+  ///   .set_id("upload");
+  /// assert_eq!(file_upload.custom_id, String::from("upload"));
+  /// ```
+  pub fn set_id<T: ToString>(mut self, id: T) -> Self {
+    self.custom_id = id.to_string();
+    self
+  }
+
+  /// Set the minimum required files for a file upload
+  /// ```
+  /// # use slashook::structs::components::FileUpload;
+  /// let file_upload = FileUpload::new()
+  ///   .set_min_values(1);
+  /// assert_eq!(file_upload.min_values, Some(1));
+  /// ```
+  pub fn set_min_values(mut self, min_values: i64) -> Self {
+    self.min_values = Some(min_values);
+    self
+  }
+
+  /// Set the maximum amount of choices for a select menu
+  /// ```
+  /// # use slashook::structs::components::FileUpload;
+  /// let file_upload = FileUpload::new()
+  ///   .set_max_values(5);
+  /// assert_eq!(file_upload.max_values, Some(5));
+  /// ```
+  pub fn set_max_values(mut self, max_values: i64) -> Self {
+    self.max_values = Some(max_values);
+    self
+  }
+
+  /// Set the required state of the file upload
+  /// ```
+  /// # use slashook::structs::components::FileUpload;
+  /// let file_upload = FileUpload::new()
+  ///   .set_required(false);
+  /// assert_eq!(file_upload.required, Some(false));
+  /// ```
+  pub fn set_required(mut self, required: bool) -> Self {
+    self.required = Some(required);
+    self
+  }
+}
+
 impl From<ActionRow> for Component {
   fn from(value: ActionRow) -> Self {
     Self::ActionRow(value)
@@ -1548,6 +1661,12 @@ impl From<Label> for Component {
   }
 }
 
+impl From<FileUpload> for Component {
+  fn from(value: FileUpload) -> Self {
+    Self::FileUpload(value)
+  }
+}
+
 impl Default for Components {
   fn default() -> Self {
     Self::new()
@@ -1614,6 +1733,12 @@ impl Default for Container {
   }
 }
 
+impl Default for FileUpload {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl From<SelectMenuType> for ComponentType {
   fn from(menu_type: SelectMenuType) -> Self {
     match menu_type {
@@ -1662,6 +1787,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       14 => Component::Separator(Separator::deserialize(value).map_err(de::Error::custom)?),
       17 => Component::Container(Container::deserialize(value).map_err(de::Error::custom)?),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
+      19 => Component::FileUpload(FileUpload::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
   }
