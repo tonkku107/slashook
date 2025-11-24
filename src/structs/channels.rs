@@ -16,7 +16,7 @@ use super::{
   guilds::GuildMember,
   interactions::Attachments,
   invites::{Invite, CreateInviteOptions},
-  messages::{Message, MessageFetchOptions, Attachment},
+  messages::{Message, MessageFetchOptions, Attachment, MessagePin},
   permissions::Permissions,
   users::User,
 };
@@ -371,6 +371,24 @@ pub struct ChannelModifyOptions {
   pub applied_tags: Option<Vec<Snowflake>>,
 }
 
+/// Options for fetching pinned messages
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct PinsListOptions {
+  /// Get messages pinned before this timestamp
+  pub before: Option<DateTime<Utc>>,
+  /// Max number of pins to return (1-50; Defaults to 50)
+  pub limit: Option<i64>,
+}
+
+/// Response from fetching pinned messages
+#[derive(Deserialize, Clone, Debug)]
+pub struct PinsListResponse {
+  /// The pinned messages
+  pub items: Vec<MessagePin>,
+  /// If there are more pinned messages to fetch
+  pub has_more: bool,
+}
+
 /// Options for creating threads
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct ThreadCreateOptions {
@@ -578,16 +596,18 @@ impl Channel {
   /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::PinsListOptions;
   /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let channel = input.channel.unwrap();
-  /// let pinned_messages = channel.get_pinned_messages(&input.rest).await?;
-  /// let ids = pinned_messages.into_iter().map(|m| m.id.unwrap()).collect::<Vec<String>>().join(", ");
+  /// let options = PinsListOptions::new().set_limit(5);
+  /// let pinned_messages = channel.get_pinned_messages(&input.rest, options).await?;
+  /// let ids = pinned_messages.items.into_iter().map(|p| p.message.id.unwrap()).collect::<Vec<String>>().join(", ");
   /// res.send_message(ids).await?;
   /// # }
   /// ```
-  pub async fn get_pinned_messages(&self, rest: &Rest) -> Result<Vec<Message>, RestError> {
-    rest.get(format!("channels/{}/pins", self.id)).await
+  pub async fn get_pinned_messages(&self, rest: &Rest, options: PinsListOptions) -> Result<PinsListResponse, RestError> {
+    rest.get_query(format!("channels/{}/messages/pins", self.id), options).await
   }
 
   /// Pin a message to the channel
@@ -602,7 +622,7 @@ impl Channel {
   /// # }
   /// ```
   pub async fn pin_message<T: ToString>(&self, rest: &Rest, message_id: T) -> Result<(), RestError> {
-    rest.put(format!("channels/{}/pins/{}", self.id, message_id.to_string()), Value::Null).await
+    rest.put(format!("channels/{}/messages/pins/{}", self.id, message_id.to_string()), Value::Null).await
   }
 
   /// Unpin a message from the channel
@@ -617,7 +637,7 @@ impl Channel {
   /// # }
   /// ```
   pub async fn unpin_message<T: ToString>(&self, rest: &Rest, message_id: T) -> Result<(), RestError> {
-    rest.delete(format!("channels/{}/pins/{}", self.id, message_id.to_string())).await
+    rest.delete(format!("channels/{}/messages/pins/{}", self.id, message_id.to_string())).await
   }
 
   /// Starts a thread, forum post or media post in the channel
@@ -916,6 +936,28 @@ impl ChannelModifyOptions {
   /// Sets applied tags
   pub fn set_applied_tags(mut self, tags: Vec<Snowflake>) -> Self {
     self.applied_tags = Some(tags);
+    self
+  }
+}
+
+impl PinsListOptions {
+  /// Creates a new PinsListOptions
+  pub fn new() -> Self {
+    Self {
+      before: None,
+      limit: None,
+    }
+  }
+
+  /// Sets before
+  pub fn set_before(mut self, before: DateTime<Utc>) -> Self {
+    self.before = Some(before);
+    self
+  }
+
+  /// Sets the limit
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
     self
   }
 }

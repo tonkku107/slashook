@@ -440,6 +440,15 @@ pub struct RoleSubscriptionData {
   pub is_renewal: bool,
 }
 
+/// Discord Message Pin Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct MessagePin {
+  /// The time the message was pinned
+  pub pinned_at: DateTime<Utc>,
+  /// The pinned message
+  pub message: Message,
+}
+
 /// Discord Message Call Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct MessageCall {
@@ -752,7 +761,7 @@ impl Message {
       return Err(RestError::InvalidStruct("Message has no id"));
     };
 
-    rest.put(format!("channels/{}/pins/{}", channel_id, id), Value::Null).await
+    rest.put(format!("channels/{}/messages/pins/{}", channel_id, id), Value::Null).await
   }
 
   /// Unpin the message from the channel
@@ -775,7 +784,7 @@ impl Message {
       return Err(RestError::InvalidStruct("Message has no id"));
     };
 
-    rest.delete(format!("channels/{}/pins/{}", channel_id, id)).await
+    rest.delete(format!("channels/{}/messages/pins/{}", channel_id, id)).await
   }
 
   /// Start a thread from the message
