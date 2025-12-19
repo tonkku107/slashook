@@ -314,6 +314,18 @@ impl CommandHandler {
           let (_, custom_id) = select_menu.custom_id.split_once('/').unwrap_or(("", select_menu.custom_id.as_str()));
           input.args.insert(custom_id.to_string(), OptionValue::Values(values));
         },
+        Component::FileUpload(file_upload) => {
+          let mut values = Vec::new();
+          for value in file_upload.values.unwrap_or_default() {
+            values.push(OptionValue::Attachment(
+              resolved.as_ref().context("File upload component provided but no resolved object")?
+              .attachments.as_ref().context("File upload component provided but no resolved attachments object")?
+              .get(&value).context("File upload component provided but no matching resolved attachment found")?
+              .clone()
+            ));
+          }
+          input.args.insert(file_upload.custom_id, OptionValue::Values(values));
+        }
         _ => {}
       }
     }
