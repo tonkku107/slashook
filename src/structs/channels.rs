@@ -291,6 +291,64 @@ pub struct FollowedChannel {
   pub webhook_id: Snowflake,
 }
 
+/// Parameters for creating a channel with [create](Channel::create).
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct ChannelCreateOptions {
+  /// Channel name (1-100 characters)
+  pub name: String,
+  /// The [type of channel](ChannelType)
+  #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
+  pub channel_type: Option<ChannelType>,
+  /// Channel topic (0-1024 characters)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub topic: Option<String>,
+  /// The bitrate (in bits) of the voice or stage channel; min 8000
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub bitrate: Option<i64>,
+  /// The user limit of the voice channel
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub user_limit: Option<i64>,
+  /// Amount of seconds a user has to wait before sending another message (0-21600); bots, as well as users with the permission `manage_messages` or `manage_channel`, are unaffected
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub rate_limit_per_user: Option<i64>,
+  /// Sorting position of the channel (channels with the same position are sorted by id)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub position: Option<i64>,
+  /// The channel’s permission overwrites
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub permission_overwrites: Option<Vec<PermissionOverwrite>>,
+  /// Id of the parent category for a channel
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub parent_id: Option<Snowflake>,
+  /// Whether the channel is [age-restricted](https://support.discord.com/hc/en-us/articles/115000084051)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub nsfw: Option<bool>,
+  /// Channel voice region id of the voice or stage channel, automatic when set to null
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub rtc_region: Option<String>,
+  /// The camera [video quality mode](VideoQualityMode) of the voice channel
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub video_quality_mode: Option<VideoQualityMode>,
+  /// The default duration that the clients use (not the API) for newly created threads in the channel, in minutes, to automatically archive the thread after recent activity
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_auto_archive_duration: Option<i64>,
+  /// Emoji to show in the add reaction button on a thread in a `GUILD_FORUM` or a `GUILD_MEDIA` channel
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_reaction_emoji: Option<DefaultReaction>,
+  /// Set of tags that can be used in a `GUILD_FORUM` or a `GUILD_MEDIA` channel
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub available_tags: Option<Vec<ForumTag>>,
+  /// The [default sort order type](SortOrderType) used to order posts in `GUILD_FORUM` and `GUILD_MEDIA` channels
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_sort_order: Option<SortOrderType>,
+  /// The [default forum layout type](ForumLayoutType) used to display posts in `GUILD_FORUM` channels
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_forum_layout: Option<ForumLayoutType>,
+  /// The initial `rate_limit_per_user` to set on newly created threads in a channel. This field is copied to the thread at creation time and does not live update.
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_thread_rate_limit_per_user: Option<i64>,
+}
+
 /// Parameters for modifying a channel with [modify](Channel::modify).
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct ChannelModifyOptions {
@@ -303,39 +361,39 @@ pub struct ChannelModifyOptions {
   /// The [type of channel](ChannelType); only conversion between text and announcement is supported and only in guilds with the "NEWS" feature
   #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
   pub channel_type: Option<ChannelType>,
-  /// The position of the channel in the left-hand listing
+  /// The position of the channel in the left-hand listing (channels with the same position are sorted by id)
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub position: Option<i64>,
+  pub position: Option<Option<i64>>,
   /// 0-1024 character channel topic (0-4096 characters for `GUILD_FORUM` and `GUILD_MEDIA` channels)
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub topic: Option<String>,
-  /// Whether the channel is nsfw
+  pub topic: Option<Option<String>>,
+  /// Whether the channel is [age-restricted](https://support.discord.com/hc/en-us/articles/115000084051)
   #[serde(skip_serializing_if = "Option::is_none")]
   pub nsfw: Option<bool>,
   /// Amount of seconds a user has to wait before sending another message (0-21600); bots, as well as users with the permission `manage_messages` or `manage_channel`, are unaffected
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub rate_limit_per_user: Option<i64>,
+  pub rate_limit_per_user: Option<Option<i64>>,
   /// The bitrate (in bits) of the voice or stage channel; min 8000
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub bitrate: Option<i64>,
-  /// The user limit of the voice channel; 0 refers to no limit, 1 to 99 refers to a user limit
+  pub bitrate: Option<Option<i64>>,
+  /// The user limit of the voice or stage channel, max 99 for voice channels and 10,000 for stage channels (0 refers to no limit)
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub user_limit: Option<i64>,
+  pub user_limit: Option<Option<i64>>,
   /// Channel or category-specific permissions
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub permission_overwrites: Option<Vec<PermissionOverwrite>>,
+  pub permission_overwrites: Option<Option<Vec<PermissionOverwrite>>>,
   /// Id of the new parent category for a channel
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub parent_id: Option<Snowflake>,
+  pub parent_id: Option<Option<Snowflake>>,
   /// Channel [voice region](https://discord.com/developers/docs/resources/voice#voice-region-object) id, automatic when set to None
   #[serde(skip_serializing_if = "Option::is_none")]
   pub rtc_region: Option<Option<String>>,
   /// The camera [video quality mode](VideoQualityMode) of the voice channel
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub video_quality_mode: Option<VideoQualityMode>,
+  pub video_quality_mode: Option<Option<VideoQualityMode>>,
   /// The default duration that the clients use (not the API) for newly created threads in the channel, in minutes, to automatically archive the thread after recent activity
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub default_auto_archive_duration: Option<i64>,
+  pub default_auto_archive_duration: Option<Option<i64>>,
   /// [Channel flags](ChannelFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field). Currently only `REQUIRE_TAG` and is supported by `GUILD_FORUM` and `GUILD_MEDIA` channels and `PINNED` in threads of those channels. `HIDE_MEDIA_DOWNLOAD_OPTIONS` is supported only by `GUILD_MEDIA` channels
   #[serde(skip_serializing_if = "Option::is_none")]
   pub flags: Option<ChannelFlags>,
@@ -344,13 +402,13 @@ pub struct ChannelModifyOptions {
   pub available_tags: Option<Vec<ForumTag>>,
   /// The emoji to show in the add reaction button on a thread in a `GUILD_FORUM` channel
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub default_reaction_emoji: Option<DefaultReaction>,
+  pub default_reaction_emoji: Option<Option<DefaultReaction>>,
   /// The initial `rate_limit_per_user` to set on newly created threads in a channel. This field is copied to the thread at creation time and does not live update.
   #[serde(skip_serializing_if = "Option::is_none")]
   pub default_thread_rate_limit_per_user: Option<i64>,
   /// The [default sort order type](SortOrderType) used to order posts in `GUILD_FORUM` and `GUILD_MEDIA` channels
   #[serde(skip_serializing_if = "Option::is_none")]
-  pub default_sort_order: Option<SortOrderType>,
+  pub default_sort_order: Option<Option<SortOrderType>>,
   /// The [default forum layout type](ForumLayoutType) used to display posts in `GUILD_FORUM` channels
   #[serde(skip_serializing_if = "Option::is_none")]
   pub default_forum_layout: Option<ForumLayoutType>,
@@ -455,6 +513,21 @@ impl Channel {
     rest.get(format!("channels/{}", channel_id.to_string())).await
   }
 
+  /// Create a new channel in a guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::channels::{Channel, ChannelCreateOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let options = ChannelCreateOptions::new("cool-channel").set_topic("Chat about cool stuff");
+  /// let channel = Channel::create(&input.rest, "613425648685547541", options).await?;
+  /// # }
+  /// ```
+  pub async fn create<T: ToString>(rest: &Rest, guild_id: T, options: ChannelCreateOptions) -> Result<Self, RestError> {
+    rest.post(format!("guilds/{}/channels", guild_id.to_string()), options).await
+  }
+
   /// Edits a channel
   /// ```
   /// # #[macro_use] extern crate slashook;
@@ -463,7 +536,7 @@ impl Channel {
   /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// let channel = Channel::fetch(&input.rest, "613430047285706767").await?;
-  /// let options = ChannelModifyOptions::new().set_topic("Cool channel");
+  /// let options = ChannelModifyOptions::new().set_topic(Some("Cool channel"));
   /// let modified_channel = channel.modify(&input.rest, options).await?;
   /// # }
   /// ```
@@ -755,8 +828,144 @@ impl Channel {
   }
 }
 
+impl ChannelCreateOptions {
+  /// Creates a new `ChannelCreateOptions` with a name
+  pub fn new<T: ToString>(name: T) -> Self {
+    Self {
+      name: name.to_string(),
+      channel_type: None,
+      topic: None,
+      bitrate: None,
+      user_limit: None,
+      rate_limit_per_user: None,
+      position: None,
+      permission_overwrites: None,
+      parent_id: None,
+      nsfw: None,
+      rtc_region: None,
+      video_quality_mode: None,
+      default_auto_archive_duration: None,
+      default_reaction_emoji: None,
+      available_tags: None,
+      default_sort_order: None,
+      default_forum_layout: None,
+      default_thread_rate_limit_per_user: None,
+    }
+  }
+
+  /// Sets the name
+  pub fn set_name<T: ToString>(mut self, name: T) -> Self {
+    self.name = name.to_string();
+    self
+  }
+
+  /// Sets the channel type
+  pub fn set_type(mut self, channel_type: ChannelType) -> Self {
+    self.channel_type = Some(channel_type);
+    self
+  }
+
+  /// Sets the topic
+  pub fn set_topic<T: ToString>(mut self, topic: T) -> Self {
+    self.topic = Some(topic.to_string());
+    self
+  }
+
+  /// Sets the bitrate
+  pub fn set_bitrate(mut self, bitrate: i64) -> Self {
+    self.bitrate = Some(bitrate);
+    self
+  }
+
+  /// Sets the user limit
+  pub fn set_user_limit(mut self, limit: i64) -> Self {
+    self.user_limit = Some(limit);
+    self
+  }
+
+  /// Sets the rate limit per user
+  pub fn set_rate_limit_per_user(mut self, ratelimit: i64) -> Self {
+    self.rate_limit_per_user = Some(ratelimit);
+    self
+  }
+
+  /// Sets the position
+  pub fn set_position(mut self, position: i64) -> Self {
+    self.position = Some(position);
+    self
+  }
+
+  /// Adds a permission overwrite
+  pub fn add_permission_overwrite(mut self, overwrite: PermissionOverwrite) -> Self {
+    let mut overwrites = self.permission_overwrites.unwrap_or_default();
+    overwrites.push(overwrite);
+    self.permission_overwrites = Some(overwrites);
+    self
+  }
+
+  /// Sets the parent id
+  pub fn set_parent_id<T: ToString>(mut self, id: T) -> Self {
+    self.parent_id = Some(id.to_string());
+    self
+  }
+
+  /// Sets nsfw
+  pub fn set_nsfw(mut self, nsfw: bool) -> Self {
+    self.nsfw = Some(nsfw);
+    self
+  }
+
+  /// Sets the RTC region
+  pub fn set_rtc_region(mut self, region: String) -> Self {
+    self.rtc_region = Some(region);
+    self
+  }
+
+  /// Sets the video quality mode
+  pub fn set_video_quality_mode(mut self, mode: VideoQualityMode) -> Self {
+    self.video_quality_mode = Some(mode);
+    self
+  }
+
+  /// Sets the default auto archive duration
+  pub fn set_default_auto_archive_duration(mut self, duration: i64) -> Self {
+    self.default_auto_archive_duration = Some(duration);
+    self
+  }
+
+  /// Sets the default reaction emoji
+  pub fn set_default_reaction_emoji(mut self, emoji: DefaultReaction) -> Self {
+    self.default_reaction_emoji = Some(emoji);
+    self
+  }
+
+  /// Sets available tags
+  pub fn set_available_tags(mut self, tags: Vec<ForumTag>) -> Self {
+    self.available_tags = Some(tags);
+    self
+  }
+
+  /// Sets the default sort order
+  pub fn set_default_sort_order(mut self, sort_order: SortOrderType) -> Self {
+    self.default_sort_order = Some(sort_order);
+    self
+  }
+
+  /// Sets the default forum layout
+  pub fn set_default_forum_layout(mut self, forum_layout: ForumLayoutType) -> Self {
+    self.default_forum_layout = Some(forum_layout);
+    self
+  }
+
+  /// Sets the default thread rate limit per user
+  pub fn set_default_thread_rate_limit_per_user(mut self, ratelimit: i64) -> Self {
+    self.default_thread_rate_limit_per_user = Some(ratelimit);
+    self
+  }
+}
+
 impl ChannelModifyOptions {
-  /// Creates a new empty ChannelModifyOptions
+  /// Creates a new empty `ChannelModifyOptions`
   pub fn new() -> Self {
     Self {
       name: None,
@@ -806,14 +1015,14 @@ impl ChannelModifyOptions {
   }
 
   /// Sets the position
-  pub fn set_position(mut self, position: i64) -> Self {
+  pub fn set_position(mut self, position: Option<i64>) -> Self {
     self.position = Some(position);
     self
   }
 
   /// Sets the topic
-  pub fn set_topic<T: ToString>(mut self, topic: T) -> Self {
-    self.topic = Some(topic.to_string());
+  pub fn set_topic<T: ToString>(mut self, topic: Option<T>) -> Self {
+    self.topic = Some(topic.map(|t| t.to_string()));
     self
   }
 
@@ -824,34 +1033,32 @@ impl ChannelModifyOptions {
   }
 
   /// Sets the rate limit per user
-  pub fn set_rate_limit_per_user(mut self, ratelimit: i64) -> Self {
+  pub fn set_rate_limit_per_user(mut self, ratelimit: Option<i64>) -> Self {
     self.rate_limit_per_user = Some(ratelimit);
     self
   }
 
   /// Sets the bitrate
-  pub fn set_bitrate(mut self, bitrate: i64) -> Self {
+  pub fn set_bitrate(mut self, bitrate: Option<i64>) -> Self {
     self.bitrate = Some(bitrate);
     self
   }
 
   /// Sets the user limit
-  pub fn set_user_limit(mut self, limit: i64) -> Self {
+  pub fn set_user_limit(mut self, limit: Option<i64>) -> Self {
     self.user_limit = Some(limit);
     self
   }
 
-  /// Adds a permission overwrite
-  pub fn add_permission_overwrite(mut self, overwrite: PermissionOverwrite) -> Self {
-    let mut overwrites = self.permission_overwrites.unwrap_or_default();
-    overwrites.push(overwrite);
+  /// Set permission overwrites
+  pub fn set_permission_overwrites(mut self, overwrites: Option<Vec<PermissionOverwrite>>) -> Self {
     self.permission_overwrites = Some(overwrites);
     self
   }
 
   /// Sets the parent id
-  pub fn set_parent_id<T: ToString>(mut self, id: T) -> Self {
-    self.parent_id = Some(id.to_string());
+  pub fn set_parent_id<T: ToString>(mut self, id: Option<T>) -> Self {
+    self.parent_id = Some(id.map(|t| t.to_string()));
     self
   }
 
@@ -862,13 +1069,13 @@ impl ChannelModifyOptions {
   }
 
   /// Sets the video quality mode
-  pub fn set_video_quality_mode(mut self, mode: VideoQualityMode) -> Self {
+  pub fn set_video_quality_mode(mut self, mode: Option<VideoQualityMode>) -> Self {
     self.video_quality_mode = Some(mode);
     self
   }
 
   /// Sets the default auto archive duration
-  pub fn set_default_auto_archive_duration(mut self, duration: i64) -> Self {
+  pub fn set_default_auto_archive_duration(mut self, duration: Option<i64>) -> Self {
     self.default_auto_archive_duration = Some(duration);
     self
   }
@@ -886,7 +1093,7 @@ impl ChannelModifyOptions {
   }
 
   /// Sets the default reaction emoji
-  pub fn set_default_reaction_emoji(mut self, emoji: DefaultReaction) -> Self {
+  pub fn set_default_reaction_emoji(mut self, emoji: Option<DefaultReaction>) -> Self {
     self.default_reaction_emoji = Some(emoji);
     self
   }
@@ -898,7 +1105,7 @@ impl ChannelModifyOptions {
   }
 
   /// Sets the default sort order
-  pub fn set_default_sort_order(mut self, sort_order: SortOrderType) -> Self {
+  pub fn set_default_sort_order(mut self, sort_order: Option<SortOrderType>) -> Self {
     self.default_sort_order = Some(sort_order);
     self
   }
