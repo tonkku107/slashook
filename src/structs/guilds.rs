@@ -7,19 +7,21 @@
 
 //! Structs related to Discord guilds
 
-use serde::{Deserialize, de::Deserializer};
-use serde_repr::Deserialize_repr;
+use serde::{Deserialize, Serialize, ser::Serializer, de::Deserializer};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use chrono::{DateTime, Utc};
 use bitflags::bitflags;
 
 use super::{
+  channels::{Channel, ChannelCreateOptions, ThreadMember},
+  Emoji,
+  Permissions,
   stickers::Sticker,
   users::{User, AvatarDecorationData},
   utils::Color,
-  Emoji,
-  Permissions,
   Snowflake,
 };
+use crate::rest::{Rest, RestError};
 use crate::internal_utils::cdn::pick_format;
 
 /// Discord Guild Object
@@ -41,11 +43,11 @@ pub struct Guild {
   pub owner: Option<bool>,
   /// Id of owner
   pub owner_id: Option<Snowflake>,
-  /// Total permissions for [the user](https://discord.com/developers/docs/resources/user#get-current-user-guilds) in the guild (excludes overwrites)
+  /// Total permissions for [the user](https://discord.com/developers/docs/resources/user#get-current-user-guilds) in the guild (excludes overwrites and [implicit permissions](https://docs.discord.com/developers/topics/permissions#implicit-permissions))
   pub permissions: Option<Permissions>,
   /// Id of afk channel
   pub afk_channel_id: Option<Snowflake>,
-  /// Afk timeout in seconds, can be set to: 60, 300, 900, 1800, 3600
+  /// Afk timeout in seconds
   pub afk_timeout: Option<i64>,
   /// True if the server widget is enabled
   pub widget_enabled: Option<bool>,
@@ -53,8 +55,8 @@ pub struct Guild {
   pub widget_channel_id: Option<Snowflake>,
   /// [Verification level](VerificationLevel) required for the guild
   pub verification_level: Option<VerificationLevel>,
-  /// Default [message notifications level](MessageNotificationsLevel)
-  pub default_message_notifications: Option<MessageNotificationsLevel>,
+  /// Default [message notifications level](MessageNotificationLevel)
+  pub default_message_notifications: Option<MessageNotificationLevel>,
   /// [Explicit content filter level](ExplicitContentFilterLevel)
   pub explicit_content_filter: Option<ExplicitContentFilterLevel>,
   /// Roles in the guild
@@ -95,13 +97,13 @@ pub struct Guild {
   pub max_video_channel_users: Option<i64>,
   /// The maximum amount of users in a stage video channel
   pub max_stage_video_channel_users: Option<i64>,
-  /// Approximate number of members in this guild, returned from the `GET /guilds/<id>` endpoint when `with_counts` is `true`
+  /// Approximate number of members in this guild, returned from the `GET /guilds/<id>` and `/users/@me/guilds` endpoints when `with_counts` is `true`
   pub approximate_member_count: Option<i64>,
-  /// Approximate number of non-offline members in this guild, returned from the `GET /guilds/<id>` endpoint when `with_counts` is `true`
+  /// Approximate number of non-offline members in this guild, returned from the `GET /guilds/<id>` and `/users/@me/guilds` endpoints when `with_counts` is `true`
   pub approximate_presence_count: Option<i64>,
   /// The welcome screen of a Community guild, shown to new members, returned in an [Invite](super::invites::Invite)'s guild object
   pub welcome_screen: Option<WelcomeScreen>,
-  /// [Guild NSFW level](NSFWLevel)
+  /// [Guild age-restriction level](NSFWLevel)
   pub nsfw_level: Option<NSFWLevel>,
   /// Custom guild stickers
   pub stickers: Option<Vec<Sticker>>,
@@ -113,8 +115,35 @@ pub struct Guild {
   pub incidents_data: Option<GuildIncidentsData>,
 }
 
+/// Discord Guild Preview Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildPreview {
+  /// Guild id
+  pub id: Snowflake,
+  /// Guild name (2-100 characters)
+  pub name: String,
+  /// [Icon hash](https://discord.com/developers/docs/reference#image-formatting)
+  pub icon: Option<String>,
+  /// [Splash hash](https://discord.com/developers/docs/reference#image-formatting)
+  pub splash: Option<String>,
+  /// [Discovery splash hash](https://discord.com/developers/docs/reference#image-formatting)
+  pub discovery_splash: Option<String>,
+  /// Custom guild emojis
+  pub emojis: Vec<Emoji>,
+  /// Enabled guild features
+  pub features: Vec<String>,
+  /// Approximate number of members in this guild
+  pub approximate_member_count: i64,
+  /// Approximate number of online members in this guild
+  pub approximate_presence_count: i64,
+  /// The description for the guild
+  pub description: Option<String>,
+  /// Custom guild stickers
+  pub stickers: Vec<Sticker>,
+}
+
 /// Discord Verification Levels
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum VerificationLevel {
@@ -134,10 +163,10 @@ pub enum VerificationLevel {
 }
 
 /// Discord Message Notifications Level
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
-pub enum MessageNotificationsLevel {
+pub enum MessageNotificationLevel {
   /// Members will receive notifications for all messages by default
   ALL_MESSAGES = 0,
   /// Members will receive notifications only for messages that @mention them by default
@@ -148,7 +177,7 @@ pub enum MessageNotificationsLevel {
 }
 
 /// Discord Explicit Content Filter Level
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum ExplicitContentFilterLevel {
@@ -585,9 +614,201 @@ pub enum EventRecurrenceRuleMonth {
   UNKNOWN,
 }
 
+/// Options for fetching a guild
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct GuildFetchOptions {
+  /// when `true`, will return approximate member and presence counts for the guild
+  pub with_counts: Option<bool>,
+}
+
+/// Parameters for modifying a guild with [modify](Guild::modify)
+#[derive(Serialize, Default, Clone, Debug)]
+pub struct GuildModifyOptions {
+  /// Guild name
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub name: Option<String>,
+  /// [Verification level](VerificationLevel)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub verification_level: Option<VerificationLevel>,
+  /// Default [message notification level](MessageNotificationLevel)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_message_notifications: Option<MessageNotificationLevel>,
+  /// [Explicit content filter level](ExplicitContentFilterLevel)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub explicit_content_filter: Option<ExplicitContentFilterLevel>,
+  /// Id for afk channel
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub afk_channel_id: Option<Option<Snowflake>>,
+  /// afk timeout in seconds, can be set to: 60, 300, 900, 1800, 3600
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub afk_timeout: Option<i64>,
+  /// base64 1024x1024 png/jpeg/gif image for the guild icon (can be animated gif when the server has the `ANIMATED_ICON` feature)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub icon: Option<Option<String>>,
+  /// base64 16:9 png/jpeg image for the guild splash (when the server has the `INVITE_SPLASH` feature)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub splash: Option<Option<String>>,
+  /// base64 16:9 png/jpeg image for the guild discovery splash (when the server has the `DISCOVERABLE` feature)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub discovery_splash: Option<Option<String>>,
+  /// base64 16:9 png/jpeg image for the guild banner (when the server has the `BANNER` feature; can be animated gif when the server has the `ANIMATED_BANNER` feature)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub banner: Option<Option<String>>,
+  /// The id of the channel where guild notices such as welcome messages and boost events are posted
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub system_channel_id: Option<Option<Snowflake>>,
+  /// [System channel flags](SystemChannelFlags)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub system_channel_flags: Option<SystemChannelFlags>,
+  /// The id of the channel where Community guilds display rules and/or guidelines
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub rules_channel_id: Option<Option<Snowflake>>,
+  /// The id of the channel where admins and moderators of Community guilds receive notices from Discord
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub public_updates_channel_id: Option<Option<Snowflake>>,
+  /// The preferred [locale](https://docs.discord.com/developers/reference#locales) of a Community guild used in server discovery and notices from Discord; defaults to “en-US”
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub preferred_locale: Option<Option<String>>,
+  /// Enabled guild features
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub features: Option<Vec<String>>,
+  /// The description for the guild
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub description: Option<Option<String>>,
+  /// Whether the guild’s boost progress bar should be enabled
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub premium_progress_bar_enabled: Option<bool>,
+  /// The id of the channel where admins and moderators of Community guilds receive safety alerts from Discord
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub safety_alerts_channel_id: Option<Option<Snowflake>>,
+}
+
+/// Options for modifying channel positions with [modify_channel_positions](Guild::modify_channel_positions)
+#[derive(Serialize, Clone, Debug)]
+pub struct GuildChannelModifyPositionOptions {
+  /// Channel id
+  pub id: Snowflake,
+  /// Sorting position of the channel (channels with the same position are sorted by id)
+  pub position: Option<i64>,
+  /// Syncs the permission overwrites with the new parent, if moving to a new category
+  pub lock_permissions: Option<bool>,
+  /// The new parent ID for the channel that is moved
+  pub parent_id: Option<Snowflake>,
+}
+
+/// Response from fetching active threads
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildListThreadsResponse {
+  /// The active threads
+  pub threads: Vec<Channel>,
+  /// A thread member object for each returned thread the current user has joined
+  pub members: Vec<ThreadMember>,
+}
+
 fn exists<'de, D: Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
   serde_json::Value::deserialize(d)?;
   Ok(true)
+}
+
+impl Guild {
+  /// Fetch a guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let options = GuildFetchOptions::new().set_with_counts(true);
+  /// let guild = Guild::fetch(&input.rest, "613425648685547541", options).await?;
+  /// # }
+  /// ```
+  pub async fn fetch<T: ToString>(rest: &Rest, guild_id: T, options: GuildFetchOptions) -> Result<Self, RestError> {
+    rest.get_query(format!("guilds/{}", guild_id.to_string()), options).await
+  }
+
+  /// Get a preview for a guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::Guild;
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let preview = Guild::get_preview(&input.rest, "613425648685547541").await?;
+  /// # }
+  /// ```
+  pub async fn get_preview<T: ToString>(rest: &Rest, guild_id: T) -> Result<GuildPreview, RestError> {
+    rest.get(format!("guilds/{}/preview", guild_id.to_string())).await
+  }
+
+  /// Modify a guild's settings
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildModifyOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = GuildModifyOptions::new().set_name("Cool server");
+  /// let modified_guild = guild.modify(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn modify(&self, rest: &Rest, options: GuildModifyOptions) -> Result<Self, RestError> {
+    rest.patch(format!("guilds/{}", self.id), options).await
+  }
+
+  /// Get the channels in the guild. Does not include threads
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let channels = guild.get_channels(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn get_channels(&self, rest: &Rest) -> Result<Vec<Channel>, RestError> {
+    rest.get(format!("guilds/{}/channels", self.id)).await
+  }
+
+  /// Create a new channel in this guild\
+  /// See also [`Channel::create`]
+  pub async fn create_channel(&self, rest: &Rest, options: ChannelCreateOptions) -> Result<Channel, RestError> {
+    Channel::create(rest, &self.id, options).await
+  }
+
+  /// Modify the positions of channels
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildChannelModifyPositionOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = GuildChannelModifyPositionOptions::new("1130595287078015027")
+  ///   .set_position(1)
+  ///   .set_parent_id("696891020146638868");
+  /// let modified_guild = guild.modify_channel_positions(&input.rest, vec![options]).await?;
+  /// # }
+  /// ```
+  pub async fn modify_channel_positions(&self, rest: &Rest, options: Vec<GuildChannelModifyPositionOptions>) -> Result<(), RestError> {
+    rest.patch(format!("guilds/{}/channels", self.id), options).await
+  }
+
+  /// List active threads in guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildChannelModifyPositionOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let threads = guild.list_active_threads(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn list_active_threads(&self, rest: &Rest) -> Result<GuildListThreadsResponse, RestError> {
+    rest.get(format!("guilds/{}/threads/active", self.id)).await
+  }
 }
 
 impl GuildMember {
@@ -630,10 +851,202 @@ impl GuildMember {
   }
 }
 
+impl GuildFetchOptions {
+  /// Creates a new empty `GuildFetchOptions`
+  pub fn new() -> Self {
+    Self {
+      with_counts: None
+    }
+  }
+
+  /// Choose whether you want approximate member and presence counts included
+  pub fn set_with_counts(mut self, with_counts: bool) -> Self {
+    self.with_counts = Some(with_counts);
+    self
+  }
+}
+
+impl GuildModifyOptions {
+  /// Creates a new empty `GuildModifyOptions`
+  pub fn new() -> Self {
+    Self {
+      name: None,
+      verification_level: None,
+      default_message_notifications: None,
+      explicit_content_filter: None,
+      afk_channel_id: None,
+      afk_timeout: None,
+      icon: None,
+      splash: None,
+      discovery_splash: None,
+      banner: None,
+      system_channel_id: None,
+      system_channel_flags: None,
+      rules_channel_id: None,
+      public_updates_channel_id: None,
+      preferred_locale: None,
+      features: None,
+      description: None,
+      premium_progress_bar_enabled: None,
+      safety_alerts_channel_id: None,
+    }
+  }
+
+  /// Set the name
+  pub fn set_name<T: ToString>(mut self, name: T) -> Self {
+    self.name = Some(name.to_string());
+    self
+  }
+
+  /// Set the verification level
+  pub fn set_verification_level(mut self, verification_level: VerificationLevel) -> Self {
+    self.verification_level = Some(verification_level);
+    self
+  }
+
+  /// Set the default message notification level
+  pub fn set_default_message_notifications(mut self, default_message_notifications: MessageNotificationLevel) -> Self {
+    self.default_message_notifications = Some(default_message_notifications);
+    self
+  }
+
+  /// Set the explicit content filter
+  pub fn set_explicit_content_filter(mut self, explicit_content_filter: ExplicitContentFilterLevel) -> Self {
+    self.explicit_content_filter = Some(explicit_content_filter);
+    self
+  }
+
+  /// Set the afk channel ID
+  pub fn set_afk_channel_id<T: ToString>(mut self, afk_channel_id: Option<T>) -> Self {
+    self.afk_channel_id = Some(afk_channel_id.map(|t| t.to_string()));
+    self
+  }
+
+  /// Set the afk timeout
+  pub fn set_afk_timeout(mut self, afk_timeout: i64) -> Self {
+    self.afk_timeout = Some(afk_timeout);
+    self
+  }
+
+  /// Set the icon
+  pub fn set_icon<T: ToString>(mut self, icon: Option<T>) -> Self {
+    self.icon = Some(icon.map(|t| t.to_string()));
+    self
+  }
+
+  /// Set the splash
+  pub fn set_splash<T: ToString>(mut self, splash: Option<T>) -> Self {
+    self.splash = Some(splash.map(|t| t.to_string()));
+    self
+  }
+
+  /// Set the discovery splash
+  pub fn set_discovery_splash<T: ToString>(mut self, discovery_splash: Option<T>) -> Self {
+    self.discovery_splash = Some(discovery_splash.map(|t| t.to_string()));
+    self
+  }
+
+  /// Set the banner
+  pub fn set_banner<T: ToString>(mut self, banner: Option<T>) -> Self {
+    self.banner = Some(banner.map(|t| t.to_string()));
+    self
+  }
+
+  /// Set the system channel ID
+  pub fn set_system_channel_id<T: ToString>(mut self, system_channel_id: Option<T>) -> Self {
+    self.system_channel_id = Some(system_channel_id.map(|t| t.to_string()));
+    self
+  }
+
+  /// Set the system channel flags
+  pub fn set_system_channel_flags(mut self, flags: SystemChannelFlags) -> Self {
+    self.system_channel_flags = Some(flags);
+    self
+  }
+
+  /// Set the rules channel ID
+  pub fn set_rules_channel_id<T: ToString>(mut self, rules_channel_id: Option<T>) -> Self {
+    self.rules_channel_id = Some(rules_channel_id.map(|t| t.to_string()));
+    self
+  }
+
+  /// Set the public updates channel ID
+  pub fn set_public_updates_channel_id<T: ToString>(mut self, public_updates_channel_id: Option<T>) -> Self {
+    self.public_updates_channel_id = Some(public_updates_channel_id.map(|t| t.to_string()));
+    self
+  }
+
+  /// Set the preferred locale
+  pub fn set_preferred_locale<T: ToString>(mut self, preferred_locale: Option<T>) -> Self {
+    self.preferred_locale = Some(preferred_locale.map(|t| t.to_string()));
+    self
+  }
+
+  /// Set the features
+  pub fn set_features(mut self, features: Vec<String>) -> Self {
+    self.features = Some(features);
+    self
+  }
+
+  /// Set the description
+  pub fn set_description<T: ToString>(mut self, description: Option<T>) -> Self {
+    self.description = Some(description.map(|t| t.to_string()));
+    self
+  }
+
+  /// Set whether the premium progress bar is enabled
+  pub fn set_premium_progress_bar_enabled(mut self, enabled: bool) -> Self {
+    self.premium_progress_bar_enabled = Some(enabled);
+    self
+  }
+
+  /// Set the safety alerts channel ID
+  pub fn set_safety_alerts_channel_id<T: ToString>(mut self, safety_alerts_channel_id: Option<T>) -> Self {
+    self.safety_alerts_channel_id = Some(safety_alerts_channel_id.map(|t| t.to_string()));
+    self
+  }
+}
+
+impl GuildChannelModifyPositionOptions {
+  /// Creates a new `GuildChannelModifyPositionOptions` with a channel id
+  pub fn new<T: ToString>(id: T) -> Self {
+    Self {
+      id: id.to_string(),
+      position: None,
+      lock_permissions: None,
+      parent_id: None
+    }
+  }
+
+  /// Set the position
+  pub fn set_position(mut self, position: i64) -> Self {
+    self.position = Some(position);
+    self
+  }
+
+  /// Set whether permissions are locked
+  pub fn set_lock_permissions(mut self, lock: bool) -> Self {
+    self.lock_permissions = Some(lock);
+    self
+  }
+
+  /// Set the parent ID
+  pub fn set_parent_id<T: ToString>(mut self, parent_id: T) -> Self {
+    self.parent_id = Some(parent_id.to_string());
+    self
+  }
+}
+
 impl<'de> Deserialize<'de> for SystemChannelFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
     Ok(Self::from_bits_retain(bits))
+  }
+}
+
+impl Serialize for SystemChannelFlags {
+  fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_u32(self.bits())
   }
 }
 
