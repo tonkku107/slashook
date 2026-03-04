@@ -15,6 +15,7 @@ use bitflags::bitflags;
 use super::{
   channels::{Channel, ChannelCreateOptions, ThreadMember},
   Emoji,
+  members::GuildMember,
   Permissions,
   stickers::Sticker,
   users::User,
@@ -562,7 +563,7 @@ pub struct GuildFetchOptions {
   pub with_counts: Option<bool>,
 }
 
-/// Parameters for modifying a guild with [modify](Guild::modify)
+/// Parameters for modifying a guild with [`Guild::modify`]
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct GuildModifyOptions {
   /// Guild name
@@ -624,16 +625,19 @@ pub struct GuildModifyOptions {
   pub safety_alerts_channel_id: Option<Option<Snowflake>>,
 }
 
-/// Options for modifying channel positions with [modify_channel_positions](Guild::modify_channel_positions)
+/// Options for modifying channel positions with [`modify_channel_positions`](Guild::modify_channel_positions)
 #[derive(Serialize, Clone, Debug)]
 pub struct GuildChannelModifyPositionOptions {
   /// Channel id
   pub id: Snowflake,
   /// Sorting position of the channel (channels with the same position are sorted by id)
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub position: Option<i64>,
   /// Syncs the permission overwrites with the new parent, if moving to a new category
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub lock_permissions: Option<bool>,
   /// The new parent ID for the channel that is moved
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub parent_id: Option<Snowflake>,
 }
 
@@ -644,6 +648,36 @@ pub struct GuildListThreadsResponse {
   pub threads: Vec<Channel>,
   /// A thread member object for each returned thread the current user has joined
   pub members: Vec<ThreadMember>,
+}
+
+/// Options for listing guild members with [`list_members`](Guild::list_members)
+#[derive(Serialize, Clone, Debug)]
+pub struct GuildMemberListOptions {
+  /// max number of members to return (1-1000); default 1
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub limit: Option<i64>,
+  /// The highest user id in the previous page
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub after: Option<Snowflake>,
+}
+
+/// Options for adding a guild member with [`add_member`](Guild::add_member)
+#[derive(Serialize, Clone, Debug)]
+pub struct GuildMemberAddOptions {
+  /// An oauth2 access token granted with the `guilds.join` to the bot’s application for the user you want to add to the guild
+  pub access_token: String,
+  /// Value to set user’s nickname to
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub nick: Option<String>,
+  /// Array of role ids the member is assigned
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub roles: Option<Vec<Snowflake>>,
+  /// Whether the user is muted in voice channels
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub mute: Option<bool>,
+  /// Whether the user is deafened in voice channels
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub deaf: Option<bool>,
 }
 
 fn exists<'de, D: Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
@@ -740,7 +774,7 @@ impl Guild {
   /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
-  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildChannelModifyPositionOptions};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
   /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
@@ -749,6 +783,45 @@ impl Guild {
   /// ```
   pub async fn list_active_threads(&self, rest: &Rest) -> Result<GuildListThreadsResponse, RestError> {
     rest.get(format!("guilds/{}/threads/active", self.id)).await
+  }
+
+  /// Get a member in the guild\
+  /// See also [`GuildMember::fetch`]
+  pub async fn get_member<T: ToString>(&self, rest: &Rest, user_id: T) -> Result<GuildMember, RestError> {
+    GuildMember::fetch(rest, &self.id, user_id).await
+  }
+
+  /// List members in the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildMemberListOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = GuildMemberListOptions::new().set_limit(50);
+  /// let members = guild.list_members(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn list_members(&self, rest: &Rest, options: GuildMemberListOptions) -> Result<Vec<GuildMember>, RestError> {
+    rest.get_query(format!("guilds/{}/members", self.id), options).await
+  }
+
+  /// Add a member to the guild. Requires prior oauth2 authorization
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildMemberAddOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// # let access_token = String::from("somewhere_prior");
+  /// let options = GuildMemberAddOptions::new(access_token).set_nick("Noob");
+  /// let member = guild.add_member(&input.rest, "933795693162799156", options).await?;
+  /// # }
+  /// ```
+  pub async fn add_member<T: ToString>(&self, rest: &Rest, user_id: T, options: GuildMemberAddOptions) -> Result<GuildMember, RestError> {
+    rest.put(format!("guilds/{}/members/{}", self.id, user_id.to_string()), options).await
   }
 }
 
@@ -935,6 +1008,73 @@ impl GuildChannelModifyPositionOptions {
   pub fn set_parent_id<T: ToString>(mut self, parent_id: T) -> Self {
     self.parent_id = Some(parent_id.to_string());
     self
+  }
+}
+
+impl GuildMemberListOptions {
+  /// Creates a new empty `GuildMemberListOptions`
+  pub fn new() -> Self {
+    Self {
+      limit: None,
+      after: None
+    }
+  }
+
+  /// Set the limit
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+
+  /// Set the after
+  pub fn set_after(mut self, after: Snowflake) -> Self {
+    self.after = Some(after);
+    self
+  }
+}
+
+impl GuildMemberAddOptions {
+  /// Creates a new `GuildMemberAddOptions` with an `access_token`
+  pub fn new(access_token: String) -> Self {
+    Self {
+      access_token,
+      nick: None,
+      roles: None,
+      mute: None,
+      deaf: None,
+    }
+  }
+
+  /// Set the nickname
+  pub fn set_nick<T: ToString>(mut self, nick: T) -> Self {
+    self.nick = Some(nick.to_string());
+    self
+  }
+
+  /// Add a role
+  pub fn add_role<T: ToString>(mut self, role_id: T) -> Self {
+    let mut roles = self.roles.unwrap_or_default();
+    roles.push(role_id.to_string());
+    self.roles = Some(roles);
+    self
+  }
+
+  /// Set mute
+  pub fn set_mute(mut self, mute: bool) -> Self {
+    self.mute = Some(mute);
+    self
+  }
+
+  /// Set deaf
+  pub fn set_deaf(mut self, deaf: bool) -> Self {
+    self.deaf = Some(deaf);
+    self
+  }
+}
+
+impl Default for GuildMemberListOptions {
+  fn default() -> Self {
+    Self::new()
   }
 }
 
