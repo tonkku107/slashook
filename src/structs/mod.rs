@@ -21,6 +21,7 @@ pub mod events;
 pub mod guilds;
 pub mod interactions;
 pub mod invites;
+pub mod members;
 pub mod messages;
 pub mod monetization;
 mod permissions;

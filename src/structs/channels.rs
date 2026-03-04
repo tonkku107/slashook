@@ -13,9 +13,9 @@ use serde_repr::{Deserialize_repr, Serialize_repr};
 use serde_json::{Value, json};
 use super::{
   Snowflake,
-  guilds::GuildMember,
   interactions::Attachments,
   invites::{Invite, CreateInviteOptions},
+  members::GuildMember,
   messages::{Message, MessageFetchOptions, Attachment, MessagePin},
   permissions::Permissions,
   users::User,
