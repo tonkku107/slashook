@@ -17,7 +17,8 @@ use crate::internal_utils::cdn::pick_format;
 use crate::rest::{Rest, RestError};
 use super::{
   channels::Channel,
-  guilds::{Guild, GuildMember},
+  guilds::Guild,
+  members::GuildMember,
   Snowflake,
 };
 

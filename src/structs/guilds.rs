@@ -15,14 +15,14 @@ use bitflags::bitflags;
 use super::{
   channels::{Channel, ChannelCreateOptions, ThreadMember},
   Emoji,
+  members::GuildMember,
   Permissions,
   stickers::Sticker,
-  users::{User, AvatarDecorationData},
+  users::User,
   utils::Color,
   Snowflake,
 };
 use crate::rest::{Rest, RestError};
-use crate::internal_utils::cdn::pick_format;
 
 /// Discord Guild Object
 #[derive(Deserialize, Clone, Debug)]
@@ -296,64 +296,6 @@ pub struct GuildIncidentsData {
   pub raid_detected_at: Option<DateTime<Utc>>,
 }
 
-/// Discord Guild Member Object
-#[derive(Deserialize, Clone, Debug)]
-pub struct GuildMember {
-  /// The user this guild member represents
-  pub user: Option<User>,
-  /// This users guild nickname
-  pub nick: Option<String>,
-  /// The member's [guild avatar hash](https://discord.com/developers/docs/reference#image-formatting)
-  pub avatar: Option<String>,
-  /// The member's [guild banner hash](https://discord.com/developers/docs/reference#image-formatting)
-  pub banner: Option<String>,
-  /// Array of [role](Role) object ids
-  pub roles: Vec<Snowflake>,
-  /// When the user joined the guild
-  pub joined_at: DateTime<Utc>,
-  /// When the user started [boosting](https://support.discord.com/hc/en-us/articles/360028038352-Server-Boosting-) the guild
-  pub premium_since: Option<DateTime<Utc>>,
-  /// Whether the user is deafened in voice channels
-  pub deaf: Option<bool>,
-  /// Whether the user is muted in voice channels
-  pub mute: Option<bool>,
-  /// [Guild member flags](GuildMemberFlags) represented as a bit set, defaults to 0
-  pub flags: GuildMemberFlags,
-  /// Whether the user has not yet passed the guild's [Membership Screening](https://discord.com/developers/docs/resources/guild#membership-screening-object) requirements
-  pub pending: Option<bool>,
-  /// Total permissions of the member in the channel, including overwrites, returned when in the interaction object
-  pub permissions: Option<Permissions>,
-  /// When the user's [timeout](https://support.discord.com/hc/en-us/articles/4413305239191-Time-Out-FAQ) will expire and the user will be able to communicate in the guild again, None or a time in the past if the user is not timed out
-  pub communication_disabled_until: Option<DateTime<Utc>>,
-  /// Data for the member's guild avatar decoration
-  pub avatar_decoration_data: Option<AvatarDecorationData>,
-}
-
-bitflags! {
-  /// Discord Guild Member Flags
-  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
-  pub struct GuildMemberFlags: u32 {
-    /// Member has left and rejoined the guild
-    const DID_REJOIN = 1 << 0;
-    /// Member has completed onboarding
-    const COMPLETED_ONBOARDING = 1 << 1;
-    /// Member is exempt from guild verification requirements
-    const BYPASSES_VERIFICATION = 1 << 2;
-    /// Member has started onboarding
-    const STARTED_ONBOARDING = 1 << 3;
-    /// Member is a guest and can only access the voice channel they were invited to
-    const IS_GUEST = 1 << 4;
-    /// Member has started Server Guide new member actions
-    const STARTED_HOME_ACTIONS = 1 << 5;
-    /// Member has completed Server Guide new member actions
-    const COMPLETED_HOME_ACTIONS = 1 << 6;
-    /// Member's username, display name, or nickname is blocked by AutoMod
-    const AUTOMOD_QUARANTINED_USERNAME = 1 << 7;
-    /// Member has dismissed the DM settings upsell
-    const DM_SETTINGS_UPSELL_ACKNOWLEDGED = 1 << 8;
-  }
-}
-
 /// Discord Role Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct Role {
@@ -621,7 +563,7 @@ pub struct GuildFetchOptions {
   pub with_counts: Option<bool>,
 }
 
-/// Parameters for modifying a guild with [modify](Guild::modify)
+/// Parameters for modifying a guild with [`Guild::modify`]
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct GuildModifyOptions {
   /// Guild name
@@ -683,16 +625,19 @@ pub struct GuildModifyOptions {
   pub safety_alerts_channel_id: Option<Option<Snowflake>>,
 }
 
-/// Options for modifying channel positions with [modify_channel_positions](Guild::modify_channel_positions)
+/// Options for modifying channel positions with [`modify_channel_positions`](Guild::modify_channel_positions)
 #[derive(Serialize, Clone, Debug)]
 pub struct GuildChannelModifyPositionOptions {
   /// Channel id
   pub id: Snowflake,
   /// Sorting position of the channel (channels with the same position are sorted by id)
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub position: Option<i64>,
   /// Syncs the permission overwrites with the new parent, if moving to a new category
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub lock_permissions: Option<bool>,
   /// The new parent ID for the channel that is moved
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub parent_id: Option<Snowflake>,
 }
 
@@ -703,6 +648,36 @@ pub struct GuildListThreadsResponse {
   pub threads: Vec<Channel>,
   /// A thread member object for each returned thread the current user has joined
   pub members: Vec<ThreadMember>,
+}
+
+/// Options for listing guild members with [`list_members`](Guild::list_members)
+#[derive(Serialize, Clone, Debug)]
+pub struct GuildMemberListOptions {
+  /// max number of members to return (1-1000); default 1
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub limit: Option<i64>,
+  /// The highest user id in the previous page
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub after: Option<Snowflake>,
+}
+
+/// Options for adding a guild member with [`add_member`](Guild::add_member)
+#[derive(Serialize, Clone, Debug)]
+pub struct GuildMemberAddOptions {
+  /// An oauth2 access token granted with the `guilds.join` to the bot’s application for the user you want to add to the guild
+  pub access_token: String,
+  /// Value to set user’s nickname to
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub nick: Option<String>,
+  /// Array of role ids the member is assigned
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub roles: Option<Vec<Snowflake>>,
+  /// Whether the user is muted in voice channels
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub mute: Option<bool>,
+  /// Whether the user is deafened in voice channels
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub deaf: Option<bool>,
 }
 
 fn exists<'de, D: Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
@@ -799,7 +774,7 @@ impl Guild {
   /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
-  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildChannelModifyPositionOptions};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
   /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
@@ -809,45 +784,44 @@ impl Guild {
   pub async fn list_active_threads(&self, rest: &Rest) -> Result<GuildListThreadsResponse, RestError> {
     rest.get(format!("guilds/{}/threads/active", self.id)).await
   }
-}
 
-impl GuildMember {
-  /// Get the url for the per-server member avatar. `None` if the member has no server-specific avatar
-  pub fn avatar_url<T: ToString, U: ToString, V: ToString, W: ToString, X: ToString>(&self, guild_id: T, user_id: U, static_format: V, animated_format: Option<W>, size: X) -> Option<String> {
-    self.avatar.as_deref().map(|a| {
-      let (format, animated) = pick_format(a, static_format.to_string(), animated_format.map(|f| f.to_string()));
-      format!("https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size={}&animated={}", guild_id.to_string(), user_id.to_string(), a, format, size.to_string(), animated)
-    })
+  /// Get a member in the guild\
+  /// See also [`GuildMember::fetch`]
+  pub async fn get_member<T: ToString>(&self, rest: &Rest, user_id: T) -> Result<GuildMember, RestError> {
+    GuildMember::fetch(rest, &self.id, user_id).await
   }
 
-  /// Get the url for the per-server member banner. `None` if the member has no server-specific banner
-  pub fn banner_url<T: ToString, U: ToString, V: ToString, W: ToString, X: ToString>(&self, guild_id: T, user_id: U, static_format: V, animated_format: Option<W>, size: X) -> Option<String> {
-    self.banner.as_deref().map(|b| {
-      let (format, animated) = pick_format(b, static_format.to_string(), animated_format.map(|f| f.to_string()));
-      format!("https://cdn.discordapp.com/guilds/{}/users/{}/banners/{}.{}?size={}&animated={}", guild_id.to_string(), user_id.to_string(), b, format, size.to_string(), animated)
-    })
+  /// List members in the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildMemberListOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = GuildMemberListOptions::new().set_limit(50);
+  /// let members = guild.list_members(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn list_members(&self, rest: &Rest, options: GuildMemberListOptions) -> Result<Vec<GuildMember>, RestError> {
+    rest.get_query(format!("guilds/{}/members", self.id), options).await
   }
 
-  /// Get the url for the member avatar that would be displayed in app.\
-  /// **NOTE:** Will return `None` if `user` in the `GuildMember` is `None`. Use [`User::display_avatar_url_with_member`] if you want to make sure you get the correct avatar.
-  pub fn display_avatar_url<T: ToString, U: ToString, V: ToString, W: ToString>(&self, guild_id: T, static_format: U, animated_format: Option<V>, size: W) -> Option<String> {
-    let Some(user) = &self.user else {
-      return None;
-    };
-
-    self.avatar_url(guild_id, &user.id, static_format.to_string(), animated_format.as_ref().map(|f| f.to_string()), size.to_string())
-      .or_else(|| Some(user.display_avatar_url(static_format, animated_format, size)))
-  }
-
-  /// Get the url for the member banner that would be displayed in app. `None` if no banner is set.\
-  /// **NOTE:** Will return `None` if `user` in the `GuildMember` is `None`. Use [`User::display_banner_url_with_member`] if you want to make sure you get the correct banner.
-  pub fn display_banner_url<T: ToString, U: ToString, V: ToString, W: ToString>(&self, guild_id: T, static_format: U, animated_format: Option<V>, size: W) -> Option<String> {
-    let Some(user) = &self.user else {
-      return None;
-    };
-
-    self.banner_url(guild_id, &user.id, static_format.to_string(), animated_format.as_ref().map(|f| f.to_string()), size.to_string())
-      .or_else(|| user.banner_url(static_format, animated_format, size))
+  /// Add a member to the guild. Requires prior oauth2 authorization
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildMemberAddOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// # let access_token = String::from("somewhere_prior");
+  /// let options = GuildMemberAddOptions::new(access_token).set_nick("Noob");
+  /// let member = guild.add_member(&input.rest, "933795693162799156", options).await?;
+  /// # }
+  /// ```
+  pub async fn add_member<T: ToString>(&self, rest: &Rest, user_id: T, options: GuildMemberAddOptions) -> Result<GuildMember, RestError> {
+    rest.put(format!("guilds/{}/members/{}", self.id, user_id.to_string()), options).await
   }
 }
 
@@ -1037,6 +1011,73 @@ impl GuildChannelModifyPositionOptions {
   }
 }
 
+impl GuildMemberListOptions {
+  /// Creates a new empty `GuildMemberListOptions`
+  pub fn new() -> Self {
+    Self {
+      limit: None,
+      after: None
+    }
+  }
+
+  /// Set the limit
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+
+  /// Set the after
+  pub fn set_after(mut self, after: Snowflake) -> Self {
+    self.after = Some(after);
+    self
+  }
+}
+
+impl GuildMemberAddOptions {
+  /// Creates a new `GuildMemberAddOptions` with an `access_token`
+  pub fn new(access_token: String) -> Self {
+    Self {
+      access_token,
+      nick: None,
+      roles: None,
+      mute: None,
+      deaf: None,
+    }
+  }
+
+  /// Set the nickname
+  pub fn set_nick<T: ToString>(mut self, nick: T) -> Self {
+    self.nick = Some(nick.to_string());
+    self
+  }
+
+  /// Add a role
+  pub fn add_role<T: ToString>(mut self, role_id: T) -> Self {
+    let mut roles = self.roles.unwrap_or_default();
+    roles.push(role_id.to_string());
+    self.roles = Some(roles);
+    self
+  }
+
+  /// Set mute
+  pub fn set_mute(mut self, mute: bool) -> Self {
+    self.mute = Some(mute);
+    self
+  }
+
+  /// Set deaf
+  pub fn set_deaf(mut self, deaf: bool) -> Self {
+    self.deaf = Some(deaf);
+    self
+  }
+}
+
+impl Default for GuildMemberListOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl<'de> Deserialize<'de> for SystemChannelFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
@@ -1047,13 +1088,6 @@ impl<'de> Deserialize<'de> for SystemChannelFlags {
 impl Serialize for SystemChannelFlags {
   fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_u32(self.bits())
-  }
-}
-
-impl<'de> Deserialize<'de> for GuildMemberFlags {
-  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-    let bits = u32::deserialize(d)?;
-    Ok(Self::from_bits_retain(bits))
   }
 }
 

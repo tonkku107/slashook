@@ -24,7 +24,7 @@ use crate::structs::{
   components::{Component, ComponentType},
   channels::Channel,
   users::User,
-  guilds::GuildMember,
+  members::GuildMember,
   messages::Message,
   monetization::Entitlement,
   Snowflake,
