@@ -30,7 +30,7 @@ pub struct GuildMember {
   pub avatar: Option<String>,
   /// The member's [guild banner hash](https://discord.com/developers/docs/reference#image-formatting)
   pub banner: Option<String>,
-  /// Array of [role](super::guilds::Role) object ids
+  /// Array of [role](super::roles::Role) object ids
   pub roles: Vec<Snowflake>,
   /// When the user joined the guild
   pub joined_at: DateTime<Utc>,
