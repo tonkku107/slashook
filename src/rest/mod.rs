@@ -207,6 +207,15 @@ impl Rest {
     handle_response(res).await
   }
 
+  /// Make a put request with reason
+  pub async fn put_reason<T: DeserializeOwned + 'static, U: Serialize, V: ToString>(&self, path: String, data: U, reason: V) -> Result<T, RestError> {
+    let req = self.client.put(format!("{}/{}", API_URL, path))
+      .json(&data)
+      .header("X-Audit-Log-Reason", reason.to_string());
+    let res = req.send().await?;
+    handle_response(res).await
+  }
+
   /// Make a delete request
   pub async fn delete<T: DeserializeOwned + 'static>(&self, path: String) -> Result<T, RestError> {
     let req = self.client.delete(format!("{}/{}", API_URL, path));
