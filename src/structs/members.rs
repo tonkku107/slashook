@@ -114,6 +114,14 @@ pub struct GuildMemberModifyOptions {
   pub bio: Option<Option<String>>,
 }
 
+/// Options for banning with [`GuildMember::ban`]
+#[derive(Serialize, Clone, Debug)]
+pub struct CreateBanOptions {
+  /// number of seconds to delete messages for, between 0 and 604800 (7 days)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub delete_message_seconds: Option<i64>,
+}
+
 impl GuildMember {
   /// Fetch a guild member
   /// ```
@@ -194,7 +202,7 @@ impl GuildMember {
   /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
-  /// # use slashook::structs::members::{GuildMember};
+  /// # use slashook::structs::members::GuildMember;
   /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// GuildMember::remove_role(&input.rest, "613425648685547541", "933795693162799156", "936746847437983786", None::<String>).await?;
@@ -214,7 +222,7 @@ impl GuildMember {
   /// ```
   /// # #[macro_use] extern crate slashook;
   /// # use slashook::commands::{CommandInput, CommandResponder};
-  /// # use slashook::structs::members::{GuildMember, GuildMemberModifyOptions};
+  /// # use slashook::structs::members::GuildMember;
   /// # #[command(name = "example", description = "An example command")]
   /// # fn example(input: CommandInput, res: CommandResponder) {
   /// GuildMember::kick(&input.rest, "613425648685547541", "933795693162799156", Some("Breaking the rules")).await?;
@@ -222,6 +230,47 @@ impl GuildMember {
   /// ```
   pub async fn kick<T: ToString, U: ToString, V: ToString>(rest: &Rest, guild_id: T, user_id: U, reason: Option<V>) -> Result<(), RestError> {
     let route = format!("guilds/{}/members/{}", guild_id.to_string(), user_id.to_string());
+
+    if let Some(reason) = reason {
+      rest.delete_reason(route, reason).await
+    } else {
+      rest.delete(route).await
+    }
+  }
+
+  /// Ban a member
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::members::{GuildMember, CreateBanOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let options = CreateBanOptions::new().set_delete_message_seconds(86400);
+  /// GuildMember::ban(&input.rest, "613425648685547541", "933795693162799156", options, Some("Breaking the rules")).await?;
+  /// # }
+  /// ```
+  pub async fn ban<T: ToString, U: ToString, V: ToString>(rest: &Rest, guild_id: T, user_id: U, options: CreateBanOptions, reason: Option<V>) -> Result<(), RestError> {
+    let route = format!("guilds/{}/bans/{}", guild_id.to_string(), user_id.to_string());
+
+    if let Some(reason) = reason {
+      rest.put_reason(route, options, reason).await
+    } else {
+      rest.put(route, options).await
+    }
+  }
+
+  /// Unban a member
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::members::GuildMember;
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// GuildMember::unban(&input.rest, "613425648685547541", "933795693162799156", None::<String>).await?;
+  /// # }
+  /// ```
+  pub async fn unban<T: ToString, U: ToString, V: ToString>(rest: &Rest, guild_id: T, user_id: U, reason: Option<V>) -> Result<(), RestError> {
+    let route = format!("guilds/{}/bans/{}", guild_id.to_string(), user_id.to_string());
 
     if let Some(reason) = reason {
       rest.delete_reason(route, reason).await
@@ -347,7 +396,28 @@ impl GuildMemberModifyOptions {
   }
 }
 
+impl CreateBanOptions {
+  /// Creates a new empty `CreateBanOptions`
+  pub fn new() -> Self {
+    Self {
+      delete_message_seconds: None,
+    }
+  }
+
+  /// Set delete message seconds
+  pub fn set_delete_message_seconds(mut self, seconds: i64) -> Self {
+    self.delete_message_seconds = Some(seconds);
+    self
+  }
+}
+
 impl Default for GuildMemberModifyOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for CreateBanOptions {
   fn default() -> Self {
     Self::new()
   }

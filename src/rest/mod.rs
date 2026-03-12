@@ -173,6 +173,15 @@ impl Rest {
     handle_response(res).await
   }
 
+  /// Make a post request with reason
+  pub async fn post_reason<T: DeserializeOwned + 'static, U: Serialize, V: ToString>(&self, path: String, data: U, reason: V) -> Result<T, RestError> {
+    let req = self.client.post(format!("{}/{}", API_URL, path))
+      .json(&data)
+      .header("X-Audit-Log-Reason", reason.to_string());
+    let res = req.send().await?;
+    handle_response(res).await
+  }
+
   /// Make a patch request
   pub async fn patch<T: DeserializeOwned + 'static, U: Serialize>(&self, path: String, data: U) -> Result<T, RestError> {
     let req = self.client.patch(format!("{}/{}", API_URL, path))
