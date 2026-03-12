@@ -7,6 +7,7 @@
 
 //! Structs related to Discord guilds
 
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize, ser::Serializer, de::Deserializer};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use chrono::{DateTime, Utc};
@@ -17,9 +18,9 @@ use super::{
   Emoji,
   members::GuildMember,
   Permissions,
+  roles::Role,
   stickers::Sticker,
   users::User,
-  utils::Color,
   Snowflake,
 };
 use crate::rest::{Rest, RestError};
@@ -294,64 +295,6 @@ pub struct GuildIncidentsData {
   pub dm_spam_detected_at: Option<DateTime<Utc>>,
   /// When the raid was detected
   pub raid_detected_at: Option<DateTime<Utc>>,
-}
-
-/// Discord Role Object
-#[derive(Deserialize, Clone, Debug)]
-pub struct Role {
-  /// Role id
-  pub id: Snowflake,
-  /// Role name
-  pub name: String,
-  /// Role color
-  pub color: Color,
-  /// If this role is pinned in the user listing
-  pub hoist: bool,
-  /// Role [icon hash](https://discord.com/developers/docs/reference#image-formatting)
-  pub icon: Option<String>,
-  /// Role unicode emoji
-  pub unicode_emoji: Option<String>,
-  /// Position of this role
-  pub position: i64,
-  /// Permission bit set
-  pub permissions: Permissions,
-  /// Whether this role is managed by an integration
-  pub managed: bool,
-  /// Whether this role is mentionable
-  pub mentionable: bool,
-  /// The tags this role has
-  pub tags: Option<RoleTags>,
-  /// [Role flags](RoleFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
-  pub flags: RoleFlags,
-}
-
-/// Discord Role Tags Object
-#[derive(Deserialize, Clone, Debug)]
-pub struct RoleTags {
-  /// The id of the bot this role belongs to
-  pub bot_id: Option<Snowflake>,
-  /// The id of the integration this role belongs to
-  pub integration_id: Option<Snowflake>,
-  /// Whether this is the guild's Booster role
-  #[serde(default, deserialize_with = "exists")]
-  pub premium_subscriber: bool,
-  /// The id of this role's subscription sku and listing
-  pub subscription_listing_id: Option<Snowflake>,
-  /// Whether this role is available for purchase
-  #[serde(default, deserialize_with = "exists")]
-  pub available_for_purchase: bool,
-  /// Whether this role is a guild's linked role
-  #[serde(default, deserialize_with = "exists")]
-  pub guild_connections: bool,
-}
-
-bitflags! {
-  /// Discord Role Flags
-  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
-  pub struct RoleFlags: u32 {
-    /// Role can be selected by members in an [onboarding](https://discord.com/developers/docs/resources/guild#guild-onboarding-object) prompt
-    const IN_PROMPT = 1 << 0;
-  }
 }
 
 /// Discord Guild Scheduled Event Object
@@ -680,9 +623,14 @@ pub struct GuildMemberAddOptions {
   pub deaf: Option<bool>,
 }
 
-fn exists<'de, D: Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
-  serde_json::Value::deserialize(d)?;
-  Ok(true)
+/// Options for modifying role positions with [`modify_role_positions`](Guild::modify_role_positions)
+#[derive(Serialize, Clone, Debug)]
+pub struct GuildRoleModifyPositionOptions {
+  /// Role
+  pub id: Snowflake,
+  /// Sorting position of the role (roles with the same position are sorted by id)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub position: Option<i64>,
 }
 
 impl Guild {
@@ -763,7 +711,7 @@ impl Guild {
   /// let options = GuildChannelModifyPositionOptions::new("1130595287078015027")
   ///   .set_position(1)
   ///   .set_parent_id("696891020146638868");
-  /// let modified_guild = guild.modify_channel_positions(&input.rest, vec![options]).await?;
+  /// guild.modify_channel_positions(&input.rest, vec![options]).await?;
   /// # }
   /// ```
   pub async fn modify_channel_positions(&self, rest: &Rest, options: Vec<GuildChannelModifyPositionOptions>) -> Result<(), RestError> {
@@ -823,13 +771,66 @@ impl Guild {
   pub async fn add_member<T: ToString>(&self, rest: &Rest, user_id: T, options: GuildMemberAddOptions) -> Result<GuildMember, RestError> {
     rest.put(format!("guilds/{}/members/{}", self.id, user_id.to_string()), options).await
   }
+
+  /// Get roles in the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let roles = guild.get_roles(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn get_roles(&self, rest: &Rest) -> Result<Vec<Role>, RestError> {
+    rest.get(format!("guilds/{}/roles", self.id)).await
+  }
+
+  /// Get a role in the guild.\
+  /// See also [`Role::fetch`]
+  pub async fn get_role<T: ToString>(&self, rest: &Rest, role_id: T) -> Result<Role, RestError> {
+    Role::fetch(rest, &self.id, role_id).await
+  }
+
+  /// Get member counts for the roles in the guild. Does not include @everyone
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let counts = guild.get_role_member_counts(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn get_role_member_counts(&self, rest: &Rest) -> Result<HashMap<Snowflake, i64>, RestError> {
+    rest.get(format!("guilds/{}/roles/member-counts", self.id)).await
+  }
+
+  /// Modify the positions of roles
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildRoleModifyPositionOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = GuildRoleModifyPositionOptions::new("936746847437983786")
+  ///   .set_position(1);
+  /// let modified_roles = guild.modify_role_positions(&input.rest, vec![options]).await?;
+  /// # }
+  /// ```
+  pub async fn modify_role_positions(&self, rest: &Rest, options: Vec<GuildRoleModifyPositionOptions>) -> Result<Vec<Role>, RestError> {
+    rest.patch(format!("guilds/{}/roles", self.id), options).await
+  }
 }
 
 impl GuildFetchOptions {
   /// Creates a new empty `GuildFetchOptions`
   pub fn new() -> Self {
     Self {
-      with_counts: None
+      with_counts: None,
     }
   }
 
@@ -988,7 +989,7 @@ impl GuildChannelModifyPositionOptions {
       id: id.to_string(),
       position: None,
       lock_permissions: None,
-      parent_id: None
+      parent_id: None,
     }
   }
 
@@ -1072,6 +1073,22 @@ impl GuildMemberAddOptions {
   }
 }
 
+impl GuildRoleModifyPositionOptions {
+  /// Creates a new `GuildRoleModifyPositionOptions` with a role id
+  pub fn new<T: ToString>(id: T) -> Self {
+    Self {
+      id: id.to_string(),
+      position: None,
+    }
+  }
+
+  /// Set the position
+  pub fn set_position(mut self, position: i64) -> Self {
+    self.position = Some(position);
+    self
+  }
+}
+
 impl Default for GuildMemberListOptions {
   fn default() -> Self {
     Self::new()
@@ -1088,12 +1105,5 @@ impl<'de> Deserialize<'de> for SystemChannelFlags {
 impl Serialize for SystemChannelFlags {
   fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_u32(self.bits())
-  }
-}
-
-impl<'de> Deserialize<'de> for RoleFlags {
-  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-    let bits = u32::deserialize(d)?;
-    Ok(Self::from_bits_retain(bits))
   }
 }

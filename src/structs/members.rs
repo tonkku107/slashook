@@ -30,7 +30,7 @@ pub struct GuildMember {
   pub avatar: Option<String>,
   /// The member's [guild banner hash](https://discord.com/developers/docs/reference#image-formatting)
   pub banner: Option<String>,
-  /// Array of [role](super::guilds::Role) object ids
+  /// Array of [role](super::roles::Role) object ids
   pub roles: Vec<Snowflake>,
   /// When the user joined the guild
   pub joined_at: DateTime<Utc>,
@@ -145,10 +145,12 @@ impl GuildMember {
   /// # }
   /// ```
   pub async fn modify<T: ToString, U: ToString, V: ToString>(rest: &Rest, guild_id: T, user_id: U, options: GuildMemberModifyOptions, reason: Option<V>) -> Result<Self, RestError> {
+    let route = format!("guilds/{}/members/{}", guild_id.to_string(), user_id.to_string());
+
     if let Some(reason) = reason {
-      rest.patch_reason(format!("guilds/{}/members/{}", guild_id.to_string(), user_id.to_string()), options, reason).await
+      rest.patch_reason(route, options, reason).await
     } else {
-      rest.patch(format!("guilds/{}/members/{}", guild_id.to_string(), user_id.to_string()), options).await
+      rest.patch(route, options).await
     }
   }
 
@@ -168,6 +170,46 @@ impl GuildMember {
     Self::modify(rest, guild_id, "@me", options, reason).await
   }
 
+  /// Add a role to a member
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::members::{GuildMember};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// GuildMember::add_role(&input.rest, "613425648685547541", "933795693162799156", "936746847437983786", None::<String>).await?;
+  /// # }
+  /// ```
+  pub async fn add_role<T: ToString, U: ToString, V: ToString, W: ToString>(rest: &Rest, guild_id: T, user_id: U, role_id: V, reason: Option<W>) -> Result<(), RestError> {
+    let route = format!("guilds/{}/members/{}/roles/{}", guild_id.to_string(), user_id.to_string(), role_id.to_string());
+
+    if let Some(reason) = reason {
+      rest.put_reason(route, (), reason).await
+    } else {
+      rest.put(route, ()).await
+    }
+  }
+
+  /// Remove a role from a member
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::members::{GuildMember};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// GuildMember::remove_role(&input.rest, "613425648685547541", "933795693162799156", "936746847437983786", None::<String>).await?;
+  /// # }
+  /// ```
+  pub async fn remove_role<T: ToString, U: ToString, V: ToString, W: ToString>(rest: &Rest, guild_id: T, user_id: U, role_id: V, reason: Option<W>) -> Result<(), RestError> {
+    let route = format!("guilds/{}/members/{}/roles/{}", guild_id.to_string(), user_id.to_string(), role_id.to_string());
+
+    if let Some(reason) = reason {
+      rest.delete_reason(route, reason).await
+    } else {
+      rest.delete(route).await
+    }
+  }
+
   /// Kick a member
   /// ```
   /// # #[macro_use] extern crate slashook;
@@ -179,10 +221,12 @@ impl GuildMember {
   /// # }
   /// ```
   pub async fn kick<T: ToString, U: ToString, V: ToString>(rest: &Rest, guild_id: T, user_id: U, reason: Option<V>) -> Result<(), RestError> {
+    let route = format!("guilds/{}/members/{}", guild_id.to_string(), user_id.to_string());
+
     if let Some(reason) = reason {
-      rest.delete_reason(format!("guilds/{}/members/{}", guild_id.to_string(), user_id.to_string()), reason).await
+      rest.delete_reason(route, reason).await
     } else {
-      rest.delete(format!("guilds/{}/members/{}", guild_id.to_string(), user_id.to_string())).await
+      rest.delete(route).await
     }
   }
 
