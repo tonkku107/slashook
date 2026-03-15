@@ -499,6 +499,15 @@ pub enum EventRecurrenceRuleMonth {
   UNKNOWN,
 }
 
+/// Discord Ban Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct Ban {
+  /// The reason for the ban
+  pub reason: Option<String>,
+  /// The banned user
+  pub user: User,
+}
+
 /// Options for fetching a guild
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct GuildFetchOptions {
@@ -631,6 +640,79 @@ pub struct GuildRoleModifyPositionOptions {
   /// Sorting position of the role (roles with the same position are sorted by id)
   #[serde(skip_serializing_if = "Option::is_none")]
   pub position: Option<i64>,
+}
+
+/// Options for fetching bans with [`get_bans`](Guild::get_bans)
+#[derive(Serialize, Clone, Debug)]
+pub struct BanFetchOptions {
+  /// Number of users to return (up to maximum 1000); Defaults to 1000
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub limit: Option<i64>,
+  /// Consider only users before given user id
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub before: Option<Snowflake>,
+  /// Consider only users after given user id
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub after: Option<Snowflake>,
+}
+
+/// Options for bulk banning with [`bulk_ban`](Guild::bulk_ban)
+#[derive(Serialize, Clone, Debug)]
+pub struct BulkBanOptions {
+  /// list of user ids to ban (max 200)
+  pub user_ids: Vec<Snowflake>,
+  /// Number of seconds to delete messages for, between 0 and 604800 (7 days)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub delete_message_seconds: Option<i64>,
+}
+
+/// Response from bulk banning with [`bulk_ban`](Guild::bulk_ban)
+#[derive(Deserialize, Clone, Debug)]
+pub struct BulkBanResponse {
+  /// List of user ids, that were successfully banned
+  pub banned_users: Vec<Snowflake>,
+  /// List of user ids, that were not banned
+  pub failed_users: Vec<Snowflake>,
+}
+
+/// Options for checking prune count with [`get_prune_count`](Guild::get_prune_count)
+#[derive(Serialize, Clone, Debug)]
+pub struct PruneCountOptions {
+  /// Number of days to count prune for (1-30); Defaults to 7
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub days: Option<i64>,
+  /// Role(s) to include
+  #[serde(serialize_with = "comma_separated_vec", skip_serializing_if = "Option::is_none")]
+  pub include_roles: Option<Vec<Snowflake>>,
+}
+
+/// Options for performing a prune with [`prune`](Guild::prune)
+#[derive(Serialize, Clone, Debug)]
+pub struct PruneOptions {
+  /// Number of days to count prune for (1-30); Defaults to 7
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub days: Option<i64>,
+  /// Whether `pruned` is returned, discouraged for large guilds
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub compute_prune_count: Option<bool>,
+  /// Role(s) to include
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub include_roles: Option<Vec<Snowflake>>
+}
+
+/// Response from checking or performing a prune with [`get_prune_count`](Guild::get_prune_count) or [`prune`](Guild::prune)
+#[derive(Deserialize, Clone, Debug)]
+pub struct PruneResponse {
+  /// Number of members that were/would be removed in the prune operation.
+  /// Can be `None` if `compute_prune_count` is set to `false` when executing the prune
+  pub pruned: Option<i64>,
+}
+
+fn comma_separated_vec<S: Serializer>(vec: &Option<Vec<String>>, s: S) -> Result<S::Ok, S::Error> {
+  let Some(vec) = vec else {
+    return s.serialize_none()
+  };
+  s.serialize_str(&vec.join(","))
 }
 
 impl Guild {
@@ -772,6 +854,63 @@ impl Guild {
     rest.put(format!("guilds/{}/members/{}", self.id, user_id.to_string()), options).await
   }
 
+  /// Get bans in the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, BanFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = BanFetchOptions::new().set_limit(5);
+  /// let bans = guild.get_bans(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn get_bans(&self, rest: &Rest, options: BanFetchOptions) -> Result<Vec<Ban>, RestError> {
+    rest.get_query(format!("guilds/{}/bans", self.id), options).await
+  }
+
+  /// Get a ban in the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let ban = guild.get_ban(&input.rest, "933795693162799156").await?;
+  /// # }
+  /// ```
+  pub async fn get_ban<T: ToString>(&self, rest: &Rest, user_id: T) -> Result<Ban, RestError> {
+    rest.get(format!("guilds/{}/bans/{}", self.id, user_id.to_string())).await
+  }
+
+  /// Bulk ban members from the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, BulkBanOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = BulkBanOptions::new()
+  ///   .add_user("933795693162799156")
+  ///   .add_user("545364944258990091")
+  ///   .add_user("520953716610957312")
+  ///   .set_delete_message_seconds(86400);
+  /// let result = guild.bulk_ban(&input.rest, options, Some("spam")).await?;
+  /// # }
+  /// ```
+  pub async fn bulk_ban<T: ToString>(&self, rest: &Rest, options: BulkBanOptions, reason: Option<T>) -> Result<BulkBanResponse, RestError> {
+    let route = format!("guilds/{}/bulk-ban", self.id);
+
+    if let Some(reason) = reason {
+      rest.post_reason(route, options, reason).await
+    } else {
+      rest.post(route, options).await
+    }
+  }
+
   /// Get roles in the guild
   /// ```
   /// # #[macro_use] extern crate slashook;
@@ -823,6 +962,48 @@ impl Guild {
   /// ```
   pub async fn modify_role_positions(&self, rest: &Rest, options: Vec<GuildRoleModifyPositionOptions>) -> Result<Vec<Role>, RestError> {
     rest.patch(format!("guilds/{}/roles", self.id), options).await
+  }
+
+  /// Check how many members would get pruned
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, PruneCountOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = PruneCountOptions::new().set_days(1);
+  /// let result = guild.get_prune_count(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn get_prune_count(&self, rest: &Rest, options: PruneCountOptions) -> Result<PruneResponse, RestError> {
+    rest.get_query(format!("guilds/{}/prune", self.id), options).await
+  }
+
+  /// Prune members from the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, PruneCountOptions, PruneOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = PruneCountOptions::new().set_days(1);
+  /// let options2 = PruneOptions::from(options.clone()).set_compute_prune_count(false);
+  /// let result = guild.get_prune_count(&input.rest, options).await?;
+  /// if (result.pruned.unwrap() < 100) {
+  ///   guild.prune(&input.rest, options2, Some("Inactivity")).await?;
+  /// }
+  /// # }
+  /// ```
+  pub async fn prune<T: ToString>(&self, rest: &Rest, options: PruneOptions, reason: Option<T>) -> Result<PruneResponse, RestError> {
+    let route = format!("guilds/{}/prune", self.id);
+
+    if let Some(reason) = reason {
+      rest.post_reason(route, options, reason).await
+    } else {
+      rest.post(route, options).await
+    }
   }
 }
 
@@ -1089,7 +1270,165 @@ impl GuildRoleModifyPositionOptions {
   }
 }
 
+impl BanFetchOptions {
+  /// Creates a new empty `BanFetchOptions`
+  pub fn new() -> Self {
+    Self {
+      limit: None,
+      before: None,
+      after: None,
+    }
+  }
+
+  /// Set the limit
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+
+  /// Set before
+  pub fn set_before<T: ToString>(mut self, before: T) -> Self {
+    self.before = Some(before.to_string());
+    self
+  }
+
+  /// Set after
+  pub fn set_after<T: ToString>(mut self, after: T) -> Self {
+    self.after = Some(after.to_string());
+    self
+  }
+}
+
+impl BulkBanOptions {
+  /// Creates a new empty `BulkBanOptions`
+  pub fn new() -> Self {
+    Self {
+      user_ids: Vec::new(),
+      delete_message_seconds: None,
+    }
+  }
+
+  /// Add a user to be banned
+  pub fn add_user<T: ToString>(mut self, user_id: T) -> Self {
+    self.user_ids.push(user_id.to_string());
+    self
+  }
+
+  /// Set all user ids at once
+  pub fn set_user_ids(mut self, user_ids: Vec<Snowflake>) -> Self {
+    self.user_ids = user_ids;
+    self
+  }
+
+  /// Set delete message seconds
+  pub fn set_delete_message_seconds(mut self, seconds: i64) -> Self {
+    self.delete_message_seconds = Some(seconds);
+    self
+  }
+}
+
+impl PruneCountOptions {
+  /// Creates a new empty `PruneCountOptions`
+  pub fn new() -> Self {
+    Self {
+      days: None,
+      include_roles: None,
+    }
+  }
+
+  /// Set days
+  pub fn set_days(mut self, days: i64) -> Self {
+    self.days = Some(days);
+    self
+  }
+
+  /// Add a role to be included
+  pub fn include_role<T: ToString>(mut self, role_id: T) -> Self {
+    let mut roles = self.include_roles.unwrap_or_default();
+    roles.push(role_id.to_string());
+    self.include_roles = Some(roles);
+    self
+  }
+
+  /// Set the roles to include
+  pub fn set_include_roles(mut self, roles: Vec<Snowflake>) -> Self {
+    self.include_roles = Some(roles);
+    self
+  }
+}
+
+impl PruneOptions {
+  /// Creates a new empty `PruneOptions`
+  pub fn new() -> Self {
+    Self {
+      days: None,
+      compute_prune_count: None,
+      include_roles: None,
+    }
+  }
+
+  /// Set days
+  pub fn set_days(mut self, days: i64) -> Self {
+    self.days = Some(days);
+    self
+  }
+
+  /// Set whether to compute the prune count
+  pub fn set_compute_prune_count(mut self, compute: bool) -> Self {
+    self.compute_prune_count = Some(compute);
+    self
+  }
+
+  /// Add a role to be included
+  pub fn include_role<T: ToString>(mut self, role_id: T) -> Self {
+    let mut roles = self.include_roles.unwrap_or_default();
+    roles.push(role_id.to_string());
+    self.include_roles = Some(roles);
+    self
+  }
+
+  /// Set the roles to include
+  pub fn set_include_roles(mut self, roles: Vec<Snowflake>) -> Self {
+    self.include_roles = Some(roles);
+    self
+  }
+}
+
+impl From<PruneCountOptions> for PruneOptions {
+  fn from(value: PruneCountOptions) -> Self {
+    Self {
+      days: value.days,
+      compute_prune_count: None,
+      include_roles: value.include_roles,
+    }
+  }
+}
+
 impl Default for GuildMemberListOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for BanFetchOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for BulkBanOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for PruneCountOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for PruneOptions {
   fn default() -> Self {
     Self::new()
   }
