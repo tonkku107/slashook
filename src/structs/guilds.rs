@@ -16,6 +16,7 @@ use bitflags::bitflags;
 use super::{
   channels::{Channel, ChannelCreateOptions, ThreadMember},
   Emoji,
+  invites::{Invite, VanityUrlInvite},
   members::GuildMember,
   Permissions,
   roles::Role,
@@ -102,7 +103,7 @@ pub struct Guild {
   pub approximate_member_count: Option<i64>,
   /// Approximate number of non-offline members in this guild, returned from the `GET /guilds/<id>` and `/users/@me/guilds` endpoints when `with_counts` is `true`
   pub approximate_presence_count: Option<i64>,
-  /// The welcome screen of a Community guild, shown to new members, returned in an [Invite](super::invites::Invite)'s guild object
+  /// The welcome screen of a Community guild, shown to new members, returned in an [Invite]'s guild object
   pub welcome_screen: Option<WelcomeScreen>,
   /// [Guild age-restriction level](NSFWLevel)
   pub nsfw_level: Option<NSFWLevel>,
@@ -254,7 +255,7 @@ pub struct WelcomeScreen {
 }
 
 /// Discord Welcome Screen Channel Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WelcomeScreenChannel {
   /// The channel's id
   pub channel_id: Snowflake,
@@ -499,6 +500,146 @@ pub enum EventRecurrenceRuleMonth {
   UNKNOWN,
 }
 
+/// Discord Guild Widget Settings Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildWidgetSettings {
+  /// Whether the widget is enabled
+  pub enabled: bool,
+  /// The widget channel id
+  pub channel_id: Option<Snowflake>,
+}
+
+/// Discord Guild Widget Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildWidget {
+  /// Guild id
+  pub id: Snowflake,
+  /// Guild name (2-100 characters)
+  pub name: Snowflake,
+  /// Instant invite for the guilds specified widget invite channel
+  pub instant_invite: Option<String>,
+  /// Voice and stage channels which are accessible by @everyone
+  pub channels: Vec<GuildWidgetChannel>,
+  /// Special widget user objects that includes users presence (Limit 100)
+  pub members: Vec<GuildWidgetUser>,
+  /// Number of online members in this guild
+  pub presence_count: i64,
+}
+
+/// Special widget channel object
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildWidgetChannel {
+  /// The id of this channel
+  pub id: Snowflake,
+  /// The name of the channel (1-100 characters)
+  pub name: Option<String>,
+  /// Sorting position of the channel
+  pub position: Option<i64>,
+}
+
+/// Special widget user object
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildWidgetUser {
+  /// The user's id (anonymized)
+  pub id: Snowflake,
+  /// The user's username
+  pub username: String,
+  /// The user's Discord-tag (anonymized)
+  pub discriminator: String,
+  /// The user's avatar (anonymized)
+  pub avatar: Option<String>,
+  /// User's status
+  pub status: Option<String>,
+  /// User's avatar url
+  pub avatar_url: Option<String>,
+  /// Whether the user is deafened in voice channels
+  pub deaf: Option<bool>,
+  /// Whether the user is muted in voice channels
+  pub mute: Option<bool>,
+  /// Whether the user has self deafened in voice channels
+  pub self_deaf: Option<bool>,
+  /// Whether the user has self muted in voice channels
+  pub self_mute: Option<bool>,
+  /// Whether the user is suppressed
+  pub suppress: Option<bool>,
+  /// Voice channel the user is in
+  pub channel_id: Option<Snowflake>,
+}
+
+/// Discord Integration Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildIntegration {
+  /// Integration id
+  pub id: Snowflake,
+  /// Integration name
+  pub name: String,
+  /// Integration type (twitch, youtube, discord, or guild_subscription)
+  pub integration_type: String,
+  /// Is this integration enabled
+  pub enabled: bool,
+  /// Is this integration syncing
+  pub syncing: Option<bool>,
+  /// Id that this integration uses for “subscribers”
+  pub role_id: Option<Snowflake>,
+  /// Whether emoticons should be synced for this integration (twitch only currently)
+  pub enable_emoticons: Option<bool>,
+  /// The behavior of expiring subscribers
+  pub expire_behavior: Option<GuildIntegrationExpireBehavior>,
+  /// The grace period (in days) before expiring subscribers
+  pub expire_grace_period: Option<i64>,
+  /// User for this integration
+  pub user: Option<User>,
+  /// Integration account information
+  pub account: GuildIntegrationAccount,
+  /// When this integration was last synced
+  pub synced_at: Option<DateTime<Utc>>,
+  /// How many subscribers this integration has
+  pub subscriber_count: Option<i64>,
+  /// Has this integration been revoked
+  pub revoked: Option<bool>,
+  /// The bot/OAuth2 application for discord integrations
+  pub application: Option<GuildIntegrationApplication>,
+  /// The scopes the application has been authorized for
+  pub scopes: Option<Vec<String>>,
+}
+
+/// Discord Integration Expire Behaviors
+#[derive(Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum GuildIntegrationExpireBehavior {
+  /// Remove role
+  REMOVE_ROLE = 0,
+  /// Kick
+  KICK = 1,
+  /// Unknown expire behavior not implemented yet
+  UNKNOWN,
+}
+
+/// Discord Integration Account Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildIntegrationAccount {
+  /// Id of the account
+  pub id: String,
+  /// Name of the account
+  pub name: String,
+}
+
+/// Discord Integration Application Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildIntegrationApplication {
+  /// The id of the app
+  pub id: String,
+  /// The name of the app
+  pub name: String,
+  /// The [icon hash](https://docs.discord.com/developers/reference#image-formatting) of the app
+  pub icon: Option<String>,
+  /// The description of the app
+  pub description: String,
+  /// The bot associated with this application
+  pub bot: Option<User>,
+}
+
 /// Discord Ban Object
 #[derive(Deserialize, Clone, Debug)]
 pub struct Ban {
@@ -506,6 +647,92 @@ pub struct Ban {
   pub reason: Option<String>,
   /// The banned user
   pub user: User,
+}
+
+/// Discord Guild Onboarding Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct GuildOnboarding {
+  /// ID of the guild this onboarding is part of
+  pub guild_id: Snowflake,
+  /// Prompts shown during onboarding and in customize community
+  pub prompts: Vec<GuildOnboardingPrompt>,
+  /// Channel IDs that members get opted into automatically
+  pub default_channel_ids: Vec<Snowflake>,
+  /// Whether onboarding is enabled in the guild
+  pub enabled: bool,
+  /// Current mode of onboarding
+  pub mode: GuildOnboardingMode,
+}
+
+/// Discord Guild Onboarding Prompt Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GuildOnboardingPrompt {
+  /// ID of the prompt
+  pub id: Snowflake,
+  /// Type of prompt
+  #[serde(rename = "type")]
+  pub prompt_type: GuildOnboardingPromptType,
+  /// Options available within the prompt
+  pub options: Vec<GuildOnboardingPromptOption>,
+  /// Title of the prompt
+  pub title: String,
+  /// Indicates whether users are limited to selecting one option for the prompt
+  pub single_select: bool,
+  /// Indicates whether the prompt is required before a user completes the onboarding flow
+  pub required: bool,
+  /// Indicates whether the prompt is present in the onboarding flow. If `false`, the prompt will only appear in the Channels & Roles tab
+  pub in_onboarding: bool,
+}
+
+/// Discord Guild Onboarding Prompt Types
+#[derive(Serialize_repr, Deserialize_repr, Default, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum GuildOnboardingPromptType {
+  /// Multiple choice
+  #[default]
+  MULTIPLE_CHOICE = 0,
+  /// Dropdown
+  DROPDOWN = 1,
+  /// Prompt type that hasn't been implemented yet
+  UNKNOWN,
+}
+
+/// Discord Guild Onboarding Prompt Option Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GuildOnboardingPromptOption {
+  /// ID of the prompt option
+  pub id: Snowflake,
+  /// IDs for channels a member is added to when the option is selected
+  pub channel_ids: Vec<Snowflake>,
+  /// IDs for roles assigned to a member when the option is selected
+  pub role_ids: Vec<Snowflake>,
+  /// Emoji of the option (from the API)
+  pub emoji: Option<Emoji>,
+  /// Emoji ID of the option (Used when creating)
+  pub emoji_id: Option<Snowflake>,
+  /// Emoji name of the option (Used when creating)
+  pub emoji_name: Option<String>,
+  /// Whether the emoji is animated (Used when creating)
+  pub emoji_animated: Option<bool>,
+  /// Title of the option
+  pub title: String,
+  /// Description of the option
+  pub description: Option<String>,
+}
+
+/// Discord Guild Onboarding Modes
+#[derive(Serialize_repr, Deserialize_repr, Default, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum GuildOnboardingMode {
+  /// Counts only Default Channels towards constraints
+  #[default]
+  ONBOARDING_DEFAULT = 0,
+  /// Counts Default Channels and Questions towards constraints
+  ONBOARDING_ADVANCED = 1,
+  /// Onboarding mode that hasn't been implemented yet
+  UNKNOWN,
 }
 
 /// Options for fetching a guild
@@ -706,6 +933,59 @@ pub struct PruneResponse {
   /// Number of members that were/would be removed in the prune operation.
   /// Can be `None` if `compute_prune_count` is set to `false` when executing the prune
   pub pruned: Option<i64>,
+}
+
+/// Options for modifying the widget with [`modify_widget`](Guild::modify_widget)
+#[derive(Serialize, Clone, Debug)]
+pub struct GuildWidgetModifyOptions {
+  /// Whether the widget is enabled
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub enabled: Option<bool>,
+  /// The widget channel id
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub channel_id: Option<Option<Snowflake>>,
+}
+
+/// Options for modifying the welcome screen with [`modify_welcome_screen`](Guild::modify_welcome_screen)
+#[derive(Serialize, Clone, Debug)]
+pub struct WelcomeScreenModifyOptions {
+  /// Whether the welcome screen is enabled
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub enabled: Option<bool>,
+  /// Channels linked in the welcome screen and their display options
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub welcome_channels: Option<Option<Vec<WelcomeScreenChannel>>>,
+  /// The server description to show in the welcome screen
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub description: Option<Option<String>>,
+}
+
+/// Options for modifying guild onboarding with [`modify_onboarding`](Guild::modify_onboarding)
+#[derive(Serialize, Clone, Debug)]
+pub struct GuildOnboardingModifyOptions {
+  /// Prompts shown during onboarding and in customize community
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub prompts: Option<Vec<GuildOnboardingPrompt>>,
+  /// Channel IDs that members get opted into automatically
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub default_channel_ids: Option<Vec<Snowflake>>,
+  /// Whether onboarding is enabled in the guild
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub enabled: Option<bool>,
+  /// Current mode of onboarding
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub mode: Option<GuildOnboardingMode>,
+}
+
+/// Options for modifying incident actions with [`modify_incident_actions`](Guild::modify_incident_actions)
+#[derive(Serialize, Clone, Debug)]
+pub struct GuildIncidentActionsModifyOptions {
+  /// When invites will be enabled again
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub invites_disabled_until: Option<Option<DateTime<Utc>>>,
+  /// When direct messages will be enabled again
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub dms_disabled_until: Option<Option<DateTime<Utc>>>,
 }
 
 fn comma_separated_vec<S: Serializer>(vec: &Option<Vec<String>>, s: S) -> Result<S::Ok, S::Error> {
@@ -1004,6 +1284,386 @@ impl Guild {
     } else {
       rest.post(route, options).await
     }
+  }
+
+  /// Get invites in the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let invites = guild.get_invites(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn get_invites(&self, rest: &Rest) -> Result<Vec<Invite>, RestError> {
+    rest.get(format!("guilds/{}/invites", self.id)).await
+  }
+
+  /// Get integrations in the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let integrations = guild.get_integrations(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn get_integrations(&self, rest: &Rest) -> Result<Vec<GuildIntegration>, RestError> {
+    rest.get(format!("guilds/{}/integrations", self.id)).await
+  }
+
+  /// Deletes an integration from the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// # let integrations = guild.get_integrations(&input.rest).await?;
+  /// # let integration = integrations.first().unwrap().clone();
+  /// guild.delete_integration(&input.rest, integration.id).await?;
+  /// # }
+  /// ```
+  pub async fn delete_integration<T: ToString>(&self, rest: &Rest, integration_id: T) -> Result<(), RestError> {
+    rest.delete(format!("guilds/{}/integrations/{}", self.id, integration_id.to_string())).await
+  }
+
+  /// Get the widget settings for the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let widget_settings = guild.get_widget_settings(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn get_widget_settings(&self, rest: &Rest) -> Result<GuildWidgetSettings, RestError> {
+    rest.get(format!("guilds/{}/widget", self.id)).await
+  }
+
+  /// Modify the widget settings for the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildWidgetModifyOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = GuildWidgetModifyOptions::new()
+  ///   .set_enabled(true)
+  ///   .set_channel_id(Some("613430047285706767"));
+  /// let new_settings = guild.modify_widget(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn modify_widget(&self, rest: &Rest, options: GuildWidgetModifyOptions) -> Result<GuildWidgetSettings, RestError> {
+    rest.patch(format!("guilds/{}/widget", self.id), options).await
+  }
+
+  /// Get widget data for a guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::Guild;
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let widget = Guild::get_widget(&input.rest, "81384788765712384").await?;
+  /// # }
+  /// ```
+  pub async fn get_widget<T: ToString>(rest: &Rest, guild_id: T) -> Result<GuildWidget, RestError> {
+    rest.get(format!("guilds/{}/widget.json", guild_id.to_string())).await
+  }
+
+  /// Get vanity url metadata
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let vanity_url = guild.get_vanity_url(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn get_vanity_url(&self, rest: &Rest) -> Result<VanityUrlInvite, RestError> {
+    rest.get(format!("guilds/{}/vanity-url", self.id)).await
+  }
+
+  /// Get the welcome screen for the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let welcome_screen = guild.get_welcome_screen(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn get_welcome_screen(&self, rest: &Rest) -> Result<WelcomeScreen, RestError> {
+    rest.get(format!("guilds/{}/welcome-screen", self.id)).await
+  }
+
+  /// Modify the guild's welcome screen
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, WelcomeScreenChannel, WelcomeScreenModifyOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let channels = vec![WelcomeScreenChannel::new("697138785317814292", "Announcements")
+  ///   .set_emoji_name("📡")
+  /// ];
+  /// let options = WelcomeScreenModifyOptions::new()
+  ///   .set_enabled(true)
+  ///   .set_welcome_channels(Some(channels))
+  ///   .set_description(Some("A fun server"));
+  /// let welcome_screen = guild.modify_welcome_screen(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn modify_welcome_screen(&self, rest: &Rest, options: WelcomeScreenModifyOptions) -> Result<WelcomeScreen, RestError> {
+    rest.patch(format!("guilds/{}/welcome-screen", self.id), options).await
+  }
+
+  /// Get the onboarding for the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let onboarding = guild.get_onboarding(&input.rest).await?;
+  /// # }
+  /// ```
+  pub async fn get_onboarding(&self, rest: &Rest) -> Result<GuildOnboarding, RestError> {
+    rest.get(format!("guilds/{}/onboarding", self.id)).await
+  }
+
+  /// Modify the onboarding for the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::Emoji;
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildOnboardingModifyOptions, GuildOnboardingPrompt, GuildOnboardingPromptOption, GuildOnboardingPromptType, GuildOnboardingMode};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = GuildOnboardingModifyOptions::new()
+  ///   .add_prompt(GuildOnboardingPrompt::new()
+  ///     .set_title("What do you want to do in this community?")
+  ///     .add_option(GuildOnboardingPromptOption::new()
+  ///       .set_title("Chat with Friends")
+  ///       .set_emoji(Emoji::new_custom_emoji("1070002302032826408", "chat", false))
+  ///       .add_channel_id("962007075288916001")
+  ///     )
+  ///     .add_option(GuildOnboardingPromptOption::new()
+  ///       .set_title("Get Gud")
+  ///       .set_description("We have excellent teachers!")
+  ///       .set_emoji(Emoji::new_standard_emoji("😀"))
+  ///       .add_role_id("982014491980083211")
+  ///     )
+  ///     .set_type(GuildOnboardingPromptType::MULTIPLE_CHOICE)
+  ///     .set_required(true)
+  ///   )
+  ///   .set_default_channel_ids(vec![
+  ///     "998678771706110023",
+  ///     "998678693058719784",
+  ///     "1070008122577518632",
+  ///     "998678764340912138",
+  ///     "998678704446263309",
+  ///     "998678683592171602",
+  ///     "998678699715067986"
+  ///   ])
+  ///   .set_enabled(true)
+  ///   .set_mode(GuildOnboardingMode::ONBOARDING_DEFAULT);
+  /// let onboarding = guild.modify_onboarding(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn modify_onboarding(&self, rest: &Rest, options: GuildOnboardingModifyOptions) -> Result<GuildOnboarding, RestError> {
+    rest.put(format!("guilds/{}/onboarding", self.id), options).await
+  }
+
+  /// Modify incident actions for the guild
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::guilds::{Guild, GuildFetchOptions, GuildIncidentActionsModifyOptions};
+  /// # use chrono::offset::Utc;
+  /// # use std::time::Duration;
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// # let guild = Guild::fetch(&input.rest, input.guild_id.unwrap(), GuildFetchOptions::new()).await?;
+  /// let options = GuildIncidentActionsModifyOptions::new()
+  ///   .set_invites_disabled_until(Some(Utc::now() + Duration::from_hours(24)))
+  ///   .set_dms_disabled_until(None);
+  /// let incident_data = guild.modify_incident_actions(&input.rest, options).await?;
+  /// # }
+  /// ```
+  pub async fn modify_incident_actions(&self, rest: &Rest, options: GuildIncidentActionsModifyOptions) -> Result<GuildIncidentsData, RestError>  {
+    rest.put(format!("guilds/{}/incident-actions", self.id), options).await
+  }
+}
+
+impl WelcomeScreenChannel {
+  /// Creates a new `WelcomeScreenChannel` with channel id and description
+  pub fn new<T: ToString, U: ToString>(channel_id: T, description: U) -> Self {
+    Self {
+      channel_id: channel_id.to_string(),
+      description: description.to_string(),
+      emoji_id: None,
+      emoji_name: None,
+    }
+  }
+
+  /// Set channel id
+  pub fn set_channel_id<T: ToString>(mut self, channel_id: T) -> Self {
+    self.channel_id = channel_id.to_string();
+    self
+  }
+
+  /// Set description
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = description.to_string();
+    self
+  }
+
+  /// Set emoji id
+  pub fn set_emoji_id<T: ToString>(mut self, emoji: T) -> Self {
+    self.emoji_id = Some(emoji.to_string());
+    self
+  }
+
+  /// Set emoji name
+  pub fn set_emoji_name<T: ToString>(mut self, emoji: T) -> Self {
+    self.emoji_name = Some(emoji.to_string());
+    self
+  }
+}
+
+impl GuildOnboardingPrompt {
+  /// Creates a new default `GuildOnboardingPrompt`
+  pub fn new() -> Self {
+    Self {
+      id: Utc::now().timestamp().to_string(),
+      prompt_type: GuildOnboardingPromptType::MULTIPLE_CHOICE,
+      options: Vec::new(),
+      title: String::new(),
+      single_select: false,
+      required: false,
+      in_onboarding: true,
+    }
+  }
+
+  /// Set the type
+  pub fn set_type(mut self, prompt_type: GuildOnboardingPromptType) -> Self {
+    self.prompt_type = prompt_type;
+    self
+  }
+
+  /// Add an option
+  pub fn add_option(mut self, option: GuildOnboardingPromptOption) -> Self {
+    self.options.push(option);
+    self
+  }
+
+  /// Set the options
+  pub fn set_options(mut self, options: Vec<GuildOnboardingPromptOption>) -> Self {
+    self.options = options;
+    self
+  }
+
+  /// Set the title
+  pub fn set_title<T: ToString>(mut self, title: T) -> Self {
+    self.title = title.to_string();
+    self
+  }
+
+  /// Set single select
+  pub fn set_single_select(mut self, single_select: bool) -> Self {
+    self.single_select = single_select;
+    self
+  }
+
+  /// Set required
+  pub fn set_required(mut self, required: bool) -> Self {
+    self.required = required;
+    self
+  }
+
+  /// Set in onboarding
+  pub fn set_in_onboarding(mut self, in_onboarding: bool) -> Self {
+    self.in_onboarding = in_onboarding;
+    self
+  }
+}
+
+impl GuildOnboardingPromptOption {
+  /// Creates a new default `GuildOnboardingPromptOption`
+  pub fn new() -> Self {
+    Self {
+      id: Utc::now().timestamp().to_string(),
+      channel_ids: Vec::new(),
+      role_ids: Vec::new(),
+      emoji: None,
+      emoji_id: None,
+      emoji_name: None,
+      emoji_animated: None,
+      title: String::new(),
+      description: None,
+    }
+  }
+
+  /// Add a channel
+  pub fn add_channel_id<T: ToString>(mut self, channel_id: T) -> Self {
+    self.channel_ids.push(channel_id.to_string());
+    self
+  }
+
+  /// Set the channels
+  pub fn set_channel_ids(mut self, ids: Vec<Snowflake>) -> Self {
+    self.channel_ids = ids;
+    self
+  }
+
+  /// Add a role
+  pub fn add_role_id<T: ToString>(mut self, role_id: T) -> Self {
+    self.role_ids.push(role_id.to_string());
+    self
+  }
+
+  /// Set the roles
+  pub fn set_role_ids(mut self, ids: Vec<Snowflake>) -> Self {
+    self.role_ids = ids;
+    self
+  }
+
+  /// Set the emoji
+  pub fn set_emoji(mut self, emoji: Emoji) -> Self {
+    self.emoji_id = emoji.id.clone();
+    self.emoji_name = emoji.name.clone();
+    self.emoji_animated = emoji.animated;
+    self.emoji = Some(emoji);
+    self
+  }
+
+  /// Set the title
+  pub fn set_title<T: ToString>(mut self, title: T) -> Self {
+    self.title = title.to_string();
+    self
+  }
+
+  /// Set the description
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = Some(description.to_string());
+    self
   }
 }
 
@@ -1404,6 +2064,143 @@ impl From<PruneCountOptions> for PruneOptions {
   }
 }
 
+impl GuildWidgetModifyOptions {
+  /// Creates a new empty `GuildWidgetSettingsModifyOptions`
+  pub fn new() -> Self {
+    Self {
+      enabled: None,
+      channel_id: None,
+    }
+  }
+
+  /// Set enabled
+  pub fn set_enabled(mut self, enabled: bool) -> Self {
+    self.enabled = Some(enabled);
+    self
+  }
+
+  /// Set channel id
+  pub fn set_channel_id<T: ToString>(mut self, channel_id: Option<T>) -> Self {
+    self.channel_id = Some(channel_id.map(|t| t.to_string()));
+    self
+  }
+}
+
+impl WelcomeScreenModifyOptions {
+  /// Creates a new empty `WelcomeScreenModifyOptions`
+  pub fn new() -> Self {
+    Self {
+      enabled: None,
+      welcome_channels: None,
+      description: None,
+    }
+  }
+
+  /// Set enabled
+  pub fn set_enabled(mut self, enabled: bool) -> Self {
+    self.enabled = Some(enabled);
+    self
+  }
+
+  /// Set welcome channels
+  pub fn set_welcome_channels(mut self, welcome_channels: Option<Vec<WelcomeScreenChannel>>) -> Self {
+    self.welcome_channels = Some(welcome_channels);
+    self
+  }
+
+  /// Set description
+  pub fn set_description<T: ToString>(mut self, description: Option<T>) -> Self {
+    self.description = Some(description.map(|t| t.to_string()));
+    self
+  }
+}
+
+impl GuildOnboardingModifyOptions {
+  /// Creates a new empty `GuildOnboardingModifyOptions`
+  pub fn new() -> Self {
+    Self {
+      prompts: None,
+      default_channel_ids: None,
+      enabled: None,
+      mode: None,
+    }
+  }
+
+  /// Add a prompt
+  pub fn add_prompt(mut self, prompt: GuildOnboardingPrompt) -> Self {
+    let mut prompts = self.prompts.unwrap_or_default();
+    prompts.push(prompt);
+    self.prompts = Some(prompts);
+    self
+  }
+
+  /// Set the prompts
+  pub fn set_prompts(mut self, prompts: Vec<GuildOnboardingPrompt>) -> Self {
+    self.prompts = Some(prompts);
+    self
+  }
+
+  /// Add a default channel
+  pub fn add_default_channel_id<T: ToString>(mut self, channel_id: T) -> Self {
+    let mut channels = self.default_channel_ids.unwrap_or_default();
+    channels.push(channel_id.to_string());
+    self.default_channel_ids = Some(channels);
+    self
+  }
+
+  /// Set the default channels
+  pub fn set_default_channel_ids<T: ToString>(mut self, ids: Vec<T>) -> Self {
+    self.default_channel_ids = Some(ids.into_iter().map(|id| id.to_string()).collect());
+    self
+  }
+
+  /// Set enabled
+  pub fn set_enabled(mut self, enabled: bool) -> Self {
+    self.enabled = Some(enabled);
+    self
+  }
+
+  /// Set the onboarding mode
+  pub fn set_mode(mut self, mode: GuildOnboardingMode) -> Self {
+    self.mode = Some(mode);
+    self
+  }
+}
+
+impl GuildIncidentActionsModifyOptions {
+  /// Creates a new empty `GuildIncidentActionsModifyOptions`
+  pub fn new() -> Self {
+    Self {
+      invites_disabled_until: None,
+      dms_disabled_until: None,
+    }
+  }
+
+  /// Set invites disabled until
+  pub fn set_invites_disabled_until(mut self, invites_disabled_until: Option<DateTime<Utc>>) -> Self {
+    self.invites_disabled_until = Some(invites_disabled_until);
+    self
+  }
+
+  /// Set DMs disabled until
+  pub fn set_dms_disabled_until(mut self, dms_disabled_until: Option<DateTime<Utc>>) -> Self {
+    self.dms_disabled_until = Some(dms_disabled_until);
+    self
+  }
+}
+
+impl Default for GuildOnboardingPrompt {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for GuildOnboardingPromptOption {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl Default for GuildMemberListOptions {
   fn default() -> Self {
     Self::new()
@@ -1429,6 +2226,30 @@ impl Default for PruneCountOptions {
 }
 
 impl Default for PruneOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for GuildWidgetModifyOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for WelcomeScreenModifyOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for GuildOnboardingModifyOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for GuildIncidentActionsModifyOptions {
   fn default() -> Self {
     Self::new()
   }
