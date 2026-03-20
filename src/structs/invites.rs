@@ -61,6 +61,15 @@ pub struct Invite {
   pub created_at: Option<DateTime<Utc>>,
 }
 
+/// Special partial invite object from [`get_vanity_url`](Guild::get_vanity_url)
+#[derive(Deserialize, Clone, Debug)]
+pub struct VanityUrlInvite {
+  /// The invite code (`None` if vanity url is not set)
+  pub code: Option<String>,
+  /// Number of times this invite has been used
+  pub uses: Option<i64>,
+}
+
 /// Discord Invite Types
 #[derive(Deserialize_repr, Serialize_repr, Clone, Debug)]
 #[repr(u8)]
