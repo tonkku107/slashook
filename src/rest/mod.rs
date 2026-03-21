@@ -34,9 +34,12 @@ pub enum RestError {
   /// Represents an error that occurred within the reqwest library
   #[error("There was an error performing this request")]
   ReqwestError(#[from] reqwest::Error),
-  /// Represents an error that occurred within the serde library
+  /// Represents an error that occurred within the serde_json library
   #[error("Failed to (de)serialize data")]
   SerializationError(#[from] serde_json::Error),
+  /// Represents an error that occurred within the serde_qs library
+  #[error("Failed to process query string")]
+  QueryStringError(#[from] serde_qs::Error),
   /// Represents an error for requests with a failed status
   #[error("Request failed with status {status}. Body: {body}")]
   RequestFailed {
@@ -150,8 +153,10 @@ impl Rest {
 
   /// Make a get request with query parameters
   pub async fn get_query<T: DeserializeOwned + 'static, U: Serialize>(&self, path: String, query: U) -> Result<T, RestError> {
-    let req = self.client.get(format!("{}/{}", API_URL, path))
-      .query(&query);
+    let qs = serde_qs::Config::new().array_format(serde_qs::ArrayFormat::Unindexed);
+    let string_qs = qs.serialize_string(&query)?;
+
+    let req = self.client.get(format!("{}/{}?{}", API_URL, path, string_qs));
     let res = req.send().await?;
     handle_response(res).await
   }
