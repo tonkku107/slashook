@@ -650,8 +650,15 @@ impl Channel {
   /// let invite = channel.create_invite(&input.rest, options).await?;
   /// # }
   /// ```
-  pub async fn create_invite(&self, rest: &Rest, options: CreateInviteOptions) -> Result<Invite, RestError> {
-    rest.post(format!("channels/{}/invites", self.id), options).await
+  pub async fn create_invite(&self, rest: &Rest, mut options: CreateInviteOptions) -> Result<Invite, RestError> {
+    let path = format!("channels/{}/invites", self.id);
+
+    if let Some(mut file) = options.target_users_file.take() {
+      file._part_name = Some("target_users_file".to_string());
+      rest.post_files(path, options, vec![file]).await
+    } else {
+      rest.post(path, options).await
+    }
   }
 
   /// Follows an announcement channel to send messages to the target channel
