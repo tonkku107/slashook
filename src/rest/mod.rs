@@ -27,6 +27,7 @@ use reqwest::{
   header::{HeaderMap, HeaderValue}
 };
 use thiserror::Error;
+use tokio_util::bytes::Bytes;
 
 /// Type for errors from rest api calls
 #[derive(Error, Debug)]
@@ -76,7 +77,8 @@ fn handle_multipart<U: Serialize + Attachments>(mut json_data: U, files: Vec<Fil
   for (i, file) in files.into_iter().enumerate() {
     attachments.push(Attachment::from_file(i.to_string(), &file));
     let part = Part::bytes(file.data).file_name(file.filename);
-    form_data = form_data.part(format!("files[{}]", i), part);
+    let name = file._part_name.unwrap_or_else(|| format!("files[{}]", i));
+    form_data = form_data.part(name, part);
   }
 
   json_data.set_attachments(attachments);
@@ -148,6 +150,13 @@ impl Rest {
     handle_response(res).await
   }
 
+  /// Make a get request and return raw bytes
+  pub async fn get_raw(&self, path: String) -> Result<Bytes, RestError> {
+    let req = self.client.get(format!("{}/{}", API_URL, path));
+    let res = req.send().await?;
+    return Ok(res.bytes().await?);
+  }
+
   /// Make a get request with query parameters
   pub async fn get_query<T: DeserializeOwned + 'static, U: Serialize>(&self, path: String, query: U) -> Result<T, RestError> {
     let req = self.client.get(format!("{}/{}", API_URL, path))
@@ -212,6 +221,15 @@ impl Rest {
   pub async fn put<T: DeserializeOwned + 'static, U: Serialize>(&self, path: String, data: U) -> Result<T, RestError> {
     let req = self.client.put(format!("{}/{}", API_URL, path))
       .json(&data);
+    let res = req.send().await?;
+    handle_response(res).await
+  }
+
+  /// Make a put request including files
+  pub async fn put_files<T: DeserializeOwned + 'static, U: Serialize + Attachments>(&self, path: String, json_data: U, files: Vec<File>) -> Result<T, RestError> {
+    let form_data = handle_multipart(json_data, files)?;
+    let req = self.client.put(format!("{}/{}", API_URL, path))
+      .multipart(form_data);
     let res = req.send().await?;
     handle_response(res).await
   }
