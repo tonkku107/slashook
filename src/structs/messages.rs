@@ -14,7 +14,7 @@ use serde_json::Value;
 use super::{
   Snowflake,
   applications::Application,
-  channels::{Channel, ChannelType, ThreadCreateOptions},
+  channels::{Channel, ChannelType, ThreadCreateOptions, ThreadMember},
   components::Component,
   embeds::Embed,
   emojis::Emoji,
@@ -458,26 +458,239 @@ pub struct MessageCall {
   pub ended_timestamp: Option<DateTime<Utc>>,
 }
 
-/// Options for fetching multiple messages with [fetch_many](Message::fetch_many).
+/// Options for fetching multiple messages with [`fetch_many`](Message::fetch_many).
 /// Only one of `around`, `before`, or `after` can be passed at once.
-#[derive(Serialize, Default, Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 pub struct MessageFetchOptions {
   /// Get messages around this message ID
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub around: Option<Snowflake>,
   /// Get messages before this message ID
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub before: Option<Snowflake>,
   /// Get messages after this message ID
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub after: Option<Snowflake>,
   /// Max number of messages to return (1-100). Defaults to 50.
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
 }
 
-/// Options for fetching reactions with [get_reactions](Message::get_reactions) or poll voters with [get_poll_voters](Message::get_poll_voters).
-#[derive(Serialize, Default, Clone, Debug)]
+/// Options for searching messages with [`search`](Message::search)
+#[derive(Serialize, Clone, Debug)]
+pub struct MessageSearchOptions {
+  /// Max number of messages to return (1-25, default 25)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub limit: Option<i64>,
+  /// Number to offset the returned messages by (max 9975)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub offset: Option<i64>,
+  /// Get messages before this message ID
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub max_id: Option<Snowflake>,
+  /// Get messages after this message ID
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub min_id: Option<Snowflake>,
+  /// Max number of words to skip between matching tokens in the search content (max 100, default 2)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub slop: Option<i64>,
+  /// Filter messages by content (max 1024 characters)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub content: Option<String>,
+  /// Filter messages by these channels (max 500)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub channel_id: Option<Vec<Snowflake>>,
+  /// Filter messages by [author type](MessageSearchAuthorType)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub author_type: Option<Vec<MessageSearchAuthorType>>,
+  /// Filter messages by these authors (max 100)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub author_id: Option<Vec<Snowflake>>,
+  /// Filter messages that mention these users (max 100)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub mentions: Option<Vec<Snowflake>>,
+  /// Filter messages that mention these roles (max 100)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub mentions_role_id: Option<Vec<Snowflake>>,
+  /// Filter messages that do or do not mention @everyone
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub mention_everyone: Option<bool>,
+  /// Filter messages that reply to these users (max 100)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub replied_to_user_id: Option<Vec<Snowflake>>,
+  /// Filter messages that reply to these messages (max 100)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub replied_to_message_id: Option<Vec<Snowflake>>,
+  /// Filter messages by whether they are or are not pinned
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub pinned: Option<bool>,
+  /// Filter messages by whether or not they [have specific things](MessageSearchHasType)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub has: Option<Vec<MessageSearchHasType>>,
+  /// Filter messages by [embed type](MessageSearchEmbedType)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub embed_type: Option<Vec<MessageSearchEmbedType>>,
+  /// Filter messages by embed provider (case-sensitive, e.g. `Tenor`) (max 256 characters, max 100)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub embed_provider: Option<Vec<String>>,
+  /// Filter messages by link hostname (e.g. `discordapp.com`) (max 256 characters, max 100)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub link_hostname: Option<Vec<String>>,
+  /// Filter messages by attachment filename (max 1024 characters, max 100)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub attachment_filename: Option<Vec<String>>,
+  /// Filter messages by attachment extension (e.g. `txt`) (max 256 characters, max 100)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub attachment_extension: Option<Vec<String>>,
+  /// The [sorting algorithm](MessageSearchSortMode) to use
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub sort_by: Option<MessageSearchSortMode>,
+  /// The direction to sort
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub sort_order: Option<MessageSearchSortOrder>,
+  /// Whether to include results from age-restricted channels (default false)
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub include_nsfw: Option<bool>,
+}
+
+/// Discord Message Search Author Types
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum MessageSearchAuthorType {
+  /// Return messages sent by user accounts
+  User,
+  /// Return messages sent by bot accounts
+  Bot,
+  /// Return messages sent by webhooks
+  Webhook,
+  /// Author type that hasn't been implemented yet
+  #[serde(untagged)]
+  Unknown(String),
+}
+
+/// Discord Message Search Has Types
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum MessageSearchHasType {
+  /// Return messages that have an image
+  Image,
+  /// Return messages that have a sound attachment
+  Sound,
+  /// Return messages that have a video
+  Video,
+  /// Return messages that have an attachment
+  File,
+  /// Return messages that have a sent sticker
+  Sticker,
+  /// Return messages that have an embed
+  Embed,
+  /// Return messages that have a link
+  Link,
+  /// Return messages that have a poll
+  Poll,
+  /// Return messages that have a forwarded message
+  Snapshot,
+  /// Has type that hasn't been implemented yet
+  #[serde(untagged)]
+  Unknown(String),
+}
+
+/// Discord Message Search Has Types
+#[derive(Serialize, Clone, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum MessageSearchEmbedType {
+  /// Return messages that have an image embed
+  Image,
+  /// Return messages that have a video embed
+  Video,
+  /// Return messages that have a gifv embed
+  Gif,
+  /// Return messages that have a sound embed
+  Sound,
+  /// Return messages that have an article embed
+  Article,
+  /// Embed type that hasn't been implemented yet
+  #[serde(untagged)]
+  Unknown(String),
+}
+
+/// Discord Message Search Sort Modes
+#[derive(Serialize, Clone, Default, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum MessageSearchSortMode {
+  /// Sort by the message creation time (default)
+  #[default]
+  Timestamp,
+  /// Sort by the relevance of the message to the search query
+  Relevance,
+  /// Sort mode that hasn't been implemented yet
+  #[serde(untagged)]
+  Unknown(String),
+}
+
+/// Discord Message Search Sort Order
+#[derive(Serialize, Clone, Default, Debug)]
+pub enum MessageSearchSortOrder {
+  /// Ascending sort
+  #[serde(rename = "asc")]
+  Ascending,
+  /// Descending sort
+  #[serde(rename = "desc")]
+  #[default]
+  Descending,
+  /// Sort order that hasn't been implemented yet
+  #[serde(untagged)]
+  Unknown(String),
+}
+
+/// Response from searching messages with [`search`](Message::search)
+#[derive(Deserialize, Clone, Debug)]
+#[serde(untagged)]
+pub enum MessageSearchResponse {
+  /// Results were returned
+  Results(MessageSearchResponseResults),
+  /// Messages are still being indexed
+  Indexing(MessageSearchResponseIndexing),
+}
+
+/// The response when results have been returned
+#[derive(Deserialize, Clone, Debug)]
+pub struct MessageSearchResponseResults {
+  /// Whether the guild is undergoing a deep historical indexing operation
+  pub doing_deep_historical_index: bool,
+  /// The number of documents that have been indexed during the current index operation, if any
+  pub documents_indexed: Option<i64>,
+  /// The total number of results that match the query
+  pub total_results: i64,
+  /// A nested array of messages that match the query
+  pub messages: Vec<Vec<Message>>,
+  /// The threads that contain the returned messages
+  pub threads: Option<Vec<Channel>>,
+  /// A thread member object for each returned thread the current user has joined
+  pub members: Option<Vec<ThreadMember>>,
+}
+
+/// The response when the messages are still being indexed
+#[derive(Deserialize, Clone, Debug)]
+pub struct MessageSearchResponseIndexing {
+  /// Discord error message
+  pub message: String,
+  /// Discord error code
+  pub code: i64,
+  /// The number of documents that have been indexed during the current index operation, if any
+  pub documents_indexed: Option<i64>,
+  /// Amount of time in seconds to wait before searching again
+  pub retry_after: i64,
+}
+
+/// Options for fetching reactions with [`get_reactions`](Message::get_reactions) or poll voters with [`get_poll_voters`](Message::get_poll_voters).
+#[derive(Serialize, Clone, Debug)]
 pub struct ReactionFetchOptions {
   /// Get users after this user ID
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub after: Option<Snowflake>,
   /// Max number of users to return (1-100) Defaults to 25.
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
 }
 
@@ -509,6 +722,33 @@ impl Message {
   /// ```
   pub async fn fetch_many<T: ToString>(rest: &Rest, channel_id: T, options: MessageFetchOptions) -> Result<Vec<Self>, RestError> {
     rest.get_query(format!("channels/{}/messages", channel_id.to_string()), options).await
+  }
+
+  /// Search for messages
+  /// ```
+  /// # #[macro_use] extern crate slashook;
+  /// # use slashook::commands::{CommandInput, CommandResponder};
+  /// # use slashook::structs::messages::{Message, MessageSearchOptions, MessageSearchAuthorType, MessageSearchSortMode, MessageSearchSortOrder, MessageSearchResponse};
+  /// # #[command(name = "example", description = "An example command")]
+  /// # fn example(input: CommandInput, res: CommandResponder) {
+  /// let options = MessageSearchOptions::new()
+  ///   .set_limit(5)
+  ///   .set_channel_id(vec![input.channel_id.unwrap()])
+  ///   .set_content("hi")
+  ///   .set_author_type(vec![MessageSearchAuthorType::User])
+  ///   .set_sort_by(MessageSearchSortMode::Timestamp)
+  ///   .set_sort_order(MessageSearchSortOrder::Ascending);
+  /// let result = Message::search(&input.rest, input.guild_id.unwrap(), options).await?;
+  /// match result {
+  ///   MessageSearchResponse::Indexing(indexing) =>
+  ///     return res.send_message(format!("Try again in {}s", indexing.retry_after)).await?,
+  ///   MessageSearchResponse::Results(results) =>
+  ///     return res.send_message(format!("Found {} messages", results.total_results)).await?,
+  /// }
+  /// # }
+  /// ```
+  pub async fn search<T: ToString>(rest: &Rest, guild_id: T, options: MessageSearchOptions) -> Result<MessageSearchResponse, RestError> {
+    rest.get_query(format!("guilds/{}/messages/search", guild_id.to_string()), options).await
   }
 
   /// Send a new message to a channel
@@ -1071,7 +1311,7 @@ impl AllowedMentions {
 }
 
 impl MessageFetchOptions {
-  /// Creates a new empty MessageFetchOptions
+  /// Creates a new empty `MessageFetchOptions`
   pub fn new() -> Self {
     Self {
       around: None,
@@ -1115,8 +1355,184 @@ impl MessageFetchOptions {
   }
 }
 
+impl MessageSearchOptions {
+  /// Creates a new empty `MessageSearchOptions`
+  pub fn new() -> Self {
+    Self {
+      limit: None,
+      offset: None,
+      max_id: None,
+      min_id: None,
+      slop: None,
+      content: None,
+      channel_id: None,
+      author_type: None,
+      author_id: None,
+      mentions: None,
+      mentions_role_id: None,
+      mention_everyone: None,
+      replied_to_user_id: None,
+      replied_to_message_id: None,
+      pinned: None,
+      has: None,
+      embed_type: None,
+      embed_provider: None,
+      link_hostname: None,
+      attachment_filename: None,
+      attachment_extension: None,
+      sort_by: None,
+      sort_order: None,
+      include_nsfw: None,
+    }
+  }
+
+  /// Set limit
+  pub fn set_limit(mut self, limit: i64) -> Self {
+    self.limit = Some(limit);
+    self
+  }
+
+  /// Set offset
+  pub fn set_offset(mut self, offset: i64) -> Self {
+    self.offset = Some(offset);
+    self
+  }
+
+  /// Set max id
+  pub fn set_max_id<T: ToString>(mut self, max_id: T) -> Self {
+    self.max_id = Some(max_id.to_string());
+    self
+  }
+
+  /// Set min id
+  pub fn set_min_id<T: ToString>(mut self, min_id: T) -> Self {
+    self.min_id = Some(min_id.to_string());
+    self
+  }
+
+  /// Set slop
+  pub fn set_slop(mut self, slop: i64) -> Self {
+    self.slop = Some(slop);
+    self
+  }
+
+  /// Set content
+  pub fn set_content<T: ToString>(mut self, content: T) -> Self {
+    self.content = Some(content.to_string());
+    self
+  }
+
+  /// Set channel ids
+  pub fn set_channel_id<T: ToString>(mut self, channel_ids: Vec<T>) -> Self {
+    self.channel_id = Some(channel_ids.into_iter().map(|id| id.to_string()).collect());
+    self
+  }
+
+  /// Set author types
+  pub fn set_author_type(mut self, author_types: Vec<MessageSearchAuthorType>) -> Self {
+    self.author_type = Some(author_types);
+    self
+  }
+
+  /// Set author ids
+  pub fn set_author_id<T: ToString>(mut self, author_ids: Vec<T>) -> Self {
+    self.author_id = Some(author_ids.into_iter().map(|id| id.to_string()).collect());
+    self
+  }
+
+  /// Set mentions
+  pub fn set_mentions<T: ToString>(mut self, mentions: Vec<T>) -> Self {
+    self.mentions = Some(mentions.into_iter().map(|id| id.to_string()).collect());
+    self
+  }
+
+  /// Set mentions role ids
+  pub fn set_mentions_role_id<T: ToString>(mut self, role_ids: Vec<T>) -> Self {
+    self.mentions_role_id = Some(role_ids.into_iter().map(|id| id.to_string()).collect());
+    self
+  }
+
+  /// Set mention_everyone
+  pub fn set_mention_everyone(mut self, mention_everyone: bool) -> Self {
+    self.mention_everyone = Some(mention_everyone);
+    self
+  }
+
+  /// Set replied to user ids
+  pub fn set_replied_to_user_id<T: ToString>(mut self, replied_to_user_ids: Vec<T>) -> Self {
+    self.replied_to_user_id = Some(replied_to_user_ids.into_iter().map(|id| id.to_string()).collect());
+    self
+  }
+
+  /// Set replied to message ids
+  pub fn set_replied_to_message_id<T: ToString>(mut self, replied_to_message_ids: Vec<T>) -> Self {
+    self.replied_to_message_id = Some(replied_to_message_ids.into_iter().map(|id| id.to_string()).collect());
+    self
+  }
+
+  /// Set pinned
+  pub fn set_pinned(mut self, pinned: bool) -> Self {
+    self.pinned = Some(pinned);
+    self
+  }
+
+  /// Set has
+  pub fn set_has(mut self, has: Vec<MessageSearchHasType>) -> Self {
+    self.has = Some(has);
+    self
+  }
+
+  /// Set embed types
+  pub fn set_embed_type(mut self, embed_types: Vec<MessageSearchEmbedType>) -> Self {
+    self.embed_type = Some(embed_types);
+    self
+  }
+
+  /// Set embed providers
+  pub fn set_embed_provider<T: ToString>(mut self, embed_providers: Vec<T>) -> Self {
+    self.embed_provider = Some(embed_providers.into_iter().map(|id| id.to_string()).collect());
+    self
+  }
+
+  /// Set link hostnames
+  pub fn set_link_hostname<T: ToString>(mut self, link_hostnames: Vec<T>) -> Self {
+    self.link_hostname = Some(link_hostnames.into_iter().map(|id| id.to_string()).collect());
+    self
+  }
+
+  /// Set attachment filenames
+  pub fn set_attachment_filename<T: ToString>(mut self, attachment_filenames: Vec<T>) -> Self {
+    self.attachment_filename = Some(attachment_filenames.into_iter().map(|id| id.to_string()).collect());
+    self
+  }
+
+  /// Set attachment extensions
+  pub fn set_attachment_extension<T: ToString>(mut self, attachment_extensions: Vec<T>) -> Self {
+    self.attachment_extension = Some(attachment_extensions.into_iter().map(|id| id.to_string()).collect());
+    self
+  }
+
+  /// Set sort by
+  pub fn set_sort_by(mut self, sort_by: MessageSearchSortMode) -> Self {
+    self.sort_by = Some(sort_by);
+    self
+  }
+
+  /// Set sort order
+  pub fn set_sort_order(mut self, sort_order: MessageSearchSortOrder) -> Self {
+    self.sort_order = Some(sort_order);
+    self
+  }
+
+  /// Set include nsfw
+  pub fn set_include_nsfw(mut self, include_nsfw: bool) -> Self {
+    self.include_nsfw = Some(include_nsfw);
+    self
+  }
+}
+
 impl ReactionFetchOptions {
-  /// Creates a new empty ReactionFetchOptions
+  /// Creates a new empty `ReactionFetchOptions`
   pub fn new() -> Self {
     Self {
       after: None,
@@ -1134,6 +1550,30 @@ impl ReactionFetchOptions {
   pub fn set_limit(mut self, limit: i64) -> Self {
     self.limit = Some(limit);
     self
+  }
+}
+
+impl Default for AllowedMentions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for MessageFetchOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for MessageSearchOptions {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for ReactionFetchOptions {
+  fn default() -> Self {
+    Self::new()
   }
 }
 
@@ -1160,11 +1600,5 @@ impl<'de> Deserialize<'de> for AttachmentFlags {
 impl Serialize for AttachmentFlags {
   fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
     s.serialize_u32(self.bits())
-  }
-}
-
-impl Default for AllowedMentions {
-  fn default() -> Self {
-    Self::new()
   }
 }
