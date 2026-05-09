@@ -39,7 +39,9 @@ pub struct File {
   /// The duration in seconds for a voice message
   pub duration_secs: Option<f64>,
   /// The waveform for a voice message
-  pub waveform: Option<String>
+  pub waveform: Option<String>,
+  /// Internal override for multipart/form-data part name (By default files will be sent as `files[n]`)
+  pub(crate) _part_name: Option<String>,
 }
 
 impl Color {
@@ -93,7 +95,8 @@ impl File {
       data: data.into(),
       description: None,
       duration_secs: None,
-      waveform: None
+      waveform: None,
+      _part_name: None,
     }
   }
 
@@ -116,7 +119,8 @@ impl File {
       data,
       description: None,
       duration_secs: None,
-      waveform: None
+      waveform: None,
+      _part_name: None,
     })
   }
 
