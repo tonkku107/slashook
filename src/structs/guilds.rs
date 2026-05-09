@@ -739,6 +739,7 @@ pub enum GuildOnboardingMode {
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct GuildFetchOptions {
   /// when `true`, will return approximate member and presence counts for the guild
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub with_counts: Option<bool>,
 }
 
