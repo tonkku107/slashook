@@ -143,12 +143,16 @@ pub struct ModifyUserOptions {
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct GetUserGuildsOptions {
   /// Get guilds before this guild ID
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub before: Option<Snowflake>,
   /// Get guilds after this guild ID
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub after: Option<Snowflake>,
   /// Max number of guilds to return (1-200). Default 200
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
   /// Include approximate member and presence counts in response
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub with_counts: Option<bool>,
 }
 

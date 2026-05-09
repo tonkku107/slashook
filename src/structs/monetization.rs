@@ -120,18 +120,25 @@ pub enum EntitlementType {
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct ListEntitlementsOptions {
   /// User ID to look up entitlements for
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub user_id: Option<Snowflake>,
   /// Optional comma-delimited list of SKU IDs to check entitlements for
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub sku_ids: Option<String>,
   /// Retrieve entitlements before this entitlement ID
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub before: Option<Snowflake>,
   /// Retrieve entitlements after this entitlement ID
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub after: Option<Snowflake>,
   /// Number of entitlements to return, 1-100, default 100
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
   /// Guild ID to look up entitlements for
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub guild_id: Option<Snowflake>,
   /// Whether or not ended entitlements should be omitted
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub exclude_ended: Option<bool>,
 }
 
@@ -201,12 +208,16 @@ pub enum SubscriptionStatus {
 #[derive(Serialize, Clone, Debug, Default)]
 pub struct ListSubscriptionOptions {
   /// List subscriptions before this ID
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub before: Option<Snowflake>,
   /// List subscriptions after this ID
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub after: Option<Snowflake>,
   /// Number of results to return (1-100)
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
   /// User ID for which to return subscriptions. Required except for OAuth queries.
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub user_id: Option<Snowflake>,
 }
 

@@ -433,8 +433,10 @@ pub struct ChannelModifyOptions {
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct PinsListOptions {
   /// Get messages pinned before this timestamp
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub before: Option<DateTime<Utc>>,
   /// Max number of pins to return (1-50; Defaults to 50)
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
 }
 
@@ -471,10 +473,13 @@ pub struct ThreadCreateOptions {
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct ThreadMemberOptions {
   /// Whether to include a [guild member](GuildMember) object for each thread member
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub with_member: Option<bool>,
   /// Get thread members after this user ID
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub after: Option<Snowflake>,
   /// Max number of thread members to return (1-100). Defaults to 100.
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
 }
 
@@ -482,8 +487,10 @@ pub struct ThreadMemberOptions {
 #[derive(Serialize, Default, Clone, Debug)]
 pub struct ThreadListOptions {
   /// Returns threads archived before this timestamp
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub before: Option<DateTime<Utc>>,
   /// Optional maximum number of threads to return
+  #[serde(skip_serializing_if = "Option::is_none")]
   pub limit: Option<i64>,
 }
 
