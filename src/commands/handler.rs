@@ -325,7 +325,12 @@ impl CommandHandler {
             ));
           }
           input.args.insert(file_upload.custom_id, OptionValue::Values(values));
-        }
+        },
+        Component::RadioGroup(radio_group) => {
+          if let Some(value) = radio_group.value {
+            input.args.insert(radio_group.custom_id, OptionValue::String(value));
+          }
+        },
         _ => {}
       }
     }

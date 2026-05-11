@@ -59,6 +59,8 @@ pub enum ComponentType {
   LABEL = 18,
   /// Component for uploading files
   FILE_UPLOAD = 19,
+  /// Single-choice set of options
+  RADIO_GROUP = 21,
   /// A component that hasn't been implemented yet
   #[serde(other)]
   UNKNOWN,
@@ -94,6 +96,8 @@ pub enum Component {
   Label(Label),
   /// Component for uploading files
   FileUpload(FileUpload),
+  /// Single-choice set of options
+  RadioGroup(RadioGroup),
   /// A component that hasn't been implemented yet
   Unknown,
 }
@@ -492,6 +496,36 @@ pub struct FileUpload {
   pub values: Option<Vec<Snowflake>>,
 }
 
+/// A Radio Group component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RadioGroup {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// Developer-defined identifier for the input; 1-100 characters
+  pub custom_id: String,
+  /// List of options to show; min 2, max 10
+  pub options: Vec<RadioGroupOption>,
+  /// Whether a selection is required to submit the modal (defaults to `true`)
+  pub required: Option<bool>,
+  /// The value of the selected option, or `None` if no option is selected
+  pub value: Option<String>,
+}
+
+/// Discord Radio Group Option Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RadioGroupOption {
+  /// Dev-defined value of the option; max 100 characters
+  pub value: String,
+  /// User-facing label of the option; max 100 characters
+  pub label: String,
+  /// Optional description for the option; max 100 characters
+  pub description: Option<String>,
+  /// Shows the option as selected by default
+  pub default: Option<bool>,
+}
+
 impl Components {
   /// Creates a new set of components with an Action Row to start off
   pub fn new() -> Self {
@@ -662,6 +696,36 @@ impl Components {
         self.0.push(Component::Label(label));
       },
       _ => panic!("Component is not a Label"),
+    }
+
+    self
+  }
+
+  /// Adds a radio group to the last label\
+  /// Note: radio groups are only valid for modals.
+  /// ```
+  /// # use slashook::structs::components::{Components, Label, RadioGroup, RadioGroupOption};
+  /// let radio_group = RadioGroup::new()
+  ///   .set_id("group1")
+  ///   .add_option(RadioGroupOption::new("true", "Yes"))
+  ///   .add_option(RadioGroupOption::new("false", "No"));
+  /// let components = Components::new_label(Label::new("Do you agree?"))
+  ///   .add_radio_group(radio_group);
+  /// ```
+  /// ## Panics
+  /// Will panic if the label cannot fit any more radio groups
+  pub fn add_radio_group(mut self, radio_group: RadioGroup) -> Self {
+    let component = self.0.pop().expect("No label available");
+
+    match component {
+      Component::Label(mut label) => {
+        let Component::Unknown = *label.component else {
+          panic!("The label can only contain one component.");
+        };
+        label = label.set_component(Component::RadioGroup(radio_group));
+        self.0.push(Component::Label(label));
+      },
+      _ => panic!("Component is not a label"),
     }
 
     self
@@ -1589,6 +1653,138 @@ impl FileUpload {
   }
 }
 
+impl RadioGroup {
+  /// Creates a new radio group
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::RADIO_GROUP,
+      id: None,
+      custom_id: String::new(),
+      options: Vec::new(),
+      required: None,
+      value: None,
+    }
+  }
+
+  /// Set the custom ID for a radio group.
+  /// ```
+  /// # use slashook::structs::components::RadioGroup;
+  /// let radio_group = RadioGroup::new()
+  ///   .set_id("group1");
+  /// assert_eq!(radio_group.custom_id, String::from("group1"));
+  /// ```
+  pub fn set_id<T: ToString>(mut self, id: T) -> Self {
+    self.custom_id = id.to_string();
+    self
+  }
+
+  /// Add an option to the radio group.
+  /// ```
+  /// # use slashook::structs::components::{RadioGroup, RadioGroupOption};
+  /// let radio_group = RadioGroup::new()
+  ///   .add_option(RadioGroupOption::new("true", "Yes"))
+  ///   .add_option(RadioGroupOption::new("false", "No"));
+  /// assert_eq!(radio_group.options.len(), 2);
+  /// ```
+  pub fn add_option(mut self, option: RadioGroupOption) -> Self {
+    self.options.push(option);
+    self
+  }
+
+  /// Set the options on the radio group.
+  /// ```
+  /// # use slashook::structs::components::{RadioGroup, RadioGroupOption};
+  /// let radio_group = RadioGroup::new()
+  ///   .set_options(vec![
+  ///     RadioGroupOption::new("true", "Yes"),
+  ///     RadioGroupOption::new("false", "No")
+  ///   ]);
+  /// assert_eq!(radio_group.options.len(), 2);
+  /// ```
+  pub fn set_options(mut self, options: Vec<RadioGroupOption>) -> Self {
+    self.options = options;
+    self
+  }
+
+  /// Set the required state of the radio group
+  /// ```
+  /// # use slashook::structs::components::RadioGroup;
+  /// let radio_group = RadioGroup::new()
+  ///   .set_required(false);
+  /// assert_eq!(radio_group.required, Some(false));
+  /// ```
+  pub fn set_required(mut self, required: bool) -> Self {
+    self.required = Some(required);
+    self
+  }
+}
+
+impl RadioGroupOption {
+  /// Creates a new radio group option with a value and a label
+  /// ```
+  /// # use slashook::structs::components::RadioGroupOption;
+  /// let option = RadioGroupOption::new("true", "Yes");
+  /// assert_eq!(option.value, String::from("true"));
+  /// assert_eq!(option.label, String::from("Yes"));
+  /// ```
+  pub fn new<T: ToString, U: ToString>(value: T, label: U) -> Self {
+    Self {
+      value: value.to_string(),
+      label: label.to_string(),
+      description: None,
+      default: None,
+    }
+  }
+
+  /// Set the value of the radio group option
+  /// ```
+  /// # use slashook::structs::components::RadioGroupOption;
+  /// let option = RadioGroupOption::new("true", "Yes")
+  ///   .set_value("1");
+  /// assert_eq!(option.value, String::from("1"));
+  /// ```
+  pub fn set_value<T: ToString>(mut self, value: T) -> Self {
+    self.value = value.to_string();
+    self
+  }
+
+  /// Set the label of the radio group option
+  /// ```
+  /// # use slashook::structs::components::RadioGroupOption;
+  /// let option = RadioGroupOption::new("true", "Yes")
+  ///   .set_label("Yep");
+  /// assert_eq!(option.label, String::from("Yep"));
+  /// ```
+  pub fn set_label<T: ToString>(mut self, label: T) -> Self {
+    self.label = label.to_string();
+    self
+  }
+
+  /// Set the description of the radio group option
+  /// ```
+  /// # use slashook::structs::components::RadioGroupOption;
+  /// let option = RadioGroupOption::new("true", "Yes")
+  ///   .set_description("Affirmative option");
+  /// assert_eq!(option.description, Some(String::from("Affirmative option")));
+  /// ```
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = Some(description.to_string());
+    self
+  }
+
+  /// Set the radio group option default state
+  /// ```
+  /// # use slashook::structs::components::RadioGroupOption;
+  /// let option = RadioGroupOption::new("true", "Yes")
+  ///   .set_default(true);
+  /// assert_eq!(option.default, Some(true));
+  /// ```
+  pub fn set_default(mut self, default: bool) -> Self {
+    self.default = Some(default);
+    self
+  }
+}
+
 impl From<ActionRow> for Component {
   fn from(value: ActionRow) -> Self {
     Self::ActionRow(value)
@@ -1739,6 +1935,12 @@ impl Default for FileUpload {
   }
 }
 
+impl Default for RadioGroup {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl From<SelectMenuType> for ComponentType {
   fn from(menu_type: SelectMenuType) -> Self {
     match menu_type {
@@ -1788,6 +1990,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       17 => Component::Container(Container::deserialize(value).map_err(de::Error::custom)?),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       19 => Component::FileUpload(FileUpload::deserialize(value).map_err(de::Error::custom)?),
+      21 => Component::RadioGroup(RadioGroup::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
   }
