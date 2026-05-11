@@ -331,6 +331,13 @@ impl CommandHandler {
             input.args.insert(radio_group.custom_id, OptionValue::String(value));
           }
         },
+        Component::CheckboxGroup(checkbox_group) => {
+          let mut values = Vec::new();
+          for value in checkbox_group.values.unwrap_or_default() {
+            values.push(OptionValue::String(value));
+          }
+          input.args.insert(checkbox_group.custom_id, OptionValue::Values(values));
+        },
         _ => {}
       }
     }
