@@ -338,6 +338,10 @@ impl CommandHandler {
           }
           input.args.insert(checkbox_group.custom_id, OptionValue::Values(values));
         },
+        Component::Checkbox(checkbox) => {
+          let value = OptionValue::Boolean(checkbox.value.unwrap_or_default());
+          input.args.insert(checkbox.custom_id, value);
+        },
         _ => {}
       }
     }

@@ -63,6 +63,8 @@ pub enum ComponentType {
   RADIO_GROUP = 21,
   /// Multi-selectable group of checkboxes
   CHECKBOX_GROUP = 22,
+  /// Single checkbox for yes/no choice
+  CHECKBOX = 23,
   /// A component that hasn't been implemented yet
   #[serde(other)]
   UNKNOWN,
@@ -102,6 +104,8 @@ pub enum Component {
   RadioGroup(RadioGroup),
   /// Multi-selectable group of checkboxes
   CheckboxGroup(CheckboxGroup),
+  /// Single checkbox for yes/no choice
+  Checkbox(Checkbox),
   /// A component that hasn't been implemented yet
   Unknown,
 }
@@ -564,6 +568,21 @@ pub struct CheckboxGroupOption {
   pub default: Option<bool>,
 }
 
+/// A Checkbox component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Checkbox {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// Developer-defined identifier for the input; 1-100 characters
+  pub custom_id: String,
+  /// Whether the checkbox is selected by default
+  pub default: Option<bool>,
+  /// The state of the checkbox (`true` if checked, `false` if unchecked)
+  pub value: Option<bool>,
+}
+
 impl Components {
   /// Creates a new set of components with an Action Row to start off
   pub fn new() -> Self {
@@ -791,6 +810,35 @@ impl Components {
           panic!("The label can only contain one component.");
         };
         label = label.set_component(Component::CheckboxGroup(checkbox_group));
+        self.0.push(Component::Label(label));
+      },
+      _ => panic!("Component is not a label"),
+    }
+
+    self
+  }
+
+  /// Adds a checkbox to the last label\
+  /// Note: checkboxes are only valid for modals.
+  /// ```
+  /// # use slashook::structs::components::{Components, Label, Checkbox};
+  /// let checkbox = Checkbox::new()
+  ///   .set_id("spam")
+  ///   .set_default(true);
+  /// let components = Components::new_label(Label::new("I would like to receive spam"))
+  ///   .add_checkbox(checkbox);
+  /// ```
+  /// ## Panics
+  /// Will panic if the label cannot fit any more checkboxes
+  pub fn add_checkbox(mut self, checkbox: Checkbox) -> Self {
+    let component = self.0.pop().expect("No label abailable");
+
+    match component {
+      Component::Label(mut label) => {
+        let Component::Unknown = *label.component else {
+          panic!("The label can only contain one component.");
+        };
+        label = label.set_component(Component::Checkbox(checkbox));
         self.0.push(Component::Label(label));
       },
       _ => panic!("Component is not a label"),
@@ -2011,6 +2059,43 @@ impl CheckboxGroupOption {
   }
 }
 
+impl Checkbox {
+  /// Creates a new checkbox
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::CHECKBOX,
+      id: None,
+      custom_id: String::new(),
+      default: None,
+      value: None,
+    }
+  }
+
+  /// Set the custom ID for a checkbox.
+  /// ```
+  /// # use slashook::structs::components::Checkbox;
+  /// let checkbox = Checkbox::new()
+  ///   .set_id("check1");
+  /// assert_eq!(checkbox.custom_id, String::from("check1"));
+  /// ```
+  pub fn set_id<T: ToString>(mut self, id: T) -> Self {
+    self.custom_id = id.to_string();
+    self
+  }
+
+  /// Set the checkbox default state
+  /// ```
+  /// # use slashook::structs::components::Checkbox;
+  /// let checkbox = Checkbox::new()
+  ///   .set_default(true);
+  /// assert_eq!(checkbox.default, Some(true));
+  /// ```
+  pub fn set_default(mut self, default: bool) -> Self {
+    self.default = Some(default);
+    self
+  }
+}
+
 impl From<ActionRow> for Component {
   fn from(value: ActionRow) -> Self {
     Self::ActionRow(value)
@@ -2173,6 +2258,12 @@ impl Default for CheckboxGroup {
   }
 }
 
+impl Default for Checkbox {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl From<SelectMenuType> for ComponentType {
   fn from(menu_type: SelectMenuType) -> Self {
     match menu_type {
@@ -2224,6 +2315,7 @@ impl<'de> serde::Deserialize<'de> for Component {
       19 => Component::FileUpload(FileUpload::deserialize(value).map_err(de::Error::custom)?),
       21 => Component::RadioGroup(RadioGroup::deserialize(value).map_err(de::Error::custom)?),
       22 => Component::CheckboxGroup(CheckboxGroup::deserialize(value).map_err(de::Error::custom)?),
+      23 => Component::Checkbox(Checkbox::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
   }
