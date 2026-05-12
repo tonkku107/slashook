@@ -346,6 +346,7 @@ pub struct TextDisplay {
   /// Optional identifier for component
   pub id: Option<i64>,
   /// Text that will be displayed similar to a message
+  #[serde(default)]
   pub content: String,
 }
 
@@ -514,6 +515,7 @@ pub struct RadioGroup {
   /// Developer-defined identifier for the input; 1-100 characters
   pub custom_id: String,
   /// List of options to show; min 2, max 10
+  #[serde(default)]
   pub options: Vec<RadioGroupOption>,
   /// Whether a selection is required to submit the modal (defaults to `true`)
   pub required: Option<bool>,
@@ -544,6 +546,7 @@ pub struct CheckboxGroup {
   /// Developer-defined identifier for the input; 1-100 characters
   pub custom_id: String,
   /// List of options to show; min 1, max 10
+  #[serde(default)]
   pub options: Vec<CheckboxGroupOption>,
   /// Minimum number of items that must be chosen; min 0, max 10 (defaults to 1);
   pub min_values: Option<i64>,
