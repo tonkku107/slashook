@@ -325,7 +325,23 @@ impl CommandHandler {
             ));
           }
           input.args.insert(file_upload.custom_id, OptionValue::Values(values));
-        }
+        },
+        Component::RadioGroup(radio_group) => {
+          if let Some(value) = radio_group.value {
+            input.args.insert(radio_group.custom_id, OptionValue::String(value));
+          }
+        },
+        Component::CheckboxGroup(checkbox_group) => {
+          let mut values = Vec::new();
+          for value in checkbox_group.values.unwrap_or_default() {
+            values.push(OptionValue::String(value));
+          }
+          input.args.insert(checkbox_group.custom_id, OptionValue::Values(values));
+        },
+        Component::Checkbox(checkbox) => {
+          let value = OptionValue::Boolean(checkbox.value.unwrap_or_default());
+          input.args.insert(checkbox.custom_id, value);
+        },
         _ => {}
       }
     }

@@ -59,6 +59,12 @@ pub enum ComponentType {
   LABEL = 18,
   /// Component for uploading files
   FILE_UPLOAD = 19,
+  /// Single-choice set of options
+  RADIO_GROUP = 21,
+  /// Multi-selectable group of checkboxes
+  CHECKBOX_GROUP = 22,
+  /// Single checkbox for yes/no choice
+  CHECKBOX = 23,
   /// A component that hasn't been implemented yet
   #[serde(other)]
   UNKNOWN,
@@ -94,6 +100,12 @@ pub enum Component {
   Label(Label),
   /// Component for uploading files
   FileUpload(FileUpload),
+  /// Single-choice set of options
+  RadioGroup(RadioGroup),
+  /// Multi-selectable group of checkboxes
+  CheckboxGroup(CheckboxGroup),
+  /// Single checkbox for yes/no choice
+  Checkbox(Checkbox),
   /// A component that hasn't been implemented yet
   Unknown,
 }
@@ -334,6 +346,7 @@ pub struct TextDisplay {
   /// Optional identifier for component
   pub id: Option<i64>,
   /// Text that will be displayed similar to a message
+  #[serde(default)]
   pub content: String,
 }
 
@@ -490,6 +503,87 @@ pub struct FileUpload {
   pub required: Option<bool>,
   /// IDs of the uploaded files found in the [resolved data](InteractionDataResolved)
   pub values: Option<Vec<Snowflake>>,
+}
+
+/// A Radio Group component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RadioGroup {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// Developer-defined identifier for the input; 1-100 characters
+  pub custom_id: String,
+  /// List of options to show; min 2, max 10
+  #[serde(default)]
+  pub options: Vec<RadioGroupOption>,
+  /// Whether a selection is required to submit the modal (defaults to `true`)
+  pub required: Option<bool>,
+  /// The value of the selected option, or `None` if no option is selected
+  pub value: Option<String>,
+}
+
+/// Discord Radio Group Option Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct RadioGroupOption {
+  /// Dev-defined value of the option; max 100 characters
+  pub value: String,
+  /// User-facing label of the option; max 100 characters
+  pub label: String,
+  /// Optional description for the option; max 100 characters
+  pub description: Option<String>,
+  /// Shows the option as selected by default
+  pub default: Option<bool>,
+}
+
+/// A Checkbox Group component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CheckboxGroup {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// Developer-defined identifier for the input; 1-100 characters
+  pub custom_id: String,
+  /// List of options to show; min 1, max 10
+  #[serde(default)]
+  pub options: Vec<CheckboxGroupOption>,
+  /// Minimum number of items that must be chosen; min 0, max 10 (defaults to 1);
+  pub min_values: Option<i64>,
+  /// Maximum number of items that can be chosen; min 1, max 10 (defaults to the number of options)
+  pub max_values: Option<i64>,
+  /// Whether selecting within the group is required (defaults to `true`)
+  pub required: Option<bool>,
+  /// The values of the selected options, or an empty array `[]` if no options are selected
+  pub values: Option<Vec<String>>,
+}
+
+/// Discord Checkbox Group Option Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct CheckboxGroupOption {
+  /// Dev-defined value of the option; max 100 characters
+  pub value: String,
+  /// User-facing label of the option; max 100 characters
+  pub label: String,
+  /// Optional description for the option; max 100 characters
+  pub description: Option<String>,
+  /// Shows the option as selected by default
+  pub default: Option<bool>,
+}
+
+/// A Checkbox component
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Checkbox {
+  #[serde(rename = "type")]
+  component_type: ComponentType,
+  /// Optional identifier for component
+  pub id: Option<i64>,
+  /// Developer-defined identifier for the input; 1-100 characters
+  pub custom_id: String,
+  /// Whether the checkbox is selected by default
+  pub default: Option<bool>,
+  /// The state of the checkbox (`true` if checked, `false` if unchecked)
+  pub value: Option<bool>,
 }
 
 impl Components {
@@ -662,6 +756,95 @@ impl Components {
         self.0.push(Component::Label(label));
       },
       _ => panic!("Component is not a Label"),
+    }
+
+    self
+  }
+
+  /// Adds a radio group to the last label\
+  /// Note: radio groups are only valid for modals.
+  /// ```
+  /// # use slashook::structs::components::{Components, Label, RadioGroup, RadioGroupOption};
+  /// let radio_group = RadioGroup::new()
+  ///   .set_id("group1")
+  ///   .add_option(RadioGroupOption::new("true", "Yes"))
+  ///   .add_option(RadioGroupOption::new("false", "No"));
+  /// let components = Components::new_label(Label::new("Do you agree?"))
+  ///   .add_radio_group(radio_group);
+  /// ```
+  /// ## Panics
+  /// Will panic if the label cannot fit any more radio groups
+  pub fn add_radio_group(mut self, radio_group: RadioGroup) -> Self {
+    let component = self.0.pop().expect("No label available");
+
+    match component {
+      Component::Label(mut label) => {
+        let Component::Unknown = *label.component else {
+          panic!("The label can only contain one component.");
+        };
+        label = label.set_component(Component::RadioGroup(radio_group));
+        self.0.push(Component::Label(label));
+      },
+      _ => panic!("Component is not a label"),
+    }
+
+    self
+  }
+
+  /// Adds a checkbox group to the last label\
+  /// Note: checkbox groups are only valid for modals.
+  /// ```
+  /// # use slashook::structs::components::{Components, Label, CheckboxGroup, CheckboxGroupOption};
+  /// let checkbox_group = CheckboxGroup::new()
+  ///   .set_id("group1")
+  ///   .add_option(CheckboxGroupOption::new("a", "This"))
+  ///   .add_option(CheckboxGroupOption::new("b", "That"));
+  /// let components = Components::new_label(Label::new("Which would you like?"))
+  ///   .add_checkbox_group(checkbox_group);
+  /// ```
+  /// ## Panics
+  /// Will panic if the label cannot fit any more checkbox groups
+  pub fn add_checkbox_group(mut self, checkbox_group: CheckboxGroup) -> Self {
+    let component = self.0.pop().expect("No label available");
+
+    match component {
+      Component::Label(mut label) => {
+        let Component::Unknown = *label.component else {
+          panic!("The label can only contain one component.");
+        };
+        label = label.set_component(Component::CheckboxGroup(checkbox_group));
+        self.0.push(Component::Label(label));
+      },
+      _ => panic!("Component is not a label"),
+    }
+
+    self
+  }
+
+  /// Adds a checkbox to the last label\
+  /// Note: checkboxes are only valid for modals.
+  /// ```
+  /// # use slashook::structs::components::{Components, Label, Checkbox};
+  /// let checkbox = Checkbox::new()
+  ///   .set_id("spam")
+  ///   .set_default(true);
+  /// let components = Components::new_label(Label::new("I would like to receive spam"))
+  ///   .add_checkbox(checkbox);
+  /// ```
+  /// ## Panics
+  /// Will panic if the label cannot fit any more checkboxes
+  pub fn add_checkbox(mut self, checkbox: Checkbox) -> Self {
+    let component = self.0.pop().expect("No label abailable");
+
+    match component {
+      Component::Label(mut label) => {
+        let Component::Unknown = *label.component else {
+          panic!("The label can only contain one component.");
+        };
+        label = label.set_component(Component::Checkbox(checkbox));
+        self.0.push(Component::Label(label));
+      },
+      _ => panic!("Component is not a label"),
     }
 
     self
@@ -1564,7 +1747,7 @@ impl FileUpload {
     self
   }
 
-  /// Set the maximum amount of choices for a select menu
+  /// Set the maximum amount of choices for a file upload
   /// ```
   /// # use slashook::structs::components::FileUpload;
   /// let file_upload = FileUpload::new()
@@ -1585,6 +1768,333 @@ impl FileUpload {
   /// ```
   pub fn set_required(mut self, required: bool) -> Self {
     self.required = Some(required);
+    self
+  }
+}
+
+impl RadioGroup {
+  /// Creates a new radio group
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::RADIO_GROUP,
+      id: None,
+      custom_id: String::new(),
+      options: Vec::new(),
+      required: None,
+      value: None,
+    }
+  }
+
+  /// Set the custom ID for a radio group.
+  /// ```
+  /// # use slashook::structs::components::RadioGroup;
+  /// let radio_group = RadioGroup::new()
+  ///   .set_id("group1");
+  /// assert_eq!(radio_group.custom_id, String::from("group1"));
+  /// ```
+  pub fn set_id<T: ToString>(mut self, id: T) -> Self {
+    self.custom_id = id.to_string();
+    self
+  }
+
+  /// Add an option to the radio group.
+  /// ```
+  /// # use slashook::structs::components::{RadioGroup, RadioGroupOption};
+  /// let radio_group = RadioGroup::new()
+  ///   .add_option(RadioGroupOption::new("true", "Yes"))
+  ///   .add_option(RadioGroupOption::new("false", "No"));
+  /// assert_eq!(radio_group.options.len(), 2);
+  /// ```
+  pub fn add_option(mut self, option: RadioGroupOption) -> Self {
+    self.options.push(option);
+    self
+  }
+
+  /// Set the options on the radio group.
+  /// ```
+  /// # use slashook::structs::components::{RadioGroup, RadioGroupOption};
+  /// let radio_group = RadioGroup::new()
+  ///   .set_options(vec![
+  ///     RadioGroupOption::new("true", "Yes"),
+  ///     RadioGroupOption::new("false", "No")
+  ///   ]);
+  /// assert_eq!(radio_group.options.len(), 2);
+  /// ```
+  pub fn set_options(mut self, options: Vec<RadioGroupOption>) -> Self {
+    self.options = options;
+    self
+  }
+
+  /// Set the required state of the radio group
+  /// ```
+  /// # use slashook::structs::components::RadioGroup;
+  /// let radio_group = RadioGroup::new()
+  ///   .set_required(false);
+  /// assert_eq!(radio_group.required, Some(false));
+  /// ```
+  pub fn set_required(mut self, required: bool) -> Self {
+    self.required = Some(required);
+    self
+  }
+}
+
+impl RadioGroupOption {
+  /// Creates a new radio group option with a value and a label
+  /// ```
+  /// # use slashook::structs::components::RadioGroupOption;
+  /// let option = RadioGroupOption::new("true", "Yes");
+  /// assert_eq!(option.value, String::from("true"));
+  /// assert_eq!(option.label, String::from("Yes"));
+  /// ```
+  pub fn new<T: ToString, U: ToString>(value: T, label: U) -> Self {
+    Self {
+      value: value.to_string(),
+      label: label.to_string(),
+      description: None,
+      default: None,
+    }
+  }
+
+  /// Set the value of the radio group option
+  /// ```
+  /// # use slashook::structs::components::RadioGroupOption;
+  /// let option = RadioGroupOption::new("true", "Yes")
+  ///   .set_value("1");
+  /// assert_eq!(option.value, String::from("1"));
+  /// ```
+  pub fn set_value<T: ToString>(mut self, value: T) -> Self {
+    self.value = value.to_string();
+    self
+  }
+
+  /// Set the label of the radio group option
+  /// ```
+  /// # use slashook::structs::components::RadioGroupOption;
+  /// let option = RadioGroupOption::new("true", "Yes")
+  ///   .set_label("Yep");
+  /// assert_eq!(option.label, String::from("Yep"));
+  /// ```
+  pub fn set_label<T: ToString>(mut self, label: T) -> Self {
+    self.label = label.to_string();
+    self
+  }
+
+  /// Set the description of the radio group option
+  /// ```
+  /// # use slashook::structs::components::RadioGroupOption;
+  /// let option = RadioGroupOption::new("true", "Yes")
+  ///   .set_description("Affirmative option");
+  /// assert_eq!(option.description, Some(String::from("Affirmative option")));
+  /// ```
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = Some(description.to_string());
+    self
+  }
+
+  /// Set the radio group option default state
+  /// ```
+  /// # use slashook::structs::components::RadioGroupOption;
+  /// let option = RadioGroupOption::new("true", "Yes")
+  ///   .set_default(true);
+  /// assert_eq!(option.default, Some(true));
+  /// ```
+  pub fn set_default(mut self, default: bool) -> Self {
+    self.default = Some(default);
+    self
+  }
+}
+
+impl CheckboxGroup {
+  /// Creates a new checkbox group
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::CHECKBOX_GROUP,
+      id: None,
+      custom_id: String::new(),
+      options: Vec::new(),
+      min_values: None,
+      max_values: None,
+      required: None,
+      values: None,
+    }
+  }
+
+  /// Set the custom ID for a checkbox group.
+  /// ```
+  /// # use slashook::structs::components::CheckboxGroup;
+  /// let checkbox_group = CheckboxGroup::new()
+  ///   .set_id("group1");
+  /// assert_eq!(checkbox_group.custom_id, String::from("group1"));
+  /// ```
+  pub fn set_id<T: ToString>(mut self, id: T) -> Self {
+    self.custom_id = id.to_string();
+    self
+  }
+
+  /// Add an option to the checkbox group.
+  /// ```
+  /// # use slashook::structs::components::{CheckboxGroup, CheckboxGroupOption};
+  /// let checkbox_group = CheckboxGroup::new()
+  ///   .add_option(CheckboxGroupOption::new("true", "Yes"))
+  ///   .add_option(CheckboxGroupOption::new("false", "No"));
+  /// assert_eq!(checkbox_group.options.len(), 2);
+  /// ```
+  pub fn add_option(mut self, option: CheckboxGroupOption) -> Self {
+    self.options.push(option);
+    self
+  }
+
+  /// Set the options on the checkbox group.
+  /// ```
+  /// # use slashook::structs::components::{CheckboxGroup, CheckboxGroupOption};
+  /// let checkbox_group = CheckboxGroup::new()
+  ///   .set_options(vec![
+  ///     CheckboxGroupOption::new("true", "Yes"),
+  ///     CheckboxGroupOption::new("false", "No")
+  ///   ]);
+  /// assert_eq!(checkbox_group.options.len(), 2);
+  /// ```
+  pub fn set_options(mut self, options: Vec<CheckboxGroupOption>) -> Self {
+    self.options = options;
+    self
+  }
+
+  /// Set the minimum required choices for a checkbox group
+  /// ```
+  /// # use slashook::structs::components::CheckboxGroup;
+  /// let checkbox_group = CheckboxGroup::new()
+  ///   .set_min_values(1);
+  /// assert_eq!(checkbox_group.min_values, Some(1));
+  /// ```
+  pub fn set_min_values(mut self, min_values: i64) -> Self {
+    self.min_values = Some(min_values);
+    self
+  }
+
+  /// Set the maximum amount of choices for a checkbox group
+  /// ```
+  /// # use slashook::structs::components::CheckboxGroup;
+  /// let checkbox_group = CheckboxGroup::new()
+  ///   .set_max_values(5);
+  /// assert_eq!(checkbox_group.max_values, Some(5));
+  /// ```
+  pub fn set_max_values(mut self, max_values: i64) -> Self {
+    self.max_values = Some(max_values);
+    self
+  }
+
+  /// Set the required state of the checkbox group
+  /// ```
+  /// # use slashook::structs::components::CheckboxGroup;
+  /// let checkbox_group = CheckboxGroup::new()
+  ///   .set_required(false);
+  /// assert_eq!(checkbox_group.required, Some(false));
+  /// ```
+  pub fn set_required(mut self, required: bool) -> Self {
+    self.required = Some(required);
+    self
+  }
+}
+
+impl CheckboxGroupOption {
+  /// Creates a new checkbox group option with a value and a label
+  /// ```
+  /// # use slashook::structs::components::CheckboxGroupOption;
+  /// let option = CheckboxGroupOption::new("true", "Yes");
+  /// assert_eq!(option.value, String::from("true"));
+  /// assert_eq!(option.label, String::from("Yes"));
+  /// ```
+  pub fn new<T: ToString, U: ToString>(value: T, label: U) -> Self {
+    Self {
+      value: value.to_string(),
+      label: label.to_string(),
+      description: None,
+      default: None,
+    }
+  }
+
+  /// Set the value of the checkbox group option
+  /// ```
+  /// # use slashook::structs::components::CheckboxGroupOption;
+  /// let option = CheckboxGroupOption::new("true", "Yes")
+  ///   .set_value("1");
+  /// assert_eq!(option.value, String::from("1"));
+  /// ```
+  pub fn set_value<T: ToString>(mut self, value: T) -> Self {
+    self.value = value.to_string();
+    self
+  }
+
+  /// Set the label of the checkbox group option
+  /// ```
+  /// # use slashook::structs::components::CheckboxGroupOption;
+  /// let option = CheckboxGroupOption::new("true", "Yes")
+  ///   .set_label("Yep");
+  /// assert_eq!(option.label, String::from("Yep"));
+  /// ```
+  pub fn set_label<T: ToString>(mut self, label: T) -> Self {
+    self.label = label.to_string();
+    self
+  }
+
+  /// Set the description of the checkbox group option
+  /// ```
+  /// # use slashook::structs::components::CheckboxGroupOption;
+  /// let option = CheckboxGroupOption::new("true", "Yes")
+  ///   .set_description("Affirmative option");
+  /// assert_eq!(option.description, Some(String::from("Affirmative option")));
+  /// ```
+  pub fn set_description<T: ToString>(mut self, description: T) -> Self {
+    self.description = Some(description.to_string());
+    self
+  }
+
+  /// Set the checkbox group option default state
+  /// ```
+  /// # use slashook::structs::components::CheckboxGroupOption;
+  /// let option = CheckboxGroupOption::new("true", "Yes")
+  ///   .set_default(true);
+  /// assert_eq!(option.default, Some(true));
+  /// ```
+  pub fn set_default(mut self, default: bool) -> Self {
+    self.default = Some(default);
+    self
+  }
+}
+
+impl Checkbox {
+  /// Creates a new checkbox
+  pub fn new() -> Self {
+    Self {
+      component_type: ComponentType::CHECKBOX,
+      id: None,
+      custom_id: String::new(),
+      default: None,
+      value: None,
+    }
+  }
+
+  /// Set the custom ID for a checkbox.
+  /// ```
+  /// # use slashook::structs::components::Checkbox;
+  /// let checkbox = Checkbox::new()
+  ///   .set_id("check1");
+  /// assert_eq!(checkbox.custom_id, String::from("check1"));
+  /// ```
+  pub fn set_id<T: ToString>(mut self, id: T) -> Self {
+    self.custom_id = id.to_string();
+    self
+  }
+
+  /// Set the checkbox default state
+  /// ```
+  /// # use slashook::structs::components::Checkbox;
+  /// let checkbox = Checkbox::new()
+  ///   .set_default(true);
+  /// assert_eq!(checkbox.default, Some(true));
+  /// ```
+  pub fn set_default(mut self, default: bool) -> Self {
+    self.default = Some(default);
     self
   }
 }
@@ -1739,6 +2249,24 @@ impl Default for FileUpload {
   }
 }
 
+impl Default for RadioGroup {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for CheckboxGroup {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Default for Checkbox {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
 impl From<SelectMenuType> for ComponentType {
   fn from(menu_type: SelectMenuType) -> Self {
     match menu_type {
@@ -1788,6 +2316,9 @@ impl<'de> serde::Deserialize<'de> for Component {
       17 => Component::Container(Container::deserialize(value).map_err(de::Error::custom)?),
       18 => Component::Label(Label::deserialize(value).map_err(de::Error::custom)?),
       19 => Component::FileUpload(FileUpload::deserialize(value).map_err(de::Error::custom)?),
+      21 => Component::RadioGroup(RadioGroup::deserialize(value).map_err(de::Error::custom)?),
+      22 => Component::CheckboxGroup(CheckboxGroup::deserialize(value).map_err(de::Error::custom)?),
+      23 => Component::Checkbox(Checkbox::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
   }
