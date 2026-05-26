@@ -261,11 +261,10 @@ impl Embed {
   /// ```
   /// # use slashook::structs::embeds::Embed;
   /// let embed = Embed::new()
-  ///   .set_image("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png", Some("A default avatar"));
-  /// assert_eq!(embed.image.as_ref().unwrap().url, String::from("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png"));
-  /// assert_eq!(embed.image.unwrap().description, Some(String::from("A default avatar")));
+  ///   .set_image("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png");
+  /// assert_eq!(embed.image.unwrap().url, String::from("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png"));
   /// ```
-  pub fn set_image<T: ToString, U: ToString>(mut self, url: T, description: Option<U>) -> Self {
+  pub fn set_image<T: ToString>(mut self, url: T) -> Self {
     self.image = Some(EmbedImage {
       url: url.to_string(),
       proxy_url: None,
@@ -274,7 +273,7 @@ impl Embed {
       content_type: None,
       placeholder: None,
       placeholder_version: None,
-      description: description.map(|t| t.to_string()),
+      description: None,
       flags: None,
     });
     self
@@ -284,11 +283,10 @@ impl Embed {
   /// ```
   /// # use slashook::structs::embeds::Embed;
   /// let embed = Embed::new()
-  ///   .set_thumbnail("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png", Some("A default avatar"));
-  /// assert_eq!(embed.thumbnail.as_ref().unwrap().url, String::from("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png"));
-  /// assert_eq!(embed.thumbnail.unwrap().description, Some(String::from("A default avatar")));
+  ///   .set_thumbnail("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png");
+  /// assert_eq!(embed.thumbnail.unwrap().url, String::from("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png"));
   /// ```
-  pub fn set_thumbnail<T: ToString, U: ToString>(mut self, url: T, description: Option<U>) -> Self {
+  pub fn set_thumbnail<T: ToString>(mut self, url: T) -> Self {
     self.thumbnail = Some(EmbedImage {
       url: url.to_string(),
       proxy_url: None,
@@ -297,7 +295,7 @@ impl Embed {
       content_type: None,
       placeholder: None,
       placeholder_version: None,
-      description: description.map(|t| t.to_string()),
+      description: None,
       flags: None,
     });
     self
