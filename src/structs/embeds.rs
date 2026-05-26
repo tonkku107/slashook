@@ -7,9 +7,10 @@
 
 //! Structs related to Discord embeds
 
-use serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize, de::Deserializer, ser::Serializer};
 use chrono::{DateTime, Utc, TimeZone};
 use std::convert::TryInto;
+use bitflags::bitflags;
 use super::utils::Color;
 
 /// Discord Embed Object
@@ -33,7 +34,7 @@ pub struct Embed {
   /// Image information
   pub image: Option<EmbedImage>,
   /// Thumbnail information
-  pub thumbnail: Option<EmbedThumbnail>,
+  pub thumbnail: Option<EmbedImage>,
   /// Video information
   pub video: Option<EmbedVideo>,
   /// Provider information
@@ -42,19 +43,8 @@ pub struct Embed {
   pub author: Option<EmbedAuthor>,
   /// Fields information
   pub fields: Option<Vec<EmbedField>>,
-}
-
-/// Discord Embed Thumbnail Object
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct EmbedThumbnail {
-  /// Source url of thumbnail (only supports http(s) and attachments)
-  pub url: String,
-  /// A proxied url of the thumbnail
-  pub proxy_url: Option<String>,
-  /// Height of thumbnail
-  pub height: Option<i64>,
-  /// Width of thumbnail
-  pub width: Option<i64>
+  /// [Embed flags](EmbedFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
+  pub flags: Option<EmbedFlags>,
 }
 
 /// Discord Embed Video Object
@@ -67,7 +57,17 @@ pub struct EmbedVideo {
   /// Height of video
   pub height: Option<i64>,
   /// Width of video
-  pub width: Option<i64>
+  pub width: Option<i64>,
+  /// The video’s [media type](https://en.wikipedia.org/wiki/Media_type)
+  pub content_type: Option<String>,
+  /// [Thumbhash](https://evanw.github.io/thumbhash/) placeholder of the video
+  pub placeholder: Option<String>,
+  /// Version of the placeholder
+  pub placeholder_version: Option<i64>,
+  /// Description (alt text) for the video
+  pub description: Option<String>,
+  /// [Embed media flags](EmbedMediaFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
+  pub flags: Option<EmbedMediaFlags>,
 }
 
 /// Discord Embed Image Object
@@ -80,7 +80,17 @@ pub struct EmbedImage {
   /// Height of image
   pub height: Option<i64>,
   /// Width of image
-  pub width: Option<i64>
+  pub width: Option<i64>,
+  /// The image’s [media type](https://en.wikipedia.org/wiki/Media_type)
+  pub content_type: Option<String>,
+  /// [Thumbhash](https://evanw.github.io/thumbhash/) placeholder of the image
+  pub placeholder: Option<String>,
+  /// Version of the placeholder
+  pub placeholder_version: Option<i64>,
+  /// Description (alt text) for the image
+  pub description: Option<String>,
+  /// [Embed media flags](EmbedMediaFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
+  pub flags: Option<EmbedMediaFlags>,
 }
 
 /// Discord Embed Provider Object
@@ -89,7 +99,7 @@ pub struct EmbedProvider {
   /// Name of provider
   pub name: Option<String>,
   /// Url of provider
-  pub url: Option<String>
+  pub url: Option<String>,
 }
 
 /// Discord Embed Author Object
@@ -102,7 +112,7 @@ pub struct EmbedAuthor {
   /// Url of author icon (only supports http(s) and attachments)
   pub icon_url: Option<String>,
   /// A proxied url of author icon
-  pub proxy_icon_url: Option<String>
+  pub proxy_icon_url: Option<String>,
 }
 
 /// Discord Embed Footer Object
@@ -113,7 +123,7 @@ pub struct EmbedFooter {
   /// Url of footer icon (only supports http(s) and attachments)
   pub icon_url: Option<String>,
   /// A proxied url of footer icon
-  pub proxy_icon_url: Option<String>
+  pub proxy_icon_url: Option<String>,
 }
 
 /// Discord Embed Field Object
@@ -124,7 +134,25 @@ pub struct EmbedField {
   /// Value of the field
   pub value: String,
   /// Whether or not this field should display inline
-  pub inline: Option<bool>
+  pub inline: Option<bool>,
+}
+
+bitflags! {
+  /// Bitflags for Discord Embed Flags
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
+  pub struct EmbedFlags: u32 {
+    /// This embed is a fallback for a reply to an activity card
+    const IS_CONTENT_INVENTORY_ENTRY = 1 << 5;
+  }
+}
+
+bitflags! {
+  /// Bitflags for Discord Embed Media Flags
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
+  pub struct EmbedMediaFlags: u32 {
+    /// This image is animated
+    const IS_ANIMATED = 1 << 5;
+  }
 }
 
 impl Embed {
@@ -143,7 +171,8 @@ impl Embed {
       video: None,
       provider: None,
       author: None,
-      fields: None
+      fields: None,
+      flags: None,
     }
   }
 
@@ -223,7 +252,7 @@ impl Embed {
     self.footer = Some(EmbedFooter{
       text: text.to_string(),
       icon_url: icon_url.map(|i| i.to_string()),
-      proxy_icon_url: None
+      proxy_icon_url: None,
     });
     self
   }
@@ -232,15 +261,21 @@ impl Embed {
   /// ```
   /// # use slashook::structs::embeds::Embed;
   /// let embed = Embed::new()
-  ///   .set_image("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png");
-  /// assert_eq!(embed.image.unwrap().url, String::from("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png"));
+  ///   .set_image("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png", Some("A default avatar"));
+  /// assert_eq!(embed.image.as_ref().unwrap().url, String::from("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png"));
+  /// assert_eq!(embed.image.unwrap().description, Some(String::from("A default avatar")));
   /// ```
-  pub fn set_image<T: ToString>(mut self, url: T) -> Self {
+  pub fn set_image<T: ToString, U: ToString>(mut self, url: T, description: Option<U>) -> Self {
     self.image = Some(EmbedImage {
       url: url.to_string(),
       proxy_url: None,
       height: None,
-      width: None
+      width: None,
+      content_type: None,
+      placeholder: None,
+      placeholder_version: None,
+      description: description.map(|t| t.to_string()),
+      flags: None,
     });
     self
   }
@@ -249,15 +284,21 @@ impl Embed {
   /// ```
   /// # use slashook::structs::embeds::Embed;
   /// let embed = Embed::new()
-  ///   .set_thumbnail("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png");
-  /// assert_eq!(embed.thumbnail.unwrap().url, String::from("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png"));
+  ///   .set_thumbnail("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png", Some("A default avatar"));
+  /// assert_eq!(embed.thumbnail.as_ref().unwrap().url, String::from("https://canary.discord.com/assets/7c8f476123d28d103efe381543274c25.png"));
+  /// assert_eq!(embed.thumbnail.unwrap().description, Some(String::from("A default avatar")));
   /// ```
-  pub fn set_thumbnail<T: ToString>(mut self, url: T) -> Self {
-    self.thumbnail = Some(EmbedThumbnail {
+  pub fn set_thumbnail<T: ToString, U: ToString>(mut self, url: T, description: Option<U>) -> Self {
+    self.thumbnail = Some(EmbedImage {
       url: url.to_string(),
       proxy_url: None,
       height: None,
-      width: None
+      width: None,
+      content_type: None,
+      placeholder: None,
+      placeholder_version: None,
+      description: description.map(|t| t.to_string()),
+      flags: None,
     });
     self
   }
@@ -274,7 +315,7 @@ impl Embed {
       name: name.to_string(),
       url: url.map(|u| u.to_string()),
       icon_url: icon_url.map(|i| i.to_string()),
-      proxy_icon_url: None
+      proxy_icon_url: None,
     });
     self
   }
@@ -290,14 +331,13 @@ impl Embed {
     let field = EmbedField {
       name: name.to_string(),
       value: value.to_string(),
-      inline: Some(inline)
+      inline: Some(inline),
     };
-    if self.fields.is_none() {
-      self.fields = Some(vec![field]);
-    } else if let Some(mut fields) = self.fields {
-      fields.push(field);
-      self.fields = Some(fields);
-    }
+
+    let mut fields = self.fields.unwrap_or_default();
+    fields.push(field);
+    self.fields = Some(fields);
+
     self
   }
 }
@@ -305,5 +345,31 @@ impl Embed {
 impl Default for Embed {
   fn default() -> Self {
     Self::new()
+  }
+}
+
+impl<'de> Deserialize<'de> for EmbedFlags {
+  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    let bits = u32::deserialize(d)?;
+    Ok(Self::from_bits_retain(bits))
+  }
+}
+
+impl Serialize for EmbedFlags {
+  fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_u32(self.bits())
+  }
+}
+
+impl<'de> Deserialize<'de> for EmbedMediaFlags {
+  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    let bits = u32::deserialize(d)?;
+    Ok(Self::from_bits_retain(bits))
+  }
+}
+
+impl Serialize for EmbedMediaFlags {
+  fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_u32(self.bits())
   }
 }

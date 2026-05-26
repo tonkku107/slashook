@@ -7,15 +7,15 @@
 
 //! Structs related to Discord stickers
 
-use serde::Deserialize;
-use serde_repr::Deserialize_repr;
+use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use super::{
   Snowflake,
   users::User,
 };
 
 /// Discord Sticker Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Sticker {
   /// [Id of the sticker](https://discord.com/developers/docs/reference#image-formatting)
   pub id: Snowflake,
@@ -43,7 +43,7 @@ pub struct Sticker {
 }
 
 /// Discord Sticker Types
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum StickerType {
@@ -68,7 +68,7 @@ pub struct StickerItem {
 }
 
 /// Discord Sticker Format Types
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum StickerFormatType {

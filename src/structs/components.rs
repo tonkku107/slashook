@@ -8,10 +8,10 @@
 //! Structs related to Discord message components
 
 use serde::{Serialize, Deserialize};
-use serde::de;
+use serde::de::{self, Deserializer};
 use serde_json::Value;
 use serde_repr::{Serialize_repr, Deserialize_repr};
-use crate::structs::utils::Color;
+use bitflags::bitflags;
 
 use super::{
   channels::ChannelType,
@@ -19,6 +19,7 @@ use super::{
   interactions::InteractionDataResolved,
   Snowflake,
 };
+use crate::structs::utils::Color;
 
 /// Discord Component Types
 #[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
@@ -315,11 +316,12 @@ pub struct TextInput {
 }
 
 /// Discord Text Input Styles
-#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Default, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum TextInputStyle {
   /// A single-line input
+  #[default]
   SHORT = 1,
   /// A multi-line input
   PARAGRAPH = 2,
@@ -363,28 +365,6 @@ pub struct Thumbnail {
   pub description: Option<String>,
   /// Whether the thumbnail should be a spoiler (or blurred out). Defaults to `false`
   pub spoiler: Option<bool>,
-}
-
-/// Discord Unfurled Media Item Object
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct UnfurledMediaItem {
-  /// Supports arbitrary urls and `attachment://<filename>` references
-  pub url: String,
-  /// The proxied url of the media item. This field is ignored and provided by the API as part of the response
-  #[serde(skip_serializing)]
-  pub proxy_url: Option<String>,
-  /// The height of the media item. This field is ignored and provided by the API as part of the response
-  #[serde(skip_serializing)]
-  pub height: Option<i64>,
-  /// The width of the media item. This field is ignored and provided by the API as part of the response
-  #[serde(skip_serializing)]
-  pub width: Option<i64>,
-  /// The [media type](https://en.wikipedia.org/wiki/Media_type) of the content. This field is ignored and provided by the API as part of the response
-  #[serde(skip_serializing)]
-  pub content_type: Option<String>,
-  /// The id of the uploaded attachment. This field is ignored and provided by the API as part of the response
-  #[serde(skip_serializing)]
-  pub attachment_id: Option<Snowflake>,
 }
 
 /// A Media Gallery component
@@ -584,6 +564,46 @@ pub struct Checkbox {
   pub default: Option<bool>,
   /// The state of the checkbox (`true` if checked, `false` if unchecked)
   pub value: Option<bool>,
+}
+
+/// Discord Unfurled Media Item Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct UnfurledMediaItem {
+  /// Supports arbitrary urls and `attachment://<filename>` references
+  pub url: String,
+  /// The proxied url of the media item. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub proxy_url: Option<String>,
+  /// The height of the media item (if image or video). This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub height: Option<i64>,
+  /// The width of the media item (if image or video). This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub width: Option<i64>,
+  /// [Thumbhash](https://evanw.github.io/thumbhash/) placeholder (if image or video). This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub placeholder: Option<String>,
+  /// Version of the placeholder (if image or video). This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub placeholder_version: Option<i64>,
+  /// The [media type](https://en.wikipedia.org/wiki/Media_type) of the content. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub content_type: Option<String>,
+  /// [Unfurled media item flags](UnfurledMediaItemFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field). This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub flags: Option<UnfurledMediaItemFlags>,
+  /// The id of the uploaded attachment. This field is ignored and provided by the API as part of the response
+  #[serde(skip_serializing)]
+  pub attachment_id: Option<Snowflake>,
+}
+
+bitflags! {
+  /// Bitflags for Discord Unfurled Media Item Flags
+  #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
+  pub struct UnfurledMediaItemFlags: u32 {
+    /// This image is animated
+    const IS_ANIMATED = 1 << 0;
+  }
 }
 
 impl Components {
@@ -1425,20 +1445,6 @@ impl Thumbnail {
   }
 }
 
-impl UnfurledMediaItem {
-  /// Creates a new unfurled media item from an url
-  pub fn new<T: ToString>(url: T) -> Self {
-    Self {
-      url: url.to_string(),
-      proxy_url: None,
-      height: None,
-      width: None,
-      content_type: None,
-      attachment_id: None,
-    }
-  }
-}
-
 impl MediaGallery {
   /// Creates a new media gallery
   pub fn new() -> Self {
@@ -2099,6 +2105,23 @@ impl Checkbox {
   }
 }
 
+impl UnfurledMediaItem {
+  /// Creates a new unfurled media item from an url
+  pub fn new<T: ToString>(url: T) -> Self {
+    Self {
+      url: url.to_string(),
+      proxy_url: None,
+      height: None,
+      width: None,
+      placeholder: None,
+      placeholder_version: None,
+      content_type: None,
+      flags: None,
+      attachment_id: None,
+    }
+  }
+}
+
 impl From<ActionRow> for Component {
   fn from(value: ActionRow) -> Self {
     Self::ActionRow(value)
@@ -2204,12 +2227,6 @@ impl Default for SelectMenu {
 impl Default for TextInput {
   fn default() -> Self {
     Self::new()
-  }
-}
-
-impl Default for TextInputStyle {
-  fn default() -> Self {
-    Self::SHORT
   }
 }
 
@@ -2321,5 +2338,12 @@ impl<'de> serde::Deserialize<'de> for Component {
       23 => Component::Checkbox(Checkbox::deserialize(value).map_err(de::Error::custom)?),
       _ => Component::Unknown,
     })
+  }
+}
+
+impl<'de> Deserialize<'de> for UnfurledMediaItemFlags {
+  fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+    let bits = u32::deserialize(d)?;
+    Ok(Self::from_bits_retain(bits))
   }
 }

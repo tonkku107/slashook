@@ -7,8 +7,8 @@
 
 //! Structs related to Discord applications
 
-use serde::{Deserialize, de::Deserializer};
-use serde_repr::Deserialize_repr;
+use serde::{Serialize, Deserialize, de::{self, Deserializer}, ser::{Serializer}};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use super::{
   events::EventType,
   guilds::Guild,
@@ -19,7 +19,7 @@ use super::{
 use bitflags::bitflags;
 
 /// Discord Application Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Application {
   /// The id of the app
   pub id: Snowflake,
@@ -29,11 +29,11 @@ pub struct Application {
   pub icon: Option<String>,
   /// The description of the app
   pub description: String,
-  /// An array of rpc origin urls, if rpc is enabled
+  /// List of RPC origin URLs, if RPC is enabled
   pub rpc_origins: Option<Vec<String>>,
-  /// When false only app owner can join the app's bot to guilds
+  /// When `false` only app owner can join the app's bot to guilds
   pub bot_public: Option<bool>,
-  /// When true the app's bot will only join upon completion of the full oauth2 code grant flow
+  /// When `true`, the app’s bot will only join upon completion of the full OAuth2 code grant flow
   pub bot_require_code_grant: Option<bool>,
   /// Partial user object for the bot user associated with the app
   pub bot: Option<User>,
@@ -41,23 +41,24 @@ pub struct Application {
   pub terms_of_service_url: Option<String>,
   /// The url of the app's privacy policy
   pub privacy_policy_url: Option<String>,
-  /// Partial user object containing info on the owner of the application
+  /// Partial user object for the owner of the app
   pub owner: Option<User>,
   /// The hex encoded key for verification in interactions and the GameSDK's [GetTicket](https://discord.com/developers/docs/game-sdk/applications#getticket)
   pub verify_key: Option<String>,
   /// If the application belongs to a team, this will be the list of the members of that team
   pub team: Option<Team>,
-  /// If this application is a game sold on Discord, this field will be the guild to which it has been linked
+  /// Guild associated with the app. For example, a developer support server.
   pub guild_id: Option<Snowflake>,
   /// Partial object of the associated guild
   pub guild: Option<Guild>,
-  /// If this application is a game sold on Discord, this field will be the id of the "Game SKU" that is created, if exists
+  /// If this app is a game sold on Discord, this field will be the id of the "Game SKU" that is created, if exists
   pub primary_sku_id: Option<Snowflake>,
-  /// If this application is a game sold on Discord, this field will be the URL slug that links to the store page
+  /// If this app is a game sold on Discord, this field will be the URL slug that links to the store page
   pub slug: Option<String>,
-  /// The application's default rich presence invite [cover image hash](https://discord.com/developers/docs/reference#image-formatting)
+  /// App's default rich presence invite [cover image hash](https://discord.com/developers/docs/reference#image-formatting)
   pub cover_image: Option<String>,
-  /// The application's public [flags](ApplicationFlags)
+  /// App's public [flags](ApplicationFlags)
+  #[serde(rename = "flags_new")]
   pub flags: Option<ApplicationFlags>,
   /// Approximate count of guilds the app has been added to
   pub approximate_guild_count: Option<i64>,
@@ -88,7 +89,7 @@ pub struct Application {
 bitflags! {
   /// Bitflags for Discord Application Flags
   #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
-  pub struct ApplicationFlags: u32 {
+  pub struct ApplicationFlags: u64 {
     /// Indicates if an app uses the [Auto Moderation API](https://discord.com/developers/docs/resources/auto-moderation)
     const APPLICATION_AUTO_MODERATION_RULE_CREATE_BADGE = 1 << 6;
     /// Intent required for bots in **100 or more servers** to receive `presence_update` events
@@ -113,7 +114,7 @@ bitflags! {
 }
 
 /// Discord Application Event Webhook Status Enum
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum ApplicationEventWebhookStatus {
@@ -129,7 +130,7 @@ pub enum ApplicationEventWebhookStatus {
 }
 
 /// Discord Integration Types Config Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ApplicationIntegrationTypesConfig {
   /// Configuration for [`GUILD_INSTALL`](super::interactions::IntegrationType::GUILD_INSTALL) integrations
   #[serde(rename = "0")]
@@ -140,14 +141,14 @@ pub struct ApplicationIntegrationTypesConfig {
 }
 
 /// Discord Integration Types Config Value Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ApplicationIntegrationTypesConfigValue {
   /// Install params for each installation context's default in-app authorization link
   pub oauth2_install_params: InstallParams,
 }
 
 /// Discord Install Params Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct InstallParams {
   /// The [scopes](https://discord.com/developers/docs/topics/oauth2#shared-resources-oauth2-scopes) to add the application to the server with
   pub scopes: Vec<String>,
@@ -156,7 +157,7 @@ pub struct InstallParams {
 }
 
 /// Discord Team Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Team {
   /// A hash of the image of the team's icon
   pub icon: Option<String>,
@@ -171,7 +172,7 @@ pub struct Team {
 }
 
 /// Discord Team Members Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TeamMember {
   /// The user's [membership state](TeamMembershipState) on the team
   pub membership_state: TeamMembershipState,
@@ -184,7 +185,7 @@ pub struct TeamMember {
 }
 
 /// Discord Team Membership State Enum
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum TeamMembershipState {
@@ -198,7 +199,7 @@ pub enum TeamMembershipState {
 }
 
 /// Discord Team Member Role Types
-#[derive(Deserialize, Eq, Hash, PartialEq, Debug, Clone)]
+#[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Debug, Clone)]
 #[allow(non_camel_case_types)]
 #[serde(rename_all = "snake_case")]
 pub enum TeamMemberRole {
@@ -215,7 +216,14 @@ pub enum TeamMemberRole {
 
 impl<'de> Deserialize<'de> for ApplicationFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
-    let bits = u32::deserialize(d)?;
+    let string = String::deserialize(d)?;
+    let bits: u64 = string.parse().map_err(de::Error::custom)?;
     Ok(Self::from_bits_retain(bits))
+  }
+}
+
+impl Serialize for ApplicationFlags {
+  fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    s.collect_str(&self.bits())
   }
 }

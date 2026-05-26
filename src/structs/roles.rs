@@ -7,7 +7,7 @@
 
 //! Structs related to Discord roles
 
-use serde::{Deserialize, Serialize, de::Deserializer};
+use serde::{Deserialize, Serialize, de::Deserializer, ser::Serializer};
 use bitflags::bitflags;
 
 use super::{
@@ -18,7 +18,7 @@ use super::{
 use crate::rest::{Rest, RestError};
 
 /// Discord Role Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Role {
   /// Role id
   pub id: Snowflake,
@@ -58,22 +58,22 @@ pub struct RoleColors {
 }
 
 /// Discord Role Tags Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct RoleTags {
   /// The id of the bot this role belongs to
   pub bot_id: Option<Snowflake>,
   /// The id of the integration this role belongs to
   pub integration_id: Option<Snowflake>,
   /// Whether this is the guild's Booster role
-  #[serde(default, deserialize_with = "exists")]
+  #[serde(default, deserialize_with = "exists", serialize_with = "null", skip_serializing_if = "std::ops::Not::not")]
   pub premium_subscriber: bool,
   /// The id of this role's subscription sku and listing
   pub subscription_listing_id: Option<Snowflake>,
   /// Whether this role is available for purchase
-  #[serde(default, deserialize_with = "exists")]
+  #[serde(default, deserialize_with = "exists", serialize_with = "null", skip_serializing_if = "std::ops::Not::not")]
   pub available_for_purchase: bool,
   /// Whether this role is a guild's linked role
-  #[serde(default, deserialize_with = "exists")]
+  #[serde(default, deserialize_with = "exists", serialize_with = "null", skip_serializing_if = "std::ops::Not::not")]
   pub guild_connections: bool,
 }
 
@@ -141,6 +141,10 @@ pub struct RoleModifyOptions {
 fn exists<'de, D: Deserializer<'de>>(d: D) -> Result<bool, D::Error> {
   serde_json::Value::deserialize(d)?;
   Ok(true)
+}
+
+fn null<S: Serializer>(_: &bool, s: S) -> Result<S::Ok, S::Error> {
+  s.serialize_none()
 }
 
 impl Role {
@@ -377,6 +381,12 @@ impl<'de> Deserialize<'de> for RoleFlags {
   fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
     let bits = u32::deserialize(d)?;
     Ok(Self::from_bits_retain(bits))
+  }
+}
+
+impl Serialize for RoleFlags {
+  fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+    s.serialize_u32(self.bits())
   }
 }
 

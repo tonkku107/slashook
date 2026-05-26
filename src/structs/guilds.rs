@@ -27,7 +27,7 @@ use super::{
 use crate::rest::{Rest, RestError};
 
 /// Discord Guild Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Guild {
   /// Guild id
   pub id: Snowflake,
@@ -195,7 +195,7 @@ pub enum ExplicitContentFilterLevel {
 }
 
 /// Discord MFA Level
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum MFALevel {
@@ -228,7 +228,7 @@ bitflags! {
 }
 
 /// Discord Premium Tier
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum PremiumTier {
@@ -246,7 +246,7 @@ pub enum PremiumTier {
 }
 
 /// Discord Welcome Screen Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct WelcomeScreen {
   /// The server description shown in the welcome screen
   pub description: Option<String>,
@@ -268,7 +268,7 @@ pub struct WelcomeScreenChannel {
 }
 
 /// Discord Guild NSFW Level
-#[derive(Deserialize_repr, Clone, Debug)]
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
 #[repr(u8)]
 #[allow(non_camel_case_types)]
 pub enum NSFWLevel {
@@ -282,11 +282,11 @@ pub enum NSFWLevel {
   AGE_RESTRICTED = 3,
   /// NSFW level that hasn't been implemented yet
   #[serde(other)]
-  UNKNOWN
+  UNKNOWN,
 }
 
 /// Discord Incidents Data Object
-#[derive(Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct GuildIncidentsData {
   /// When invites get enabled again
   pub invites_disabled_until: Option<DateTime<Utc>>,
