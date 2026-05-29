@@ -121,6 +121,8 @@ pub fn event(attr: TokenStream, item: TokenStream) -> TokenStream {
   let matcher = match event_type.as_str() {
     "APPLICATION_AUTHORIZED" => quote_spanned! {data_var.ty.span()=> slashook::structs::events::EventData::ApplicationAuthorized(d) => *d},
     "ENTITLEMENT_CREATE" => quote_spanned! {data_var.ty.span()=>slashook::structs::events::EventData::EntitlementCreate(d) => d},
+    "ENTITLEMENT_UPDATE" => quote_spanned! {data_var.ty.span()=>slashook::structs::events::EventData::EntitlementUpdate(d) => d},
+    "ENTITLEMENT_DELETE" => quote_spanned! {data_var.ty.span()=>slashook::structs::events::EventData::EntitlementDelete(d) => d},
     "QUEST_USER_ENROLLMENT" => quote_spanned! {data_var.ty.span()=>slashook::structs::events::EventData::QuestUserEnrollment(d) => d},
     _ => return syn::Error::new(path.span(), "Unknown event type").into_compile_error().into(),
   };

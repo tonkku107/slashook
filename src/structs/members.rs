@@ -13,7 +13,7 @@ use bitflags::bitflags;
 
 use super::{
   Permissions,
-  users::{User, AvatarDecorationData},
+  users::{User, AvatarDecorationData, Collectibles},
   Snowflake,
 };
 use crate::rest::{Rest, RestError};
@@ -50,6 +50,8 @@ pub struct GuildMember {
   pub communication_disabled_until: Option<DateTime<Utc>>,
   /// Data for the member's guild avatar decoration
   pub avatar_decoration_data: Option<AvatarDecorationData>,
+  /// Data for the member’s collectibles
+  pub collectibles: Option<Collectibles>,
 }
 
 bitflags! {

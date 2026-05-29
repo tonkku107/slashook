@@ -316,7 +316,7 @@ pub enum OptionValue {
   /// Represents a boolean value
   Boolean(bool),
   /// Represents a user value
-  User(User),
+  User(Box<User>),
   /// Represents a channel value
   Channel(Box<Channel>),
   /// Represents a role channe
@@ -324,7 +324,7 @@ pub enum OptionValue {
   /// Represents a number value
   Number(f64),
   /// Represents an attachment value
-  Attachment(Attachment),
+  Attachment(Box<Attachment>),
   /// Represents multiple values as a vec
   Values(Vec<OptionValue>),
   /// Represents any unknown value

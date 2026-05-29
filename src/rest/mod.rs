@@ -157,7 +157,7 @@ impl Rest {
   pub async fn get_raw(&self, path: String) -> Result<Bytes, RestError> {
     let req = self.client.get(format!("{}/{}", API_URL, path));
     let res = req.send().await?;
-    return Ok(res.bytes().await?);
+    Ok(res.bytes().await?)
   }
 
   /// Make a get request with query parameters

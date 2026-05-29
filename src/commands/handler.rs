@@ -192,7 +192,7 @@ impl CommandHandler {
           option.value.context("Boolean option has no value")?
           .as_bool().context("Boolean option value is not a boolean")?
         ),
-        InteractionOptionType::USER => OptionValue::User(
+        InteractionOptionType::USER => OptionValue::User(Box::new(
           resolved.as_ref().context("User option provided but no resolved object")?
           .users.as_ref().context("User option provided but no resolved users object")?
           .get(
@@ -200,7 +200,7 @@ impl CommandHandler {
             .as_str().context("User option value is not a string (user id)")?
           ).context("User option provided but no matching resolved user found")?
           .clone()
-        ),
+        )),
         InteractionOptionType::CHANNEL => OptionValue::Channel(Box::new(
           resolved.as_ref().context("Channel option provided but no resolved object")?
           .channels.as_ref().context("Channel option provided but not resolved channels object")?
@@ -227,7 +227,7 @@ impl CommandHandler {
           option.value.context("Number option has no value")?
           .as_f64().context("Number option value is not a number")?
         ),
-        InteractionOptionType::ATTACHMENT => OptionValue::Attachment(
+        InteractionOptionType::ATTACHMENT => OptionValue::Attachment(Box::new(
           resolved.as_ref().context("Attachment option provided but no resolved object")?
           .attachments.as_ref().context("Attachment option provided but no resolved attachments object")?
           .get(
@@ -235,7 +235,7 @@ impl CommandHandler {
             .as_str().context("Attachment option value is not a string (attachment id)")?
           ).context("Attachment option provided but no matching resolved attachment found")?
           .clone()
-        ),
+        )),
         _ => OptionValue::Other(option.value.unwrap_or_default())
       };
       if option.focused.unwrap_or_default() {
@@ -256,12 +256,12 @@ impl CommandHandler {
       },
       ComponentType::USER_SELECT => {
         for value in values.iter() {
-          resolved_values.push(OptionValue::User(
+          resolved_values.push(OptionValue::User(Box::new(
             resolved.as_ref().context("User select provided but no resolved object")?
             .users.as_ref().context("User select provided but no resolved users object")?
             .get(value).context("User select provided but no matching resolved user found")?
             .clone()
-          ));
+          )));
         }
       },
       ComponentType::ROLE_SELECT => {
@@ -317,12 +317,12 @@ impl CommandHandler {
         Component::FileUpload(file_upload) => {
           let mut values = Vec::new();
           for value in file_upload.values.unwrap_or_default() {
-            values.push(OptionValue::Attachment(
+            values.push(OptionValue::Attachment(Box::new(
               resolved.as_ref().context("File upload component provided but no resolved object")?
               .attachments.as_ref().context("File upload component provided but no resolved attachments object")?
               .get(&value).context("File upload component provided but no matching resolved attachment found")?
               .clone()
-            ));
+            )));
           }
           input.args.insert(file_upload.custom_id, OptionValue::Values(values));
         },
@@ -352,7 +352,7 @@ impl CommandHandler {
     let mut found_value = None;
     if let Some(users) = &resolved.users
       && let Some(user) = users.get(option_value) {
-        found_value = Some(OptionValue::User(user.clone()))
+        found_value = Some(OptionValue::User(Box::new(user.clone())))
     }
     if let Some(roles) = &resolved.roles
       && let Some(role) = roles.get(option_value) {

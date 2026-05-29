@@ -59,6 +59,10 @@ pub struct User {
   pub public_flags: Option<UserFlags>,
   /// Data for the user's avatar decoration
   pub avatar_decoration_data: Option<AvatarDecorationData>,
+  /// Data for the user’s collectibles
+  pub collectibles: Option<Collectibles>,
+  /// The user’s primary guild
+  pub primary_guild: Option<UserPrimaryGuild>,
 }
 
 bitflags! {
@@ -123,6 +127,39 @@ pub struct AvatarDecorationData {
   pub asset: String,
   /// ID of the avatar decoration's SKU
   pub sku_id: Snowflake,
+}
+
+/// Discord Collectibles Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Collectibles {
+  /// Object mapping of nameplate data
+  pub nameplate: Option<Nameplate>,
+}
+
+/// Discord Nameplate Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct Nameplate {
+  /// Id of the nameplate SKU
+  pub sku_id: Snowflake,
+  /// Path to the [nameplate asset](https://docs.discord.com/developers/reference#image-formatting)
+  pub asset: String,
+  /// The label of this nameplate. Currently unused
+  pub label: String,
+  /// Background color of the nameplate, one of: `crimson`, `berry`, `sky`, `teal`, `forest`, `bubble_gum`, `violet`, `cobalt`, `clover`, `lemon`, `white`
+  pub palette: String,
+}
+
+/// Discord User Primary Guild Object
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct UserPrimaryGuild {
+  /// The id of the user’s primary guild
+  pub identity_guild_id: Option<Snowflake>,
+  /// Whether the user is displaying the primary guild’s server tag. This can be `None` if the system clears the identity, e.g. the server no longer supports tags. This will be `false` if the user manually removes their tag.
+  pub identity_enabled: Option<bool>,
+  /// The text of the user’s server tag. Limited to 4 characters
+  pub tag: Option<String>,
+  /// The [server tag badge hash](https://docs.discord.com/developers/reference#image-formatting)
+  pub badge: Option<String>,
 }
 
 /// Options for modifying the user with [`modify_current_user`](User::modify_current_user)

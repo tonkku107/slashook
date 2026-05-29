@@ -9,7 +9,7 @@
 
 use std::str::FromStr;
 use chrono::{DateTime, NaiveDateTime, Utc};
-use serde::{de, Deserialize};
+use serde::{de, Deserialize, Serialize};
 use serde_json::Value;
 use serde_repr::Deserialize_repr;
 use super::{
@@ -63,13 +63,17 @@ pub struct EventBody {
 }
 
 /// Discord Event Types
-#[derive(Deserialize, Eq, Hash, PartialEq, Debug, Clone)]
+#[derive(Serialize, Deserialize, Eq, Hash, PartialEq, Debug, Clone)]
 #[allow(non_camel_case_types)]
 pub enum EventType {
   /// Sent when an app was authorized by a user to a server or their account
   APPLICATION_AUTHORIZED,
   /// Entitlement was created
   ENTITLEMENT_CREATE,
+  /// Entitlement was updated
+  ENTITLEMENT_UPDATE,
+  /// Entitlement was deleted
+  ENTITLEMENT_DELETE,
   /// User was added to a Quest (currently unavailable)
   QUEST_USER_ENROLLMENT,
   /// An event type that hasn't been implemented yet
@@ -84,6 +88,10 @@ pub enum EventData {
   ApplicationAuthorized(Box<ApplicationAuthorizedEventData>),
   /// Entitlement was created
   EntitlementCreate(Entitlement),
+  /// Entitlement was updated
+  EntitlementUpdate(Entitlement),
+  /// Entitlement was deleted
+  EntitlementDelete(Entitlement),
   /// User was added to a Quest (currently unavailable)
   QuestUserEnrollment(Value),
   /// An event type that hasn't been implemented yet
@@ -124,6 +132,8 @@ impl<'de> Deserialize<'de> for EventBody {
       let event_data = match event_body.event_type {
         EventType::APPLICATION_AUTHORIZED => EventData::ApplicationAuthorized(Box::new(ApplicationAuthorizedEventData::deserialize(&*raw_data).map_err(de::Error::custom)?)),
         EventType::ENTITLEMENT_CREATE => EventData::EntitlementCreate(Entitlement::deserialize(&*raw_data).map_err(de::Error::custom)?),
+        EventType::ENTITLEMENT_UPDATE => EventData::EntitlementUpdate(Entitlement::deserialize(&*raw_data).map_err(de::Error::custom)?),
+        EventType::ENTITLEMENT_DELETE => EventData::EntitlementDelete(Entitlement::deserialize(&*raw_data).map_err(de::Error::custom)?),
         EventType::QUEST_USER_ENROLLMENT => EventData::QuestUserEnrollment(raw_data.take()),
         EventType::UNKNOWN => EventData::Unknown(raw_data.take()),
       };

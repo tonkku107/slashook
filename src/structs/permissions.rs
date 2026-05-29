@@ -32,7 +32,7 @@ bitflags! {
     const MANAGE_CHANNELS = 1 << 4;
     /// Allows management and editing of the guild
     const MANAGE_GUILD = 1 << 5;
-    /// Allows for the addition of reactions to messages
+    /// Allows for adding new reactions to messages. This permission does not apply to reacting with an existing reaction on a message.
     const ADD_REACTIONS = 1 << 6;
     /// Allows for viewing of audit logs
     const VIEW_AUDIT_LOG = 1 << 7;
@@ -80,17 +80,17 @@ bitflags! {
     const MANAGE_ROLES = 1 << 28;
     /// Allows management and editing of webhooks
     const MANAGE_WEBHOOKS = 1 << 29;
-    /// Allows management and editing of emojis, stickers, and soundboard sounds
+    /// Allows for editing and deleting emojis, stickers, and soundboard sounds created by all users
     const MANAGE_GUILD_EXPERSSIONS = 1 << 30;
     /// Allows members to use application commands, including slash commands and context menu commands.
     const USE_APPLICATION_COMMANDS = 1 << 31;
     /// Allows for requesting to speak in stage channels.
     const REQUEST_TO_SPEAK = 1 << 32;
-    /// Allows for creating, editing, and deleting scheduled events
+    /// Allows for editing and deleting scheduled events created by all users
     const MANAGE_EVENTS = 1 << 33;
     /// Allows for deleting and archiving threads, and viewing all private threads
     const MANAGE_THREADS = 1 << 34;
-    /// Allows for creating threads
+    /// Allows for creating public and announcement threads
     const CREATE_PUBLIC_THREADS = 1 << 35;
     /// Allows for creating private threads
     const CREATE_PRIVATE_THREADS = 1 << 36;
@@ -98,7 +98,7 @@ bitflags! {
     const USE_EXTERNAL_STICKERS = 1 << 37;
     /// Allows for sending messages in threads
     const SEND_MESSAGES_IN_THREADS = 1 << 38;
-    /// Allows for using Activities (applications with the [`EMBEDDED`](crate::structs::applications::ApplicationFlags::EMBEDDED) flag) in a voice channel
+    /// Allows for using Activities (applications with the [`EMBEDDED`](crate::structs::applications::ApplicationFlags::EMBEDDED) flag)
     const USE_EMBEDDED_ACTIVITIES = 1 << 39;
     /// Allows for timing out users to prevent them from sending or reacting to messages in chat and threads, and from speaking in voice and stage channels
     const MODERATE_MEMBERS = 1 << 40;
@@ -114,10 +114,16 @@ bitflags! {
     const USE_EXTERNAL_SOUNDS = 1 << 45;
     /// Allows sending voice messages
     const SEND_VOICE_MESSAGES = 1 << 46;
+    /// Allows setting voice channel status
+    const SET_VOICE_CHANNEL_STATUS = 1 << 48;
     /// Allows sending polls
     const SEND_POLLS = 1 << 49;
     /// Allows user-installed apps to send public responses. When disabled, users will still be allowed to use their apps but the responses will be ephemeral. This only applies to apps not also installed to the server.
     const USE_EXTERNAL_APPS = 1 << 50;
+    /// Allows pinning and unpinning messages
+    const PIN_MESSAGES = 1 << 51;
+    /// Allows bypassing slowmode restrictions
+    const BYPASS_SLOWMODE = 1 << 52;
   }
 }
 

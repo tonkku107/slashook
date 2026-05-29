@@ -37,23 +37,23 @@ pub struct Channel {
   pub channel_type: ChannelType,
   /// The id of the guild (may be missing for some channel objects received over gateway guild dispatches)
   pub guild_id: Option<Snowflake>,
-  /// Sorting position of the channel
+  /// sorting position of the channel (channels with the same position are sorted by id)
   pub position: Option<i64>,
   /// Explicit permission overwrites for members and roles
   pub permission_overwrites: Option<Vec<PermissionOverwrite>>,
   /// The name of the channel (1-100 characters)
   pub name: Option<String>,
-  /// The channel topic (0-4096 characters for `GUILD_FORUM` channels, 0-1024 characters for all others)
+  /// The channel topic (0-4096 characters for `GUILD_FORUM` and `GUILD_MEDIA` channels, 0-1024 characters for all others)
   pub topic: Option<String>,
-  /// Whether the channel is nsfw
+  /// Whether the channel is [age-restricted](https://support.discord.com/hc/en-us/articles/115000084051)
   pub nsfw: Option<bool>,
-  /// The id of the last message sent in this channel (or thread for `GUILD_FORUM` channels) (may not point to an existing or valid message or thread)
+  /// The id of the last message sent in this channel (or thread for `GUILD_FORUM` or `GUILD_MEDIA` channels) (may not point to an existing or valid message or thread)
   pub last_message_id: Option<Snowflake>,
-  /// The bitrate (in bits) of the voice channel
+  /// The bitrate (in bits per second) of the voice channel
   pub bitrate: Option<i64>,
   /// The user limit of the voice channel
   pub user_limit: Option<i64>,
-  /// Amount of seconds a user has to wait before sending another message (0-21600); bots, as well as users with the permission `manage_messages` or `manage_channel`, are unaffected
+  /// Amount of seconds a user has to wait before sending another message (0-21600); bots, as well as users with the permission `BYPASS_SLOWMODE`, are unaffected
   pub rate_limit_per_user: Option<i64>,
   /// The recipients of the DM
   pub recipients: Option<Vec<User>>,
@@ -83,21 +83,21 @@ pub struct Channel {
   pub member: Option<ThreadMember>,
   /// Default duration, copied onto newly created threads, in minutes, threads will stop showing in the channel list after the specified period of inactivity, can be set to: 60, 1440, 4320, 10080
   pub default_auto_archive_duration: Option<i64>,
-  /// Computed permissions for the invoking user in the channel, including overwrites, only included when part of the `resolved` data received on a slash command interaction
+  /// Computed permissions for the invoking user in the channel, including overwrites, only included when part of the `resolved` data received on an interaction. This does not include [implicit permissions](https://docs.discord.com/developers/topics/permissions#implicit-permissions), which may need to be checked separately
   pub permissions: Option<Permissions>,
   /// [Channel flags](ChannelFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field)
   pub flags: Option<ChannelFlags>,
   /// Number of messages ever sent in a thread, it's similar to `message_count` on message creation, but will not decrement the number when a message is deleted
   pub total_message_sent: Option<i64>,
-  /// The set of tags that can be used in a `GUILD_FORUM` channel
+  /// The set of tags that can be used in a `GUILD_FORUM` or `GUILD_MEDIA` channel
   pub available_tags: Option<Vec<ForumTag>>,
-  /// The IDs of the set of tags that have been applied to a thread in a `GUILD_FORUM` channel
+  /// The IDs of the set of tags that have been applied to a thread in a `GUILD_FORUM` or a `GUILD_MEDIA` channel
   pub applied_tags: Option<Vec<Snowflake>>,
-  /// The emoji to show in the add reaction button on a thread in a `GUILD_FORUM` channel
+  /// The emoji to show in the add reaction button on a thread in a `GUILD_FORUM` or a `GUILD_MEDIA` channel
   pub default_reaction_emoji: Option<DefaultReaction>,
   /// The initial `rate_limit_per_user` to set on newly created threads in a channel. This field is copied to the thread at creation time and does not live update.
   pub default_thread_rate_limit_per_user: Option<i64>,
-  /// The [default sort order type](SortOrderType) used to order posts in `GUILD_FORUM` channels. Defaults to `None`, which indicates a preferred sort order hasn't been set by a channel admin
+  /// The [default sort order type](SortOrderType) used to order posts in `GUILD_FORUM` or `GUILD_MEDIA` channels. Defaults to `None`, which indicates a preferred sort order hasn't been set by a channel admin
   pub default_sort_order: Option<SortOrderType>,
   /// The [default forum layout view](ForumLayoutType) used to display posts in `GUILD_FORUM` channels. Defaults to `NOT_SET`, which indicates a layout view has not been set by a channel admin
   pub default_forum_layout: Option<ForumLayoutType>,
@@ -219,9 +219,9 @@ bitflags! {
   /// Bitflags for Discord Channel Flags
   #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct ChannelFlags: u32 {
-    /// This thread is pinned to the top of its parent `GUILD_FORUM` channel
+    /// This thread is pinned to the top of its parent `GUILD_FORUM` or `GUILD_MEDIA` channel
     const PINNED = 1 << 1;
-    /// Whether a tag is required to be specified when creating a thread in a `GUILD_FORUM` channel. Tags are specified in the `applied_tags` field.
+    /// Whether a tag is required to be specified when creating a thread in a `GUILD_FORUM` or a `GUILD_MEDIA` channel. Tags are specified in the `applied_tags` field.
     const REQUIRE_TAG = 1 << 4;
     /// When set hides the embedded media download options. Available only for media channels
     const HIDE_MEDIA_DOWNLOAD_OPTIONS = 1 << 15;
@@ -302,13 +302,13 @@ pub struct ChannelCreateOptions {
   /// Channel topic (0-1024 characters)
   #[serde(skip_serializing_if = "Option::is_none")]
   pub topic: Option<String>,
-  /// The bitrate (in bits) of the voice or stage channel; min 8000
+  /// The bitrate (in bits per second) of the voice or stage channel; min 8000
   #[serde(skip_serializing_if = "Option::is_none")]
   pub bitrate: Option<i64>,
   /// The user limit of the voice channel
   #[serde(skip_serializing_if = "Option::is_none")]
   pub user_limit: Option<i64>,
-  /// Amount of seconds a user has to wait before sending another message (0-21600); bots, as well as users with the permission `manage_messages` or `manage_channel`, are unaffected
+  /// Amount of seconds a user has to wait before sending another message (0-21600); bots, as well as users with the permission `BYPASS_SLOWMODE`, are unaffected
   #[serde(skip_serializing_if = "Option::is_none")]
   pub rate_limit_per_user: Option<i64>,
   /// Sorting position of the channel (channels with the same position are sorted by id)
@@ -373,7 +373,7 @@ pub struct ChannelModifyOptions {
   /// Amount of seconds a user has to wait before sending another message (0-21600); bots, as well as users with the permission `manage_messages` or `manage_channel`, are unaffected
   #[serde(skip_serializing_if = "Option::is_none")]
   pub rate_limit_per_user: Option<Option<i64>>,
-  /// The bitrate (in bits) of the voice or stage channel; min 8000
+  /// The bitrate (in bits per second) of the voice or stage channel; min 8000
   #[serde(skip_serializing_if = "Option::is_none")]
   pub bitrate: Option<Option<i64>>,
   /// The user limit of the voice or stage channel, max 99 for voice channels and 10,000 for stage channels (0 refers to no limit)
@@ -394,13 +394,13 @@ pub struct ChannelModifyOptions {
   /// The default duration that the clients use (not the API) for newly created threads in the channel, in minutes, to automatically archive the thread after recent activity
   #[serde(skip_serializing_if = "Option::is_none")]
   pub default_auto_archive_duration: Option<Option<i64>>,
-  /// [Channel flags](ChannelFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field). Currently only `REQUIRE_TAG` and is supported by `GUILD_FORUM` and `GUILD_MEDIA` channels and `PINNED` in threads of those channels. `HIDE_MEDIA_DOWNLOAD_OPTIONS` is supported only by `GUILD_MEDIA` channels
+  /// [Channel flags](ChannelFlags) combined as a [bitfield](https://en.wikipedia.org/wiki/Bit_field). Currently only `REQUIRE_TAG` is supported by `GUILD_FORUM` and `GUILD_MEDIA` channels and `PINNED` in threads of those channels. `HIDE_MEDIA_DOWNLOAD_OPTIONS` is supported only by `GUILD_MEDIA` channels
   #[serde(skip_serializing_if = "Option::is_none")]
   pub flags: Option<ChannelFlags>,
   /// The set of tags that can be used in a `GUILD_FORUM` or a `GUILD_MEDIA` channel; limited to 20
   #[serde(skip_serializing_if = "Option::is_none")]
   pub available_tags: Option<Vec<ForumTag>>,
-  /// The emoji to show in the add reaction button on a thread in a `GUILD_FORUM` channel
+  /// The emoji to show in the add reaction button on a thread in a `GUILD_FORUM` or a `GUILD_MEDIA` channel
   #[serde(skip_serializing_if = "Option::is_none")]
   pub default_reaction_emoji: Option<Option<DefaultReaction>>,
   /// The initial `rate_limit_per_user` to set on newly created threads in a channel. This field is copied to the thread at creation time and does not live update.
@@ -424,7 +424,7 @@ pub struct ChannelModifyOptions {
   /// Whether non-moderators can add other non-moderators to a thread; only available on private threads
   #[serde(skip_serializing_if = "Option::is_none")]
   pub invitable: Option<bool>,
-  /// The IDs of the set of tags that have been applied to a thread in a `GUILD_FORUM` or a `GUILD_MEDIA` channel
+  /// The IDs of the set of tags that have been applied to a thread in a `GUILD_FORUM` or a `GUILD_MEDIA` channel; limited to 5
   #[serde(skip_serializing_if = "Option::is_none")]
   pub applied_tags: Option<Vec<Snowflake>>,
 }

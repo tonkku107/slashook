@@ -111,6 +111,8 @@ pub struct Message {
   pub poll: Option<Poll>,
   /// The call associated with the message
   pub call: Option<MessageCall>,
+  /// The custom client-side theme shared via the message
+  pub shared_client_theme: Option<SharedClientTheme>,
 }
 
 /// Discord Channel Mention Object
@@ -136,7 +138,7 @@ pub struct Attachment {
   pub filename: String,
   /// The title of the file
   pub title: Option<String>,
-  /// Description for the file
+  /// Description (alt text) for the file (max 1024 characters)
   pub description: Option<String>,
   /// The attachment's [media type](https://en.wikipedia.org/wiki/Media_type)
   pub content_type: Option<String>,
@@ -146,10 +148,14 @@ pub struct Attachment {
   pub url: String,
   /// A proxied url of file
   pub proxy_url: String,
-  /// Height of file (if image)
+  /// Height of file (if image or video)
   pub height: Option<i64>,
-  /// Width of file (if image)
+  /// Width of file (if image or video)
   pub width: Option<i64>,
+  /// Thumbhash placeholder (if image or video)
+  pub placeholder: Option<String>,
+  /// Version of the placeholder (if image or video)
+  pub placeholder_version: Option<i64>,
   /// Whether this attachment is ephemeral
   pub ephemeral: Option<bool>,
   /// The duration of the audio file (currently for voice messages)
@@ -158,14 +164,28 @@ pub struct Attachment {
   pub waveform: Option<String>,
   /// [Attachment flags](AttachmentFlags) combined as a bitfield
   pub flags: Option<AttachmentFlags>,
+  /// For Clips, array of users who were in the stream
+  pub clip_participants: Option<Vec<User>>,
+  /// For Clips, when the clip was created
+  pub clip_created_at: Option<DateTime<Utc>>,
+  /// For Clips, the application in the stream, if recognized
+  pub application: Option<Application>,
 }
 
 bitflags! {
   /// Bitflags for Discord Attachment Flags
   #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
   pub struct AttachmentFlags: u32 {
-    /// This attachment has been edited using the remix feature on mobile
+    /// This attachment is a [Clip from a stream](https://support.discord.com/hc/en-us/articles/16861982215703)
+    const IS_CLIP = 1 << 0;
+    /// This attachment is the thumbnail of a thread in a media channel, displayed in the grid but not on the message
+    const IS_THUMBNAIL = 1 << 1;
+    /// This attachment has been edited using the remix feature on mobile (deprecated)
     const IS_REMIX = 1 << 2;
+    /// This attachment was marked as a spoiler and is blurred until clicked
+    const IS_SPOILER = 1 << 3;
+    /// This attachment is an animated image
+    const IS_ANIMATED = 1 << 5;
   }
 }
 
@@ -456,6 +476,40 @@ pub struct MessageCall {
   pub participants: Vec<Snowflake>,
   /// Time when call ended
   pub ended_timestamp: Option<DateTime<Utc>>,
+}
+
+/// Discord Shared Client Theme Object
+#[derive(Deserialize, Clone, Debug)]
+pub struct SharedClientTheme {
+  /// The hexadecimal-encoded colors of the theme (max of 5)
+  pub colors: Vec<String>,
+  /// The direction of the theme’s colors (max of 360)
+  pub gradient_angle: i64,
+  /// The intensity of the theme’s colors (max of 100)
+  pub base_mix: i64,
+  /// The mode of the theme
+  pub base_theme: Option<BaseThemeType>,
+}
+
+/// Discord Base Theme Types
+#[derive(Deserialize_repr, Default, Clone, Debug)]
+#[repr(u8)]
+#[allow(non_camel_case_types)]
+pub enum BaseThemeType {
+  /// Equivalent to `DARK`
+  #[default]
+  UNSET = 0,
+  /// Ash theme
+  DARK = 1,
+  /// Light theme
+  LIGHT = 2,
+  /// Dark theme
+  DARKER = 3,
+  /// Onyx theme
+  MIDNIGHT = 4,
+  /// Base theme type that hasn't been implemented yet
+  #[serde(other)]
+  UNKNOWN,
 }
 
 /// Options for fetching multiple messages with [`fetch_many`](Message::fetch_many).
@@ -1155,10 +1209,15 @@ impl Attachment {
       proxy_url: String::from(""),
       height: None,
       width: None,
+      placeholder: None,
+      placeholder_version: None,
       ephemeral: None,
       duration_secs: None,
       waveform: None,
-      flags: None
+      flags: None,
+      clip_participants: None,
+      clip_created_at: None,
+      application: None,
     }
   }
 
@@ -1174,10 +1233,15 @@ impl Attachment {
       proxy_url: String::from(""),
       height: None,
       width: None,
+      placeholder: None,
+      placeholder_version: None,
       ephemeral: None,
       duration_secs: file.duration_secs,
       waveform: file.waveform.clone(),
-      flags: None
+      flags: None,
+      clip_participants: None,
+      clip_created_at: None,
+      application: None,
     }
   }
 }
