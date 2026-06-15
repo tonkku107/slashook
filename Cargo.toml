@@ -17,7 +17,7 @@ serde_json = "^1.0.150"
 serde_repr = "^0.1.20"
 serde_qs = "^1.1.2"
 bitflags = "^2.13.0"
-reqwest = { version = "^0.12.28", features = ["json", "multipart"] }
+reqwest = { version = "^0.13.4", default-features = false, features = ["charset", "http2", "system-proxy", "native-tls", "json", "multipart", "query", "form"] }
 ring = "^0.17.14"
 hex = "^0.4.3"
 chrono = { version = "^0.4.45", features = ["serde"] }
