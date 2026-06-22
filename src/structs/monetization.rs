@@ -195,10 +195,10 @@ pub struct Subscription {
 pub enum SubscriptionStatus {
   /// Subscription is active and scheduled to renew.
   ACTIVE = 0,
+   /// Subscription is inactive and not being charged.
+  INACTIVE = 1,
   /// Subscription is active but will not renew.
-  ENDING = 1,
-  /// Subscription is inactive and not being charged.
-  INACTIVE = 2,
+  ENDING = 2,
   /// A subscription status that hasn't been implemented yet
   #[serde(other)]
   UNKNOWN
