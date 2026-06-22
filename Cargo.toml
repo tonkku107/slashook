@@ -12,18 +12,18 @@ license = "MIT OR Apache-2.0"
 [dependencies]
 slashook-macros = { version = "=0.5.0", path = "./macros" }
 rocket = "^0.5.1"
-serde = "^1.0.219"
-serde_json = "^1.0.140"
+serde = "^1.0.228"
+serde_json = "^1.0.150"
 serde_repr = "^0.1.20"
-serde_qs = "^1.0.0"
-bitflags = "^2.9.0"
-reqwest = { version = "^0.12.15", features = ["json", "multipart"] }
+serde_qs = "^1.1.2"
+bitflags = "^2.13.0"
+reqwest = { version = "^0.13.4", default-features = false, features = ["charset", "http2", "system-proxy", "native-tls", "json", "multipart", "query", "form"] }
 ring = "^0.17.14"
 hex = "^0.4.3"
-chrono = { version = "^0.4.40", features = ["serde"] }
-thiserror = "^2.0.12"
-anyhow = "^1.0.98"
+chrono = { version = "^0.4.45", features = ["serde"] }
+thiserror = "^2.0.18"
+anyhow = "^1.0.102"
 common-multipart-rfc7578 = "^0.7.0"
-tokio-util = { version = "^0.7.15", features = ["io"] }
+tokio-util = { version = "^0.7.18", features = ["io"] }
 infer = "^0.19.0"
 base64 = "^0.22.1"
